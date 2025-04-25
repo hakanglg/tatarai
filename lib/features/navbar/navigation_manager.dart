@@ -1,0 +1,132 @@
+import 'package:flutter/cupertino.dart';
+import 'package:tatarai/core/utils/logger.dart';
+import 'package:tatarai/features/home/views/home_tab_content.dart';
+import 'package:tatarai/features/plant_analysis/views/analysis_screen.dart';
+import 'package:tatarai/features/profile/views/profile_screen.dart';
+
+/// Navigasyon öğeleri için varsayılan ikonlar ve başlıklar
+class NavigationItems {
+  /// Home tab item - iOS stil ev ikonu
+  static const BottomNavigationBarItem homeTab = BottomNavigationBarItem(
+    icon: Icon(CupertinoIcons.house),
+    activeIcon: Icon(CupertinoIcons.house_fill),
+    label: 'Ana Sayfa',
+  );
+
+  /// Analysis tab item - iOS stil kamera ikonu
+  static const BottomNavigationBarItem analysisTab = BottomNavigationBarItem(
+    icon: Icon(CupertinoIcons.camera),
+    activeIcon: Icon(CupertinoIcons.camera_fill),
+    label: 'Analiz',
+  );
+
+  /// Profile tab item - iOS stil profil ikonu
+  static const BottomNavigationBarItem profileTab = BottomNavigationBarItem(
+    icon: Icon(CupertinoIcons.person),
+    activeIcon: Icon(CupertinoIcons.person_fill),
+    label: 'Profil',
+  );
+
+  /// Tüm tab itemlarını içeren liste
+  static const List<BottomNavigationBarItem> allTabs = [
+    homeTab,
+    analysisTab,
+    profileTab,
+  ];
+}
+
+/// Navigasyon yöneticisi sınıfı
+/// Tab değişimlerini ve ekran yüklemelerini yönetir
+class NavigationManager with ChangeNotifier {
+  // Singleton instance
+  static NavigationManager? _instance;
+
+  /// Singleton instance getter
+  static NavigationManager? get instance => _instance;
+
+  /// Singleton instance oluşturucu
+  static NavigationManager? initialize({int initialIndex = 0}) {
+    try {
+      if (_instance == null) {
+        AppLogger.i('NavigationManager başlatılıyor (index: $initialIndex)');
+        _instance = NavigationManager._internal(initialIndex: initialIndex);
+        AppLogger.i('NavigationManager başarıyla başlatıldı');
+      } else {
+        // Eğer zaten instance varsa, sadece index'i güncelle
+        AppLogger.i('NavigationManager zaten başlatılmış, index güncelleniyor');
+        _instance!._tabController.index = initialIndex;
+        _instance!._currentIndex = initialIndex;
+        _instance!.notifyListeners();
+      }
+      return _instance;
+    } catch (e, stack) {
+      AppLogger.e('NavigationManager başlatma hatası', e, stack);
+      return null;
+    }
+  }
+
+  int _currentIndex = 0;
+  late List<Widget> _screens;
+  late final CupertinoTabController _tabController;
+
+  /// Geçerli sekme indeksi
+  int get currentIndex => _currentIndex;
+
+  /// Tab controller
+  CupertinoTabController get tabController => _tabController;
+
+  /// Ekran listesi
+  List<Widget> get screens => _screens;
+
+  /// Private constructor for singleton pattern
+  NavigationManager._internal({int initialIndex = 0}) {
+    _currentIndex = initialIndex;
+    _tabController = CupertinoTabController(initialIndex: initialIndex);
+    _tabController.addListener(_handleTabChange);
+    _initScreens();
+  }
+
+  /// Ekranları başlat
+  void _initScreens() {
+    try {
+      _screens = [
+        const HomeTabContent(),
+        const AnalysisScreen(),
+        const ProfileScreen(),
+      ];
+    } catch (e, stack) {
+      AppLogger.e('Ekranları yüklerken hata', e, stack);
+      _screens = List.generate(
+        NavigationItems.allTabs.length,
+        (_) => const SizedBox.shrink(),
+      );
+    }
+  }
+
+  /// Tab değişikliğini dinle
+  void _handleTabChange() {
+    if (_currentIndex != _tabController.index) {
+      _currentIndex = _tabController.index;
+      notifyListeners();
+    }
+  }
+
+  /// Belirli bir tab'a geçiş yap
+  void switchToTab(int index) {
+    if (index >= 0 && index < NavigationItems.allTabs.length) {
+      _tabController.index = index;
+      _currentIndex = index;
+      notifyListeners();
+    } else {
+      AppLogger.w('Geçersiz sekme indeksi: $index');
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabController.removeListener(_handleTabChange);
+    _tabController.dispose();
+    _instance = null;
+    super.dispose();
+  }
+}

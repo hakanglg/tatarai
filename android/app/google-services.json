@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "15603377427",
+    "project_id": "tatar-ai",
+    "storage_bucket": "tatar-ai.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:15603377427:android:38b10fff96cd72941026e6",
+        "android_client_info": {
+          "package_name": "com.xovasoftware.tatarai"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "15603377427-3jf4rj64sonf7u4v4gdgkjcvbkdss77f.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA96Uqpu0fDNlxe0JXLpjmJu4LGPnMXT1M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "15603377427-3jf4rj64sonf7u4v4gdgkjcvbkdss77f.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "15603377427-d682f3kgdrsfparkncpm45sstdmked9b.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.xovasoftware.tatarai"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

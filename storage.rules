@@ -1,0 +1,19 @@
+rules_version = '2';
+
+// Craft rules based on data in your Firestore database
+// allow write: if firestore.get(
+//    /databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin;
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Test modunda herkesin tüm dosyalara erişmesine izin ver
+    match /{allPaths=**} {
+      allow read, write: if true;
+    }
+    
+    // Sonraki aşamada daha güvenli kurallar ekleyebilirsiniz:
+    // match /{userId}/{allImages=**} {
+    //   allow read: if request.auth != null; // Tüm kullanıcılar görebilir
+    //   allow write: if request.auth != null && request.auth.uid == userId; // Sadece kendi dosyalarına yazabilir
+    // }
+  }
+}
