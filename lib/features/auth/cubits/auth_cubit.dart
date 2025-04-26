@@ -18,9 +18,9 @@ class AuthCubit extends Cubit<AuthState> {
   AuthCubit({
     required UserRepository userRepository,
     required AuthService authService,
-  }) : _userRepository = userRepository,
-       _authService = authService,
-       super(AuthState.initial()) {
+  })  : _userRepository = userRepository,
+        _authService = authService,
+        super(AuthState.initial()) {
     _init();
   }
 
@@ -361,6 +361,27 @@ class AuthCubit extends Cubit<AuthState> {
     return _authService.getMessageFromErrorCode(exception.code);
   }
 
+  /// Kullanıcı hesabını siler
+  Future<void> deleteAccount() async {
+    try {
+      emit(state.copyWith(isLoading: true, errorMessage: null));
+      logInfo('Hesap siliniyor');
+
+      await _userRepository.deleteAccount();
+
+      emit(AuthState.unauthenticated());
+      logSuccess('Hesap silme başarılı');
+    } catch (e) {
+      logError('Hesap silme hatası', e);
+      emit(
+        state.copyWith(
+          isLoading: false,
+          errorMessage: 'Hesap silinirken bir hata oluştu: ${e.toString()}',
+        ),
+      );
+    }
+  }
+
   /// Premium hesaba yükseltme
   Future<void> upgradeToPremium() async {
     try {
@@ -450,6 +471,36 @@ class AuthCubit extends Cubit<AuthState> {
     }
 
     return hasCredits;
+  }
+
+  /// Kullanıcı profil bilgilerini günceller
+  Future<void> updateProfile({String? displayName, String? photoURL}) async {
+    try {
+      emit(state.copyWith(isLoading: true, errorMessage: null));
+      logInfo('Profil güncelleniyor');
+
+      final updatedUser = await _userRepository.updateProfile(
+        displayName: displayName,
+        photoURL: photoURL,
+      );
+
+      if (updatedUser != null) {
+        emit(state.copyWith(
+          user: updatedUser,
+          isLoading: false,
+        ));
+        logSuccess('Profil güncelleme başarılı');
+      } else {
+        emit(state.copyWith(isLoading: false));
+        logWarning('Profil güncellenemedi: Kullanıcı bilgisi alınamadı');
+      }
+    } catch (e) {
+      logError('Profil güncelleme hatası', e);
+      emit(state.copyWith(
+        isLoading: false,
+        errorMessage: 'Profil güncellenirken bir hata oluştu: ${e.toString()}',
+      ));
+    }
   }
 
   @override
