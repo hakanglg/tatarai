@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/cupertino.dart';
@@ -16,7 +17,12 @@ import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/core/widgets/app_button.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
 import 'package:tatarai/features/auth/models/auth_state.dart';
+import 'package:tatarai/features/auth/models/user_model.dart';
+import 'package:tatarai/features/auth/repositories/user_repository.dart';
+import 'package:tatarai/features/auth/services/auth_service.dart';
 import 'package:tatarai/features/payment/views/premium_screen.dart';
+import 'package:flutter/material.dart';
+import 'package:tatarai/features/profile/cubits/profile_cubit.dart';
 
 /// Kullanıcı profil bilgilerini gösteren ve düzenleyen ekran
 class ProfileScreen extends StatefulWidget {
@@ -32,443 +38,289 @@ class _ProfileScreenState extends State<ProfileScreen> {
   File? _selectedProfileImage;
   bool _isUploading = false;
 
-  Future<void> _pickImage() async {
-    try {
-      HapticFeedback.lightImpact();
-
-      showCupertinoModalPopup(
-        context: context,
-        builder: (context) => CupertinoActionSheet(
-          title: const Text('Profil Fotoğrafı'),
-          message:
-              const Text('Profil fotoğrafınızı nereden seçmek istersiniz?'),
-          actions: [
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.pop(context);
-                _pickImageFromSource(ImageSource.camera);
-              },
-              child: const Text('Kamera'),
-            ),
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.pop(context);
-                _pickImageFromSource(ImageSource.gallery);
-              },
-              child: const Text('Galeri'),
-            ),
-          ],
-          cancelButton: CupertinoActionSheetAction(
-            isDestructiveAction: true,
-            onPressed: () => Navigator.pop(context),
-            child: const Text('İptal'),
-          ),
-        ),
-      );
-    } catch (e) {
-      AppLogger.e('Profil fotoğrafı seçme hatası', e);
-    }
-  }
-
-  Future<void> _pickImageFromSource(ImageSource source) async {
-    try {
-      final XFile? image = await _imagePicker.pickImage(
-        source: source,
-        maxWidth: 800,
-        maxHeight: 800,
-        imageQuality: 85,
-      );
-
-      if (image != null) {
-        setState(() {
-          _selectedProfileImage = File(image.path);
-          _isUploading = true;
-        });
-
-        try {
-          // Resmi Firebase Storage'a yükle
-          final String imageUrl =
-              await _uploadProfileImage(_selectedProfileImage!);
-
-          // Kullanıcı profilini güncelle
-          await context.read<AuthCubit>().updateProfile(photoURL: imageUrl);
-
-          // Başarılı mesajı göster
-          if (mounted) {
-            _showSnackBar(context, 'Profil fotoğrafınız başarıyla güncellendi');
-          }
-        } catch (e) {
-          AppLogger.e('Profil fotoğrafı yükleme hatası', e);
-          if (mounted) {
-            _showSnackBar(context,
-                'Fotoğraf yüklenirken bir hata oluştu: ${e.toString()}');
-          }
-        } finally {
-          if (mounted) {
-            setState(() {
-              _isUploading = false;
-            });
-          }
-        }
-      }
-    } catch (e) {
-      setState(() {
-        _isUploading = false;
-      });
-      AppLogger.e('Profil fotoğrafı seçme hatası', e);
-    }
-  }
-
-  /// Profil fotoğrafını Firebase Storage'a yükler
-  Future<String> _uploadProfileImage(File imageFile) async {
-    try {
-      // Firebase Storage referansını al
-      final userId = context.read<AuthCubit>().state.user?.id;
-      if (userId == null) {
-        throw Exception('Kullanıcı oturum açmamış');
-      }
-
-      // Firebase Storage'da profil fotoğrafları için klasör oluştur
-      final storageRef = FirebaseStorage.instance.ref();
-      final profileImageRef = storageRef.child('profile_images/$userId.jpg');
-
-      // İmajı sıkıştır
-      final Uint8List compressedImage =
-          await FlutterImageCompress.compressWithFile(
-                imageFile.absolute.path,
-                quality: 85,
-                minWidth: 500,
-                minHeight: 500,
-              ) ??
-              await imageFile.readAsBytes();
-
-      // Storage'a yükle
-      final uploadTask = profileImageRef.putData(
-        compressedImage,
-        SettableMetadata(contentType: 'image/jpeg'),
-      );
-
-      // Yükleme tamamlanana kadar bekle
-      final TaskSnapshot taskSnapshot = await uploadTask;
-
-      // Yüklenen resmin URL'ini al
-      final downloadUrl = await taskSnapshot.ref.getDownloadURL();
-
-      AppLogger.i('Profil fotoğrafı başarıyla yüklendi: $downloadUrl');
-      return downloadUrl;
-    } catch (e) {
-      AppLogger.e('Profil fotoğrafı yükleme hatası (detay)', e);
-      throw Exception('Profil fotoğrafı yüklenirken bir hata oluştu');
-    }
-  }
-
-  /// Bildirim göster
-  void _showSnackBar(BuildContext context, String message) {
-    showCupertinoDialog(
-      context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: const Text('Bilgi'),
-        content: Text(message),
-        actions: [
-          CupertinoDialogAction(
-            child: const Text('Tamam'),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showDeleteAccountDialog() {
-    HapticFeedback.mediumImpact();
-
-    showCupertinoDialog(
-      context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: const Text('Hesabı Sil'),
-        content: const Text(
-          'Hesabınızı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz ve tüm verileriniz kalıcı olarak silinecektir.',
-        ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('İptal'),
-          ),
-          CupertinoDialogAction(
-            isDestructiveAction: true,
-            onPressed: () {
-              Navigator.pop(context);
-              context.read<AuthCubit>().deleteAccount();
-            },
-            child: const Text('Hesabı Sil'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    return _buildScreenContent(context);
+  }
+
+  Widget _buildScreenContent(BuildContext context) {
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         middle: const Text('Profil'),
       ),
       child: SafeArea(
-        child: BlocBuilder<AuthCubit, AuthState>(
+        child: BlocBuilder<ProfileCubit, ProfileState>(
           builder: (context, state) {
+            // Yükleniyor durumu
+            if (state.isLoading) {
+              return const Center(child: CupertinoActivityIndicator());
+            }
+
+            // Hata durumu
+            if (state.errorMessage != null) {
+              return Center(
+                child: Text(
+                  'Hata: ${state.errorMessage}',
+                  style: AppTextTheme.bodyText1
+                      .copyWith(color: CupertinoColors.systemRed),
+                  textAlign: TextAlign.center,
+                ),
+              );
+            }
+
             final user = state.user;
 
             if (user == null) {
               return const Center(child: Text('Oturum açık değil'));
             }
 
-            return CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.all(context.dimensions.paddingL),
-                    child: Column(
-                      children: [
-                        // Profil Fotoğrafı Bölümü
-                        _buildProfilePhoto(user),
-
-                        // Kullanıcı Bilgileri
-                        SizedBox(height: context.dimensions.spaceL),
-                        Text(
-                          user.displayName ?? user.email.split('@')[0],
-                          style: AppTextTheme.headline2,
-                        ),
-                        SizedBox(height: context.dimensions.spaceXS),
-                        Text(user.email,
-                            style: AppTextTheme.subtitle1.copyWith(
-                              color: CupertinoColors.systemGrey,
-                            )),
-
-                        // Üyelik Bilgileri Kartı
-                        SizedBox(height: context.dimensions.spaceL),
-                        _buildMembershipCard(user),
-                      ],
-                    ),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: context.dimensions.paddingL,
-                      vertical: context.dimensions.paddingM,
-                    ),
-                    child: Text(
-                      'Hesap Ayarları',
-                      style: AppTextTheme.headline5.copyWith(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-                SliverList(
-                  delegate: SliverChildListDelegate([
-                    _buildSettingsGroup(
-                      items: [
-                        if (!user.isEmailVerified) ...[
-                          _buildSettingsItem(
-                            title: 'E-posta Doğrulama',
-                            icon: CupertinoIcons.mail_solid,
-                            showTrailingIcon: false,
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: context.dimensions.paddingXS,
-                                    vertical: 4.0,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: CupertinoColors.systemRed
-                                        .withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(
-                                        context.dimensions.radiusXS),
-                                  ),
-                                  child: const Text(
-                                    'Doğrulanmadı',
-                                    style: TextStyle(
-                                      color: CupertinoColors.systemRed,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                CupertinoButton(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12.0,
-                                    vertical: 4.0,
-                                  ),
-                                  color: AppColors.primary,
-                                  borderRadius: BorderRadius.circular(
-                                      context.dimensions.radiusXS),
-                                  minSize: 0,
-                                  child: const Text(
-                                    'Doğrulama Gönder',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: CupertinoColors.white,
-                                    ),
-                                  ),
-                                  onPressed: () {
-                                    context
-                                        .read<AuthCubit>()
-                                        .sendEmailVerification();
-                                    _showVerificationDialog(context);
-                                  },
-                                ),
-                              ],
-                            ),
-                            onTap: () {},
-                          ),
-                          _buildSettingsItem(
-                            title: 'Doğrulama Durumunu Güncelle',
-                            icon: CupertinoIcons.refresh,
-                            showTrailingIcon: false,
-                            trailing: CupertinoButton(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12.0,
-                                vertical: 4.0,
-                              ),
-                              color: AppColors.secondary,
-                              borderRadius: BorderRadius.circular(
-                                  context.dimensions.radiusXS),
-                              minSize: 0,
-                              child: const Text(
-                                'Güncelle',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: CupertinoColors.white,
-                                ),
-                              ),
-                              onPressed: () {
-                                context
-                                    .read<AuthCubit>()
-                                    .refreshEmailVerificationStatus();
-                                _showRefreshEmailDialog(context);
-                              },
-                            ),
-                            onTap: () {},
-                          ),
-                        ],
-                      ],
-                    ),
-                    SizedBox(height: context.dimensions.spaceM),
-                    _buildSettingsGroup(
-                      header: 'Satın Alma',
-                      items: [
-                        _buildSettingsItem(
-                          title: 'Premium\'a Yükselt',
-                          subtitle: user.isPremium
-                              ? 'Premium üyeliğiniz aktif'
-                              : 'Sınırsız analiz ve özel özellikler',
-                          icon: CupertinoIcons.star_circle_fill,
-                          iconColor: CupertinoColors.systemYellow,
-                          showTrailingIcon: !user.isPremium,
-                          trailing: user.isPremium
-                              ? Container(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: context.dimensions.paddingXS,
-                                    vertical: 4.0,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: CupertinoColors.systemGreen
-                                        .withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(
-                                        context.dimensions.radiusXS),
-                                  ),
-                                  child: const Text(
-                                    'Aktif',
-                                    style: TextStyle(
-                                      color: CupertinoColors.systemGreen,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                )
-                              : null,
-                          onTap: user.isPremium
-                              ? () {}
-                              : () {
-                                  Navigator.of(context).push(
-                                    CupertinoPageRoute(
-                                      builder: (context) =>
-                                          const PremiumScreen(),
-                                    ),
-                                  );
-                                },
-                        ),
-                        _buildSettingsItem(
-                          title: 'Kredi Satın Al',
-                          subtitle: 'Mevcut krediniz: ${user.analysisCredits}',
-                          icon: CupertinoIcons.cart_fill,
-                          iconColor: AppColors.secondary,
-                          onTap: () {
-                            // TODO: Kredi satın alma ekranına yönlendir
-                          },
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: context.dimensions.spaceM),
-                    _buildSettingsGroup(
-                      header: 'Uygulama',
-                      items: [
-                        _buildSettingsItem(
-                          title: 'Yardım',
-                          subtitle: 'Sık sorulan sorular ve destek',
-                          icon: CupertinoIcons.question_circle_fill,
-                          iconColor: CupertinoColors.systemBlue,
-                          onTap: () {},
-                        ),
-                        _buildSettingsItem(
-                          title: 'Hakkında',
-                          subtitle: 'Uygulama bilgileri ve sürüm',
-                          icon: CupertinoIcons.info_circle_fill,
-                          iconColor: CupertinoColors.systemGrey,
-                          onTap: () {},
-                        ),
-                        _buildSettingsItem(
-                          title: 'Hesabı Sil',
-                          subtitle:
-                              'Tüm verileriniz kalıcı olarak silinecektir',
-                          icon: CupertinoIcons.delete,
-                          iconColor: CupertinoColors.systemGrey,
-                          onTap: _showDeleteAccountDialog,
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: context.dimensions.spaceXL),
-
-                    // Çıkış yap butonu
-                    Padding(
-                      padding: EdgeInsets.symmetric(
-                          horizontal: context.dimensions.paddingL),
-                      child: AppButton(
-                        type: AppButtonType.destructive,
-                        text: 'Çıkış Yap',
-                        isLoading: state.isLoading,
-                        icon: CupertinoIcons.square_arrow_right,
-                        onPressed: () => _showLogoutDialog(context),
-                      ),
-                    ),
-
-                    SizedBox(height: context.dimensions.spaceXXL),
-                  ]),
-                ),
-              ],
-            );
+            return _buildUserProfile(context, user);
           },
         ),
       ),
     );
   }
 
-  Widget _buildProfilePhoto(user) {
+  Widget _buildUserProfile(BuildContext context, UserModel user) {
+    return CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.all(context.dimensions.paddingL),
+            child: Column(
+              children: [
+                // Profil Fotoğrafı Bölümü
+                _buildProfilePhoto(user),
+
+                // Kullanıcı Bilgileri
+                SizedBox(height: context.dimensions.spaceL),
+                Text(
+                  user.displayName ?? user.email.split('@')[0],
+                  style: AppTextTheme.headline2,
+                ),
+                SizedBox(height: context.dimensions.spaceXS),
+                Text(user.email,
+                    style: AppTextTheme.subtitle1.copyWith(
+                      color: CupertinoColors.systemGrey,
+                    )),
+
+                // Üyelik Bilgileri Kartı
+                SizedBox(height: context.dimensions.spaceL),
+                _buildMembershipCard(user),
+              ],
+            ),
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: context.dimensions.paddingL,
+              vertical: context.dimensions.paddingM,
+            ),
+            child: Text(
+              'Hesap Ayarları',
+              style: AppTextTheme.headline5.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+        SliverList(
+          delegate: SliverChildListDelegate([
+            _buildSettingsGroup(
+              items: [
+                if (!user.isEmailVerified) ...[
+                  _buildSettingsItem(
+                    title: 'E-posta Doğrulama',
+                    icon: CupertinoIcons.mail_solid,
+                    showTrailingIcon: false,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: context.dimensions.paddingXS,
+                            vertical: 4.0,
+                          ),
+                          decoration: BoxDecoration(
+                            color: CupertinoColors.systemRed.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(
+                                context.dimensions.radiusXS),
+                          ),
+                          child: const Text(
+                            'Doğrulanmadı',
+                            style: TextStyle(
+                              color: CupertinoColors.systemRed,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        CupertinoButton(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12.0,
+                            vertical: 4.0,
+                          ),
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(
+                              context.dimensions.radiusXS),
+                          minSize: 0,
+                          child: const Text(
+                            'Doğrulama Gönder',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: CupertinoColors.white,
+                            ),
+                          ),
+                          onPressed: () {
+                            context
+                                .read<ProfileCubit>()
+                                .sendEmailVerification();
+                            _showVerificationDialog(context);
+                          },
+                        ),
+                      ],
+                    ),
+                    onTap: () {},
+                  ),
+                  _buildSettingsItem(
+                    title: 'Doğrulama Durumunu Güncelle',
+                    icon: CupertinoIcons.refresh,
+                    showTrailingIcon: false,
+                    trailing: CupertinoButton(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12.0,
+                        vertical: 4.0,
+                      ),
+                      color: AppColors.secondary,
+                      borderRadius:
+                          BorderRadius.circular(context.dimensions.radiusXS),
+                      minSize: 0,
+                      child: const Text(
+                        'Güncelle',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: CupertinoColors.white,
+                        ),
+                      ),
+                      onPressed: () {
+                        context
+                            .read<ProfileCubit>()
+                            .refreshEmailVerificationStatus();
+                        _showRefreshEmailDialog(context);
+                      },
+                    ),
+                    onTap: () {},
+                  ),
+                ],
+              ],
+            ),
+            SizedBox(height: context.dimensions.spaceM),
+            _buildSettingsGroup(
+              header: 'Satın Alma',
+              items: [
+                _buildSettingsItem(
+                  title: 'Premium\'a Yükselt',
+                  subtitle: user.isPremium
+                      ? 'Premium üyeliğiniz aktif'
+                      : 'Sınırsız analiz ve özel özellikler',
+                  icon: CupertinoIcons.star_circle_fill,
+                  iconColor: CupertinoColors.systemYellow,
+                  showTrailingIcon: !user.isPremium,
+                  trailing: user.isPremium
+                      ? Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: context.dimensions.paddingXS,
+                            vertical: 4.0,
+                          ),
+                          decoration: BoxDecoration(
+                            color: CupertinoColors.systemGreen.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(
+                                context.dimensions.radiusXS),
+                          ),
+                          child: const Text(
+                            'Aktif',
+                            style: TextStyle(
+                              color: CupertinoColors.systemGreen,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        )
+                      : null,
+                  onTap: user.isPremium
+                      ? () {}
+                      : () {
+                          Navigator.of(context).push(
+                            CupertinoPageRoute(
+                              builder: (context) => const PremiumScreen(),
+                            ),
+                          );
+                        },
+                ),
+                _buildSettingsItem(
+                  title: 'Kredi Satın Al',
+                  subtitle: 'Mevcut krediniz: ${user.analysisCredits}',
+                  icon: CupertinoIcons.cart_fill,
+                  iconColor: AppColors.secondary,
+                  onTap: () {
+                    // TODO: Kredi satın alma ekranına yönlendir
+                  },
+                ),
+              ],
+            ),
+            SizedBox(height: context.dimensions.spaceM),
+            _buildSettingsGroup(
+              header: 'Uygulama',
+              items: [
+                _buildSettingsItem(
+                  title: 'Yardım',
+                  subtitle: 'Sık sorulan sorular ve destek',
+                  icon: CupertinoIcons.question_circle_fill,
+                  iconColor: CupertinoColors.systemBlue,
+                  onTap: () {},
+                ),
+                _buildSettingsItem(
+                  title: 'Hakkında',
+                  subtitle: 'Uygulama bilgileri ve sürüm',
+                  icon: CupertinoIcons.info_circle_fill,
+                  iconColor: CupertinoColors.systemGrey,
+                  onTap: () {},
+                ),
+                _buildSettingsItem(
+                  title: 'Hesabı Sil',
+                  subtitle: 'Tüm verileriniz kalıcı olarak silinecektir',
+                  icon: CupertinoIcons.delete,
+                  iconColor: CupertinoColors.systemGrey,
+                  onTap: _showDeleteAccountDialog,
+                ),
+              ],
+            ),
+            SizedBox(height: context.dimensions.spaceXL),
+
+            // Çıkış yap butonu
+            Padding(
+              padding:
+                  EdgeInsets.symmetric(horizontal: context.dimensions.paddingL),
+              child: AppButton(
+                type: AppButtonType.destructive,
+                text: 'Çıkış Yap',
+                isLoading: context.read<AuthCubit>().state.isLoading,
+                icon: CupertinoIcons.square_arrow_right,
+                onPressed: () => _showLogoutDialog(context),
+              ),
+            ),
+
+            SizedBox(height: context.dimensions.spaceXXL),
+          ]),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProfilePhoto(UserModel user) {
     return GestureDetector(
       onTap: _pickImage,
       child: Stack(
@@ -539,7 +391,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildMembershipCard(user) {
+  Widget _buildMembershipCard(UserModel user) {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(context.dimensions.paddingL),
@@ -548,80 +400,238 @@ class _ProfileScreenState extends State<ProfileScreen> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: user.isPremium
-              ? [AppColors.primary, AppColors.secondary]
+              ? [
+                  const Color(0xFF1E7D32), // Daha koyu yeşil
+                  const Color(0xFF2E7D32), // Ana yeşil
+                  const Color(0xFF388E3C), // Açık yeşil
+                ]
               : [
-                  const Color(0xFF4CAF50),
-                  const Color(0xFF8BC34A),
-                  const Color(0xFF7CB342),
-                  const Color(0xFF43A047),
+                  const Color(0xFF78909C), // Gri-mavi
+                  const Color(0xFF607D8B), // Daha koyu gri-mavi
+                  const Color(0xFF546E7A), // En koyu gri-mavi
                 ],
-          stops: user.isPremium ? null : const [0.0, 0.4, 0.7, 1.0],
+          stops: const [0.0, 0.6, 1.0],
         ),
         borderRadius: BorderRadius.circular(context.dimensions.radiusL),
         boxShadow: [
           BoxShadow(
-            color: user.isPremium
-                ? AppColors.primary.withOpacity(0.3)
-                : const Color(0xFF4CAF50).withOpacity(0.3),
+            color: Colors.black.withOpacity(0.2),
             blurRadius: 15,
-            offset: const Offset(0, 5),
+            offset: const Offset(0, 8),
+          ),
+          BoxShadow(
+            color: Colors.white.withOpacity(0.1),
+            blurRadius: 5,
+            offset: const Offset(0, -2),
+            spreadRadius: -3,
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          // Arka plan dekoratif elemanları
+          Positioned(
+            right: -25,
+            top: -25,
+            child: Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          Positioned(
+            left: -15,
+            bottom: -20,
+            child: Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+
+          // Kart içeriği
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                user.isPremium ? 'Premium Üye' : 'Standart Üye',
-                style: AppTextTheme.subtitle1.copyWith(
-                  color: CupertinoColors.white,
-                  fontWeight: FontWeight.bold,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Sol taraf: Logo ve üyelik tipi
+                  Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          user.isPremium
+                              ? CupertinoIcons.star_fill
+                              : CupertinoIcons.person_fill,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                      SizedBox(width: context.dimensions.spaceM),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            user.isPremium ? 'Premium Üye' : 'Standart Üye',
+                            style: AppTextTheme.subtitle1.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            user.isPremium
+                                ? 'Tüm özelliklere erişim'
+                                : 'Sınırlı erişim',
+                            style: AppTextTheme.caption.copyWith(
+                              color: Colors.white.withOpacity(0.7),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+
+                  // Sağ taraf: Premium rozeti
+                  if (user.isPremium)
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: context.dimensions.paddingS,
+                        vertical: context.dimensions.paddingXS / 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.amber,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            CupertinoIcons.star_fill,
+                            color: Colors.amber,
+                            size: 14,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            'PRO',
+                            style: TextStyle(
+                              color: Colors.amber,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+
+              SizedBox(height: context.dimensions.spaceL),
+
+              // Analiz kredileri göstergesi
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Kalan Analiz',
+                        style: AppTextTheme.bodyText2.copyWith(
+                          color: Colors.white.withOpacity(0.8),
+                        ),
+                      ),
+                      Text(
+                        '${user.analysisCredits}',
+                        style: AppTextTheme.headline6.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: context.dimensions.spaceS),
+
+                  // İlerleme çubuğu
+                  ClipRRect(
+                    borderRadius:
+                        BorderRadius.circular(context.dimensions.radiusS),
+                    child: LinearProgressIndicator(
+                      value: user.isPremium
+                          ? 1.0
+                          : (user.analysisCredits / 10)
+                              .clamp(0.0, 1.0), // 10 maksimum kredi varsayımı
+                      backgroundColor: Colors.white.withOpacity(0.2),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        user.isPremium ? Colors.amber : Colors.white,
+                      ),
+                      minHeight: 6,
+                    ),
+                  ),
+                ],
+              ),
+
+              SizedBox(height: context.dimensions.spaceL),
+
+              // Premium olmayan kullanıcılar için yükseltme butonu
+              if (!user.isPremium)
+                Container(
+                  width: double.infinity,
+                  child: CupertinoButton(
+                    padding: EdgeInsets.symmetric(
+                      vertical: context.dimensions.paddingS,
+                    ),
+                    color: Colors.white,
+                    borderRadius:
+                        BorderRadius.circular(context.dimensions.radiusM),
+                    minSize: 0,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          CupertinoIcons.arrow_up_circle_fill,
+                          color: const Color(0xFF1E7D32),
+                          size: 18,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Premium\'a Yükselt',
+                          style: TextStyle(
+                            color: const Color(0xFF1E7D32),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        CupertinoPageRoute(
+                          builder: (context) => const PremiumScreen(),
+                        ),
+                      );
+                    },
+                  ),
                 ),
-              ),
-              Icon(
-                user.isPremium
-                    ? CupertinoIcons.star_fill
-                    : CupertinoIcons.leaf_arrow_circlepath,
-                color: CupertinoColors.white,
-                size: 24,
-              ),
             ],
           ),
-          SizedBox(height: context.dimensions.spaceM),
-          Text(
-            'Kalan Analiz: ${user.analysisCredits}',
-            style: AppTextTheme.bodyText1.copyWith(
-              color: CupertinoColors.white,
-            ),
-          ),
-          SizedBox(height: context.dimensions.spaceM),
-          if (!user.isPremium)
-            CupertinoButton(
-              padding: EdgeInsets.symmetric(
-                horizontal: context.dimensions.paddingM,
-                vertical: context.dimensions.paddingXS,
-              ),
-              color: CupertinoColors.white,
-              borderRadius: BorderRadius.circular(context.dimensions.radiusM),
-              minSize: 0,
-              child: Text(
-                'Premium\'a Yükselt',
-                style: TextStyle(
-                  color: const Color(0xFF4CAF50),
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              onPressed: () {
-                Navigator.of(context).push(
-                  CupertinoPageRoute(
-                    builder: (context) => const PremiumScreen(),
-                  ),
-                );
-              },
-            ),
         ],
       ),
     );
@@ -757,7 +767,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             isDestructiveAction: true,
             onPressed: () {
               Navigator.pop(context);
-              context.read<AuthCubit>().signOut();
+              context.read<ProfileCubit>().signOut();
               context.goNamed(RouteNames.login);
             },
             child: const Text('Çıkış Yap'),
@@ -796,6 +806,189 @@ class _ProfileScreenState extends State<ProfileScreen> {
           'E-posta doğrulama durumunuz kontrol edildi. '
           'Eğer e-postanızı doğruladıysanız, profil bilgileriniz güncellenecektir.',
         ),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('Tamam'),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteAccountDialog() {
+    HapticFeedback.mediumImpact();
+
+    showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('Hesabı Sil'),
+        content: const Text(
+          'Hesabınızı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz ve tüm verileriniz kalıcı olarak silinecektir.',
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('İptal'),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () {
+              Navigator.pop(context);
+              context.read<ProfileCubit>().deleteAccount();
+            },
+            child: const Text('Hesabı Sil'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      HapticFeedback.lightImpact();
+
+      showCupertinoModalPopup(
+        context: context,
+        builder: (context) => CupertinoActionSheet(
+          title: const Text('Profil Fotoğrafı'),
+          message:
+              const Text('Profil fotoğrafınızı nereden seçmek istersiniz?'),
+          actions: [
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.pop(context);
+                _pickImageFromSource(ImageSource.camera);
+              },
+              child: const Text('Kamera'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.pop(context);
+                _pickImageFromSource(ImageSource.gallery);
+              },
+              child: const Text('Galeri'),
+            ),
+          ],
+          cancelButton: CupertinoActionSheetAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.pop(context),
+            child: const Text('İptal'),
+          ),
+        ),
+      );
+    } catch (e) {
+      AppLogger.e('Profil fotoğrafı seçme hatası', e);
+    }
+  }
+
+  Future<void> _pickImageFromSource(ImageSource source) async {
+    try {
+      final profileCubit = context.read<ProfileCubit>();
+      final XFile? image = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        setState(() {
+          _selectedProfileImage = File(image.path);
+          _isUploading = true;
+        });
+
+        // ProfileCubit'e yükleme durumunu bildir
+        profileCubit.setImageUploading(true);
+
+        try {
+          // Resmi Firebase Storage'a yükle
+          final String imageUrl =
+              await _uploadProfileImage(_selectedProfileImage!);
+
+          // Kullanıcı profilini güncelle
+          await profileCubit.updateProfile(photoURL: imageUrl);
+
+          // Başarılı mesajı göster
+          if (mounted) {
+            _showSnackBar(context, 'Profil fotoğrafınız başarıyla güncellendi');
+          }
+        } catch (e) {
+          AppLogger.e('Profil fotoğrafı yükleme hatası', e);
+          if (mounted) {
+            _showSnackBar(context,
+                'Fotoğraf yüklenirken bir hata oluştu: ${e.toString()}');
+          }
+        } finally {
+          if (mounted) {
+            setState(() {
+              _isUploading = false;
+            });
+
+            // ProfileCubit'e yükleme durumunu bildir
+            profileCubit.setImageUploading(false);
+          }
+        }
+      }
+    } catch (e) {
+      setState(() {
+        _isUploading = false;
+      });
+      context.read<ProfileCubit>().setImageUploading(false);
+      AppLogger.e('Profil fotoğrafı seçme hatası', e);
+    }
+  }
+
+  /// Profil fotoğrafını Firebase Storage'a yükler
+  Future<String> _uploadProfileImage(File imageFile) async {
+    try {
+      // Firebase Storage referansını al
+      final userId = context.read<ProfileCubit>().state.user?.id;
+      if (userId == null) {
+        throw Exception('Kullanıcı oturum açmamış');
+      }
+
+      // Firebase Storage'da profil fotoğrafları için klasör oluştur
+      final storageRef = FirebaseStorage.instance.ref();
+      final profileImageRef = storageRef.child('profile_images/$userId.jpg');
+
+      // İmajı sıkıştır
+      final Uint8List compressedImage =
+          await FlutterImageCompress.compressWithFile(
+                imageFile.absolute.path,
+                quality: 85,
+                minWidth: 500,
+                minHeight: 500,
+              ) ??
+              await imageFile.readAsBytes();
+
+      // Storage'a yükle
+      final uploadTask = profileImageRef.putData(
+        compressedImage,
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
+
+      // Yükleme tamamlanana kadar bekle
+      final TaskSnapshot taskSnapshot = await uploadTask;
+
+      // Yüklenen resmin URL'ini al
+      final downloadUrl = await taskSnapshot.ref.getDownloadURL();
+
+      AppLogger.i('Profil fotoğrafı başarıyla yüklendi: $downloadUrl');
+      return downloadUrl;
+    } catch (e) {
+      AppLogger.e('Profil fotoğrafı yükleme hatası (detay)', e);
+      throw Exception('Profil fotoğrafı yüklenirken bir hata oluştu');
+    }
+  }
+
+  /// Bildirim göster
+  void _showSnackBar(BuildContext context, String message) {
+    showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('Bilgi'),
+        content: Text(message),
         actions: [
           CupertinoDialogAction(
             child: const Text('Tamam'),

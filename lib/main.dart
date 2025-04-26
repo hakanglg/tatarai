@@ -18,6 +18,7 @@ import 'package:tatarai/features/auth/services/auth_service.dart';
 import 'package:tatarai/features/plant_analysis/cubits/plant_analysis_cubit.dart';
 import 'package:tatarai/features/plant_analysis/services/gemini_service.dart';
 import 'package:tatarai/features/plant_analysis/services/plant_analysis_service.dart';
+import 'package:tatarai/features/profile/cubits/profile_cubit.dart';
 import 'package:tatarai/firebase_options.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -238,6 +239,13 @@ class TatarAI extends StatelessWidget {
         BlocProvider<PlantAnalysisCubit>(
           create: (context) =>
               PlantAnalysisCubit(repository: plantAnalysisRepository),
+        ),
+        // Profil Cubit'i
+        BlocProvider<ProfileCubit>(
+          create: (context) => ProfileCubit(
+            userRepository: userRepository,
+            authCubit: authCubit,
+          ),
         ),
         // Diğer Cubit'ler eklenecek (payment, vb.)
       ],

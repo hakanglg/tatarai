@@ -24,6 +24,9 @@ class AuthCubit extends Cubit<AuthState> {
     _init();
   }
 
+  /// Kullanıcı verilerini gerçek zamanlı olarak dinleyen stream
+  Stream<UserModel?> get userStream => _userRepository.user;
+
   // Log metotları
   void logInfo(String message) {
     AppLogger.i('AuthCubit: $message');

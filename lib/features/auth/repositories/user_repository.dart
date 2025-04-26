@@ -44,40 +44,68 @@ class UserRepository extends BaseRepository with CacheableMixin {
         return null;
       }
 
+      // Firebase Auth kullanıcısı mevcut, Firestore'da dinleme yapmak için stream başlat
+      // İlk değeri hemen döndürmek için
       try {
-        // Firestore'dan kullanıcı bilgilerini alma
-        UserModel userModel = await getUserData(firebaseUser.uid);
+        // Kullanıcı verilerini önce normal olarak al
+        final userData = await getUserData(firebaseUser.uid);
 
-        // Kullanıcı verisini önbelleğe alma
-        await cacheData(
-          _userCachePrefix + firebaseUser.uid,
-          userModel.toFirestore(),
-        );
+        // Arka planda stream'i başlat
+        getUserStream(firebaseUser.uid).listen((updatedUser) {
+          // Stream kullanıcı değişikliklerini otomatik olarak dinleyecek
+          // Herhangi bir şey yapmamıza gerek yok, Bloc/Cubit bunu dinliyor olacak
+        });
 
-        return userModel;
+        return userData;
       } catch (e) {
-        logWarning('Kullanıcı verisi alınamadı', e.toString());
-
-        // Önbellekten almayı deneyelim
-        try {
-          final cachedData = await getCachedData(
-            _userCachePrefix + firebaseUser.uid,
-          );
-          if (cachedData != null) {
-            // Önbellekten alınan veriyi kullanarak bir model oluştur
-            final userDoc = await _firestore
-                .collection(_userCollection)
-                .doc(firebaseUser.uid)
-                .get();
-            return UserModel.fromFirestore(userDoc);
-          }
-        } catch (_) {
-          // Önbellekten de alınamadı, Firebase Auth kullanıcısından bir model oluştur
-        }
-
-        // Firebase Auth kullanıcısından temel model oluşturma
+        // Hata durumunda en azından temel kullanıcı modelini döndür
+        logWarning('Kullanıcı verisi alınamadı, temel model döndürülüyor',
+            e.toString());
         return UserModel.fromFirebaseUser(firebaseUser);
       }
+    });
+  }
+
+  /// Belirli bir kullanıcı ID'si için Firestore değişikliklerini gerçek zamanlı dinler
+  Stream<UserModel?> getUserStream(String userId) {
+    return _firestore
+        .collection(_userCollection)
+        .doc(userId)
+        .snapshots()
+        .map((snapshot) {
+      if (snapshot.exists) {
+        try {
+          final userModel = UserModel.fromFirestore(snapshot);
+
+          // Kullanıcı verisini önbelleğe alma
+          cacheData(
+            _userCachePrefix + userId,
+            userModel.toFirestore(),
+          );
+
+          logInfo(
+              'Kullanıcı verisi güncellendi: ${userModel.email}, Analiz kredisi: ${userModel.analysisCredits}');
+          return userModel;
+        } catch (e) {
+          logError('Kullanıcı verisi işlenirken hata', e.toString());
+          rethrow;
+        }
+      } else {
+        // Kullanıcı Firestore'da yok, Firebase Auth kullanıcısından model oluştur
+        final firebaseUser = _authService.currentUser;
+        if (firebaseUser != null && firebaseUser.uid == userId) {
+          return UserModel.fromFirebaseUser(firebaseUser);
+        }
+        return null;
+      }
+    }).handleError((error) {
+      logError('Firestore kullanıcı dinleme hatası', error.toString());
+      // Hata durumunda Firebase Auth kullanıcısından bir model oluşturmayı dene
+      final firebaseUser = _authService.currentUser;
+      if (firebaseUser != null && firebaseUser.uid == userId) {
+        return UserModel.fromFirebaseUser(firebaseUser);
+      }
+      return null;
     });
   }
 
