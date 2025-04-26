@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart' show Colors;
 
 import '../theme/app_text_styles.dart';
 import '../theme/color_scheme.dart';
@@ -13,6 +14,9 @@ enum AppButtonType {
 
   /// Tehlikeli işlem butonu - kırmızı arka plan, beyaz metin
   destructive,
+
+  /// Text buton - transparan arka plan, yeşil metin
+  text,
 }
 
 /// Uygulama genelinde kullanılacak standart buton bileşeni
@@ -66,15 +70,29 @@ class AppButton extends StatelessWidget {
       child: _buildContent(),
     );
 
+    Widget finalButton = buttonChild;
+
+    // Secondary butona kenarlık ekle
+    if (type == AppButtonType.secondary) {
+      finalButton = Container(
+        decoration: BoxDecoration(
+          border:
+              Border.all(color: AppColors.primary.withOpacity(0.3), width: 1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: buttonChild,
+      );
+    }
+
     if (isFullWidth) {
       return SizedBox(
         width: double.infinity,
         height: height,
-        child: buttonChild,
+        child: finalButton,
       );
     } else {
       // Esnek olmayan mod - sadece içeriği kadar genişlikte
-      return SizedBox(height: height, child: buttonChild);
+      return SizedBox(height: height, child: finalButton);
     }
   }
 
@@ -114,6 +132,8 @@ class AppButton extends StatelessWidget {
         return AppColors.surface;
       case AppButtonType.destructive:
         return AppColors.error;
+      case AppButtonType.text:
+        return Colors.transparent;
     }
   }
 
@@ -126,6 +146,53 @@ class AppButton extends StatelessWidget {
         return AppColors.primary;
       case AppButtonType.destructive:
         return AppColors.onPrimary;
+      case AppButtonType.text:
+        return AppColors.primary;
     }
   }
 }
+
+/* 
+// Örnek Kullanım:
+Row(
+  children: [
+    // Primary Buton
+    AppButton(
+      text: 'Primary',
+      onPressed: () {},
+      type: AppButtonType.primary,
+      isFullWidth: false,
+    ),
+    
+    const SizedBox(width: 8),
+    
+    // Secondary Buton
+    AppButton(
+      text: 'Secondary',
+      onPressed: () {},
+      type: AppButtonType.secondary,
+      isFullWidth: false,
+    ),
+    
+    const SizedBox(width: 8),
+    
+    // Destructive Buton
+    AppButton(
+      text: 'Destructive',
+      onPressed: () {},
+      type: AppButtonType.destructive,
+      isFullWidth: false,
+    ),
+    
+    const SizedBox(width: 8),
+    
+    // Text Buton
+    AppButton(
+      text: 'Text',
+      onPressed: () {},
+      type: AppButtonType.text,
+      isFullWidth: false,
+    ),
+  ],
+)
+*/

@@ -174,7 +174,7 @@ class _HomeTabContentState extends State<HomeTabContent> {
                           height: 32,
                           child: AppButton(
                             text: 'Tümünü Gör',
-                            type: AppButtonType.secondary,
+                            type: AppButtonType.text,
                             height: 32,
                             isFullWidth: false,
                             onPressed: () {
