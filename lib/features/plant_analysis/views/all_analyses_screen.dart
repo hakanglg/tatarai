@@ -8,7 +8,6 @@ import 'package:tatarai/features/plant_analysis/cubits/plant_analysis_cubit.dart
 import 'package:tatarai/features/plant_analysis/models/plant_analysis_result.dart';
 import 'package:tatarai/features/plant_analysis/models/plant_analysis_state.dart';
 import 'package:tatarai/features/plant_analysis/views/analysis_result_screen.dart';
-import 'package:tatarai/core/theme/app_theme.dart';
 
 /// Tüm analizleri gösteren ekran
 class AllAnalysesScreen extends StatefulWidget {
@@ -28,14 +27,6 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return AppTheme.buildCupertinoNavigationBar(
-      middle: const Text('Tüm Analizler'),
-      leading: CupertinoNavigationBarBackButton(
-        color: AppColors.primary,
-        previousPageTitle: 'Ana Sayfa',
-        onPressed: () => Navigator.of(context).pop(),
-      ),
-    );
     return CupertinoPageScaffold(
       navigationBar: const CupertinoNavigationBar(
         middle: Text('Tüm Analizler'),

@@ -13,7 +13,7 @@ class AppTheme {
   static CupertinoThemeData get cupertinoTheme {
     return CupertinoThemeData(
       primaryColor: CupertinoColors.systemGrey,
-      primaryContrastingColor: AppColors.onPrimary,
+      primaryContrastingColor: AppColors.onBackground,
       barBackgroundColor: AppColors.background,
       scaffoldBackgroundColor: AppColors.background,
       textTheme: AppTextTheme.cupertinoTextTheme,
@@ -50,26 +50,6 @@ class AppTheme {
       ),
       textTheme: AppTextTheme.materialTextTheme,
       iconTheme: const IconThemeData(color: AppColors.primary, size: 24),
-    );
-  }
-
-  /// CupertinoNavigationBar'da ikon rengi ve arka planı kolayca ayarlamak için yardımcı fonksiyon
-  static CupertinoNavigationBar buildCupertinoNavigationBar({
-    required Widget middle,
-    Widget? leading,
-    Widget? trailing,
-    String? previousPageTitle,
-    Color? backgroundColor,
-  }) {
-    return CupertinoNavigationBar(
-      middle: middle,
-      leading: leading,
-      trailing: trailing,
-      previousPageTitle: previousPageTitle,
-      backgroundColor: backgroundColor ?? AppColors.background,
-      border: const Border(
-        bottom: BorderSide(color: CupertinoColors.separator, width: 0.5),
-      ),
     );
   }
 }
