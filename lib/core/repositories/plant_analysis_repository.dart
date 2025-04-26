@@ -145,6 +145,9 @@ class PlantAnalysisRepository {
       String? sunlight;
       String? soil;
       String? climate;
+      String? growthStage; // Gelişim aşaması
+      int? growthScore; // Gelişim skoru
+      String? growthComment; // Gelişim yorumu
 
       // Yanıtı satır satır analiz et
       final lines = geminiResponse.split('\n');
@@ -200,6 +203,23 @@ class PlantAnalysisRepository {
         } else if (trimmedLine.startsWith('IKLIM:')) {
           currentSection = 'climate';
           climate = trimmedLine.substring('IKLIM:'.length).trim();
+        } else if (trimmedLine.startsWith('GELISIM_ASAMASI:')) {
+          currentSection = 'growthStage';
+          growthStage = trimmedLine.substring('GELISIM_ASAMASI:'.length).trim();
+        } else if (trimmedLine.startsWith('GELISIM_SKORU:')) {
+          currentSection = 'growthScore';
+          final scoreText =
+              trimmedLine.substring('GELISIM_SKORU:'.length).trim();
+          // Sayısal değeri ayıkla (70/100 veya sadece 70 formatından)
+          final scoreRegex = RegExp(r'(\d+)');
+          final match = scoreRegex.firstMatch(scoreText);
+          if (match != null) {
+            growthScore = int.tryParse(match.group(1) ?? '0') ?? 0;
+          }
+        } else if (trimmedLine.startsWith('GELISIM_YORUMU:')) {
+          currentSection = 'growthComment';
+          growthComment =
+              trimmedLine.substring('GELISIM_YORUMU:'.length).trim();
         }
         // Mevcut bölüme göre içerik ekleme
         else if (currentSection == 'diseases' && trimmedLine.startsWith('-')) {
@@ -256,6 +276,9 @@ class PlantAnalysisRepository {
           } else {
             description = trimmedLine;
           }
+        } else if (currentSection == 'growthComment' && growthComment != null) {
+          // Gelişim yorumunu birleştir (birden fazla satır olabilir)
+          growthComment += ' $trimmedLine';
         }
       }
 
@@ -310,8 +333,33 @@ class PlantAnalysisRepository {
         fullDescription += '\n\nİklim Gereksinimleri: $climate';
       }
 
-      // Konum bilgisini açıklamaya ekle
-      fullDescription += '\n\nKonum: $location';
+      // Gelişim durumu bilgisini değerlendirme
+      // Eğer gelişim skoru yoksa ama gelişim aşaması biliniyorsa, gelişim skorunu tahmin et
+      if (growthScore == null && growthStage != null) {
+        // Basit bir tahmin algoritması
+        final stageLower = growthStage.toLowerCase();
+        if (stageLower.contains('olgun') ||
+            stageLower.contains('hasat') ||
+            stageLower.contains('olgunlaşma')) {
+          growthScore = 85;
+        } else if (stageLower.contains('çiçek') ||
+            stageLower.contains('cicek') ||
+            stageLower.contains('meyve')) {
+          growthScore = 70;
+        } else if (stageLower.contains('büyüme') ||
+            stageLower.contains('gelişme') ||
+            stageLower.contains('genc')) {
+          growthScore = 50;
+        } else if (stageLower.contains('fide') ||
+            stageLower.contains('çimlenme') ||
+            stageLower.contains('yeni')) {
+          growthScore = 30;
+        } else {
+          growthScore = 60; // Varsayılan orta düzey
+        }
+
+        AppLogger.i('Gelişim skoru tahmin edildi: $growthScore');
+      }
 
       // Sonuç nesnesini oluştur
       return PlantAnalysisResult(
@@ -329,6 +377,8 @@ class PlantAnalysisRepository {
         geminiAnalysis: geminiResponse, // Tam Gemini yanıtı
         location: location, // Konum bilgisini de ekle
         fieldName: fieldName,
+        growthStage: growthStage,
+        growthScore: growthScore,
       );
     } catch (e) {
       AppLogger.e('Gemini yanıtını işleme hatası', e);
@@ -347,6 +397,8 @@ class PlantAnalysisRepository {
         geminiAnalysis: geminiResponse,
         location: location, // Konum bilgisini de ekle
         fieldName: fieldName,
+        growthStage: null,
+        growthScore: null,
       );
     }
   }
@@ -494,6 +546,8 @@ class PlantAnalysisRepository {
         'climate': result.climate,
         'location': result.location,
         'fieldName': result.fieldName,
+        'growthStage': result.growthStage,
+        'growthScore': result.growthScore,
       };
 
       // Firestore'a kaydet
@@ -568,6 +622,8 @@ class PlantAnalysisRepository {
           sunlight: data['sunlight'],
           location: data['location'],
           fieldName: data['fieldName'],
+          growthStage: data['growthStage'],
+          growthScore: data['growthScore'],
         );
       }).toList();
 
@@ -655,6 +711,8 @@ class PlantAnalysisRepository {
         sunlight: data['sunlight'],
         location: data['location'],
         fieldName: data['fieldName'],
+        growthStage: data['growthStage'],
+        growthScore: data['growthScore'],
       );
     } catch (e) {
       AppLogger.e('Analiz detayları getirme hatası: $e', e);

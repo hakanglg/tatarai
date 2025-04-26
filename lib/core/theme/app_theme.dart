@@ -13,7 +13,7 @@ class AppTheme {
   static CupertinoThemeData get cupertinoTheme {
     return CupertinoThemeData(
       primaryColor: CupertinoColors.systemGrey,
-      primaryContrastingColor: AppColors.onBackground,
+      primaryContrastingColor: AppColors.onPrimary,
       barBackgroundColor: AppColors.background,
       scaffoldBackgroundColor: AppColors.background,
       textTheme: AppTextTheme.cupertinoTextTheme,

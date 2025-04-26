@@ -107,12 +107,18 @@ BOLGESEL_BILGILER:
 - [Bölgedeki yaygın sorunlar ve bu sorunlara özel çözümler]
 - [Bölgesel iklim koşullarına göre uyarlamalar]
 
+GELISIM_ASAMASI: [Bitkinin şu anki gelişim aşaması - örneğin: Fide, Çiçeklenme, Meyvelenme, Olgunlaşma, Hasat vb.]
+GELISIM_SKORU: [0-100 arası bir değer olarak bitkinin gelişim durumu. Örneğin: 75]
+GELISIM_YORUMU: [Bitkinin gelişim durumu hakkında kısa bir yorum, varsa gelişimini yavaşlatan faktörler veya gelişimini destekleyen olumlu koşullar]
+
 SULAMA: [Sulama sıklığı ve yöntemleri hakkında çiftçiye pratik bilgiler]
 ISIK: [Işık ihtiyacı]
 TOPRAK: [Toprak gereksinimleri ve toprak hazırlama tavsiyeleri]
 IKLIM: [Bölgesel iklim koşullarına göre uyarılar ve öneriler]
 
 Lütfen tüm bilgileri Türkçe ve çiftçinin kolayca anlayabileceği şekilde, teknik terimlerden mümkün olduğunca kaçınarak ver. MUDAHALE_YONTEMLERI bölümünde mutlaka ilaçlama, gübreleme veya diğer somut çözümler öner. Hastalık yoksa HASTALIKLAR ve MUDAHALE_YONTEMLERI bölümlerini boş bırak ve SAGLIK_DURUMU'nu "Sağlıklı" olarak belirt. Her ana başlık (örn. BITKI_ADI:) tam olarak belirtilen formatta olmalıdır.
+
+GELISIM_ASAMASI, GELISIM_SKORU ve GELISIM_YORUMU bölümlerini mutlaka doldur. Gelişim skoru için 0-100 arası sayısal bir değer ver. Gelişim aşaması için bitkinin şu anki durumunu (fide, çiçeklenme, meyve verme vs) belirt. Yorumda ise bitkinin neden bu gelişim skoruna sahip olduğunu ve gelişimini olumlu/olumsuz etkileyen faktörleri açıkla.
 
 Eğer konum bilgisi verilmişse, BOLGESEL_BILGILER bölümünde o bölge için özel tavsiyelerde bulun. Bölgeye uygun ilaçlar, yerel tarım uygulamaları ve iklim koşullarına göre özel öneriler sun.''';
 

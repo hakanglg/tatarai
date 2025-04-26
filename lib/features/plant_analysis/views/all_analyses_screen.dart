@@ -28,10 +28,16 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen> {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text('Tüm Analizler'),
+      navigationBar: CupertinoNavigationBar(
         backgroundColor: CupertinoColors.systemBackground,
-        previousPageTitle: 'Ana Sayfa',
+        middle: Text('Tüm Analizler', style: TextStyle(color: Colors.black)),
+        leading: GestureDetector(
+          onTap: () => Navigator.of(context).maybePop(),
+          child: Icon(
+            CupertinoIcons.back,
+            color: Colors.black, // Ok simgesinin rengi burada
+          ),
+        ),
       ),
       child: SafeArea(
         child: BlocBuilder<PlantAnalysisCubit, PlantAnalysisState>(

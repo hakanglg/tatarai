@@ -107,6 +107,7 @@ class NavigationManager with ChangeNotifier {
   void _handleTabChange() {
     if (_currentIndex != _tabController.index) {
       _currentIndex = _tabController.index;
+      AppLogger.i('Tab değişikliği tespit edildi: $_currentIndex');
       notifyListeners();
     }
   }
@@ -114,9 +115,17 @@ class NavigationManager with ChangeNotifier {
   /// Belirli bir tab'a geçiş yap
   void switchToTab(int index) {
     if (index >= 0 && index < NavigationItems.allTabs.length) {
+      AppLogger.i('switchToTab çağrıldı: $index (şu anki: $_currentIndex)');
+
+      // Önce controller'ı güncelle
       _tabController.index = index;
-      _currentIndex = index;
-      notifyListeners();
+
+      // Sonra current index'i güncelle
+      if (_currentIndex != index) {
+        _currentIndex = index;
+        AppLogger.i('Tab değiştirildi: $index');
+        notifyListeners();
+      }
     } else {
       AppLogger.w('Geçersiz sekme indeksi: $index');
     }

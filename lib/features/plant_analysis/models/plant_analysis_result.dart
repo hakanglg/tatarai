@@ -23,6 +23,8 @@ class PlantAnalysisResult extends Equatable {
     this.geminiAnalysis,
     this.location,
     this.fieldName,
+    this.growthStage,
+    this.growthScore,
   });
 
   /// Analiz benzersiz tanımlayıcısı
@@ -82,6 +84,12 @@ class PlantAnalysisResult extends Equatable {
   /// Tarla adı veya konumu
   final String? fieldName;
 
+  /// Bitkinin gelişim aşaması (fide, çiçeklenme, meyve vb.)
+  final String? growthStage;
+
+  /// Gelişim skoru (0-100 arası)
+  final int? growthScore;
+
   /// Sınıfın mevcut değerlerini koruyarak yeni bir örnek oluşturur
   PlantAnalysisResult copyWith({
     String? id,
@@ -103,6 +111,8 @@ class PlantAnalysisResult extends Equatable {
     String? geminiAnalysis,
     String? location,
     String? fieldName,
+    String? growthStage,
+    int? growthScore,
   }) {
     return PlantAnalysisResult(
       id: id ?? this.id,
@@ -124,6 +134,8 @@ class PlantAnalysisResult extends Equatable {
       geminiAnalysis: geminiAnalysis ?? this.geminiAnalysis,
       location: location ?? this.location,
       fieldName: fieldName ?? this.fieldName,
+      growthStage: growthStage ?? this.growthStage,
+      growthScore: growthScore ?? this.growthScore,
     );
   }
 
@@ -148,6 +160,21 @@ class PlantAnalysisResult extends Equatable {
                 .map((disease) => Disease.fromJson(disease))
                 .toList();
           }
+        }
+
+        // Gelişim durumu bilgisini al
+        String? growthStage;
+        int? growthScore;
+
+        if (json.containsKey('growth_assessment')) {
+          final growth = json['growth_assessment'];
+          growthStage = growth['stage'];
+          growthScore = growth['score'];
+        } else if (firstMatch.containsKey('plant_details') &&
+            firstMatch['plant_details'].containsKey('growth_assessment')) {
+          final growth = firstMatch['plant_details']['growth_assessment'];
+          growthStage = growth['stage'];
+          growthScore = growth['score'];
         }
 
         return PlantAnalysisResult(
@@ -178,6 +205,8 @@ class PlantAnalysisResult extends Equatable {
           geminiAnalysis: firstMatch['plant_details']?['gemini_analysis'],
           location: firstMatch['plant_details']?['location'],
           fieldName: firstMatch['plant_details']?['field_name'],
+          growthStage: growthStage,
+          growthScore: growthScore,
         );
       }
     }
@@ -192,6 +221,16 @@ class PlantAnalysisResult extends Equatable {
         diseases = (health['diseases'] as List<dynamic>)
             .map((disease) => Disease.fromJson(disease))
             .toList();
+      }
+
+      // Gelişim durumu bilgisini al
+      String? growthStage;
+      int? growthScore;
+
+      if (json.containsKey('growth_assessment')) {
+        final growth = json['growth_assessment'];
+        growthStage = growth['stage'];
+        growthScore = growth['score'];
       }
 
       return PlantAnalysisResult(
@@ -216,6 +255,8 @@ class PlantAnalysisResult extends Equatable {
         geminiAnalysis: null,
         location: json['plant_details']?['location'],
         fieldName: json['plant_details']?['field_name'],
+        growthStage: growthStage,
+        growthScore: growthScore,
       );
     }
 
@@ -235,6 +276,8 @@ class PlantAnalysisResult extends Equatable {
       geminiAnalysis: null,
       location: null,
       fieldName: null,
+      growthStage: null,
+      growthScore: null,
     );
   }
 
@@ -359,6 +402,8 @@ class PlantAnalysisResult extends Equatable {
         geminiAnalysis,
         location,
         fieldName,
+        growthStage,
+        growthScore,
       ];
 }
 
@@ -514,6 +559,8 @@ extension PlantAnalysisResultJsonSerialization on PlantAnalysisResult {
           : null,
       'location': location,
       'fieldName': fieldName,
+      'growthStage': growthStage,
+      'growthScore': growthScore,
     };
   }
 
@@ -574,6 +621,8 @@ extension PlantAnalysisResultJsonSerialization on PlantAnalysisResult {
           : null,
       location: json['location'],
       fieldName: json['fieldName'],
+      growthStage: json['growthStage'],
+      growthScore: json['growthScore'],
     );
   }
 }

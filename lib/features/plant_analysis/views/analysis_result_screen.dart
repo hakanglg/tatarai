@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
+import 'package:tatarai/core/theme/dimensions.dart';
 import 'package:tatarai/core/theme/text_theme.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/core/widgets/app_button.dart';
@@ -146,12 +147,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const CupertinoPageScaffold(
-        navigationBar: CupertinoNavigationBar(
-          middle: Text('Analiz Sonucu'),
-          backgroundColor: CupertinoColors.systemBackground,
-          previousPageTitle: 'Geri',
-        ),
+      return CupertinoPageScaffold(
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -172,10 +168,16 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
 
     if (_errorMessage != null) {
       return CupertinoPageScaffold(
-        navigationBar: const CupertinoNavigationBar(
-          middle: Text('Analiz Sonucu'),
+        navigationBar: CupertinoNavigationBar(
+          middle: Text('Analiz Sonucu Yüklenemedi'),
           backgroundColor: CupertinoColors.systemBackground,
-          previousPageTitle: 'Geri',
+          leading: GestureDetector(
+            onTap: () => Navigator.of(context).maybePop(),
+            child: Icon(
+              CupertinoIcons.back,
+              color: Colors.black, // Ok simgesinin rengi burada
+            ),
+          ),
         ),
         child: Center(
           child: Column(
@@ -225,10 +227,16 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
 
     final result = _analysisResult;
     if (result == null) {
-      return const CupertinoPageScaffold(
+      return CupertinoPageScaffold(
         navigationBar: CupertinoNavigationBar(
-          middle: Text('Analiz Sonucu'),
-          previousPageTitle: 'Geri',
+          middle: Text('Analiz Sonucu Bulunamadı'),
+          leading: GestureDetector(
+            onTap: () => Navigator.of(context).maybePop(),
+            child: Icon(
+              CupertinoIcons.back,
+              color: Colors.black, // Ok simgesinin rengi burada
+            ),
+          ),
         ),
         child: Center(child: Text('Analiz sonucu bulunamadı')),
       );
@@ -241,13 +249,19 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
   Widget _buildResultScreen(BuildContext context, PlantAnalysisResult result) {
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
-        middle: Text(result.plantName),
+        middle: Text(
+          result.fieldName != null && result.fieldName!.isNotEmpty
+              ? result.fieldName!
+              : result.plantName,
+        ),
         backgroundColor: CupertinoColors.systemBackground,
         automaticallyImplyLeading: false,
-        leading: CupertinoNavigationBarBackButton(
-          color: CupertinoColors.systemGrey,
-          previousPageTitle: 'Geri',
-          onPressed: () => Navigator.of(context).pop(),
+        leading: GestureDetector(
+          onTap: () => Navigator.of(context).maybePop(),
+          child: Icon(
+            CupertinoIcons.back,
+            color: Colors.black, // Ok simgesinin rengi burada
+          ),
         ),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
@@ -272,7 +286,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                   child: Hero(
                     tag: 'plantImage',
                     child: Container(
-                      height: 300,
+                      height: context.dimensions.screenHeight * 0.35,
                       width: double.infinity,
                       decoration: BoxDecoration(
                         color: CupertinoColors.systemGrey6,
@@ -477,23 +491,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                       const SizedBox(height: 18),
 
                       // Bitki açıklaması
-                      Text(
-                        'Hakkında',
-                        style: AppTextTheme.headline6.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        result.description.isNotEmpty
-                            ? result.description
-                            : 'Bu bitki hakkında henüz açıklama bulunmuyor.',
-                        style: AppTextTheme.bodyText1.copyWith(
-                          color: CupertinoColors.systemGrey,
-                          height: 1.4,
-                        ),
-                      ),
+                      _buildDescriptionSection(),
                     ],
                   ),
                 ),
@@ -517,11 +515,13 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                 ],
 
                 // Bakım bilgileri - modern görünüm için güncellendi
-                if (result.watering != null || result.sunlight != null) ...[
+                if (result.watering != null ||
+                    result.sunlight != null ||
+                    result.growthStage != null) ...[
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
                     child: Text(
-                      'Bakım Tavsiyeleri',
+                      'Gelişim Durumu ve Bakım Tavsiyeleri',
                       style: AppTextTheme.headline5.copyWith(
                         fontWeight: FontWeight.w700,
                         color: AppColors.primary,
@@ -537,17 +537,25 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                 // Öneriler - modern görünüm için güncellendi
                 if (result.suggestions.isNotEmpty) ...[
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+                    padding: EdgeInsets.fromLTRB(
+                      context.dimensions.paddingM,
+                      context.dimensions.paddingL,
+                      context.dimensions.paddingM,
+                      context.dimensions.paddingXS,
+                    ),
                     child: Text(
                       'Öneriler',
                       style: AppTextTheme.headline5.copyWith(
                         fontWeight: FontWeight.w700,
                         color: AppColors.primary,
+                        fontSize: context.dimensions.fontSizeL,
                       ),
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: context.dimensions.paddingM,
+                    ),
                     child: _buildSuggestionsList(result.suggestions),
                   ),
                 ],
@@ -555,40 +563,48 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                 // Benzer Görüntüler - modern görünüm için güncellendi
                 if (result.similarImages.isNotEmpty) ...[
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+                    padding: EdgeInsets.fromLTRB(
+                        context.dimensions.paddingM,
+                        context.dimensions.paddingL,
+                        context.dimensions.paddingM,
+                        context.dimensions.paddingXS),
                     child: Text(
                       'Benzer Bitkiler',
                       style: AppTextTheme.headline5.copyWith(
                         fontWeight: FontWeight.w700,
                         color: AppColors.primary,
+                        fontSize: context.dimensions.fontSizeL,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: context.dimensions.spaceXS),
                   SizedBox(
-                    height: 140,
+                    height: context.dimensions.screenHeight * 0.18,
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
                       physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      padding: EdgeInsets.symmetric(
+                          horizontal: context.dimensions.paddingM),
                       itemCount: result.similarImages.length,
                       itemBuilder: (context, index) {
                         return Container(
-                          margin: const EdgeInsets.only(right: 12.0),
+                          margin:
+                              EdgeInsets.only(right: context.dimensions.spaceS),
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(
+                                context.dimensions.radiusL),
                             boxShadow: [
                               BoxShadow(
-                                color: CupertinoColors.systemGrey5.withOpacity(
-                                  0.5,
-                                ),
-                                blurRadius: 8,
+                                color: CupertinoColors.systemGrey5
+                                    .withOpacity(0.5),
+                                blurRadius: context.dimensions.spaceXS,
                                 offset: const Offset(0, 2),
                               ),
                             ],
                           ),
                           child: ClipRRect(
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(
+                                context.dimensions.radiusL),
                             child:
                                 _buildImageWidget(result.similarImages[index]),
                           ),
@@ -600,7 +616,12 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
 
                 // Tek buton - "Yeni Analiz" butonu
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
+                  padding: EdgeInsets.fromLTRB(
+                    context.dimensions.paddingM,
+                    context.dimensions.paddingL,
+                    context.dimensions.paddingM,
+                    context.dimensions.paddingL,
+                  ),
                   child: SizedBox(
                     width: double.infinity,
                     child: AppButton(
@@ -866,14 +887,14 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
   // Öneriler listesi - modern görünüm için güncellendi
   Widget _buildSuggestionsList(List<String> suggestions) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(context.dimensions.paddingL),
       decoration: BoxDecoration(
         color: CupertinoColors.systemBackground,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(context.dimensions.radiusL),
         boxShadow: [
           BoxShadow(
             color: CupertinoColors.systemGrey5.withOpacity(0.5),
-            blurRadius: 12,
+            blurRadius: context.dimensions.radiusL,
             offset: const Offset(0, 2),
             spreadRadius: 1,
           ),
@@ -883,28 +904,31 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: suggestions.map((suggestion) {
           return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            padding: EdgeInsets.symmetric(vertical: context.dimensions.spaceXS),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  margin: const EdgeInsets.only(top: 2),
-                  padding: const EdgeInsets.all(6),
+                  margin: EdgeInsets.only(top: context.dimensions.spaceXXS),
+                  padding: EdgeInsets.all(context.dimensions.spaceXXS + 2),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withOpacity(0.12),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     CupertinoIcons.checkmark_circle_fill,
                     color: AppColors.primary,
-                    size: 14,
+                    size: context.dimensions.iconSizeXS - 2,
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: context.dimensions.spaceS),
                 Expanded(
                   child: Text(
                     suggestion,
-                    style: AppTextTheme.bodyText2.copyWith(height: 1.4),
+                    style: AppTextTheme.bodyText2.copyWith(
+                      height: 1.4,
+                      fontSize: context.dimensions.fontSizeM,
+                    ),
                   ),
                 ),
               ],
@@ -934,6 +958,78 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Gelişim durumu ve yorumu
+          if (result.growthStage != null) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    CupertinoIcons.chart_bar_alt_fill,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Gelişim Aşaması',
+                        style: AppTextTheme.headline6.copyWith(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        result.growthStage!,
+                        style: AppTextTheme.bodyText2.copyWith(
+                          color: CupertinoColors.systemGrey,
+                          height: 1.4,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (result.growthScore != null) ...[
+                        const SizedBox(height: 10),
+                        _buildGrowthScoreIndicator(result.growthScore!),
+                        const SizedBox(height: 8),
+                        Text(
+                          _getGrowthScoreText(result.growthScore!),
+                          style: AppTextTheme.bodyText2.copyWith(
+                            color: CupertinoColors.systemGrey,
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _getGrowthAdvice(
+                              result.growthScore!, result.growthStage),
+                          style: AppTextTheme.bodyText2.copyWith(
+                            color: _getGrowthScoreColor(result.growthScore!),
+                            height: 1.4,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (result.watering != null || result.sunlight != null) ...[
+              const SizedBox(height: 24),
+              Divider(height: 1),
+              const SizedBox(height: 24),
+            ],
+          ],
+
           if (result.watering != null) ...[
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1027,5 +1123,155 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
         ],
       ),
     );
+  }
+
+  /// Gelişim durumuna göre tavsiye metni döndürür
+  String _getGrowthAdvice(int score, String? stage) {
+    final String stageText = stage?.toLowerCase() ?? '';
+
+    if (score >= 80) {
+      if (stageText.contains('çiçek') || stageText.contains('cicek')) {
+        return 'Çiçeklenme döneminde gübre desteğini sürdürün, düzenli sulama çok önemli.';
+      } else if (stageText.contains('fide') || stageText.contains('fidan')) {
+        return 'Fide aşamasında iyi gelişiyor, düzenli sulamaya devam edin.';
+      } else if (stageText.contains('meyve')) {
+        return 'Meyvelenme döneminde potasyum açısından zengin gübreler tercih edin.';
+      } else if (stageText.contains('olgun')) {
+        return 'Olgunlaşma sürecinde ideal koşullar sağlanmış, aynı şekilde devam edin.';
+      }
+      return 'Şu anki bakım koşullarını koruyun, bitkiniz çok iyi gelişiyor.';
+    } else if (score >= 60) {
+      if (stageText.contains('çiçek') || stageText.contains('cicek')) {
+        return 'Çiçeklenme döneminde daha fazla fosfor içerikli gübre kullanın.';
+      } else if (stageText.contains('fide') || stageText.contains('fidan')) {
+        return 'Fide aşamasında daha dengeli bir sulama programı uygulayın.';
+      } else if (stageText.contains('meyve')) {
+        return 'Meyvelenme için ek mikro element takviyesi yapmanız faydalı olabilir.';
+      } else if (stageText.contains('olgun')) {
+        return 'Olgunlaşma sürecinde ışık koşullarını optimize edin.';
+      }
+      return 'Biraz daha gübreleme ve optimize edilmiş sulama ile gelişimi artırabilirsiniz.';
+    } else if (score >= 40) {
+      if (stageText.contains('çiçek') || stageText.contains('cicek')) {
+        return 'Çiçeklenme için acilen fosfor/potasyum dengesini sağlayın.';
+      } else if (stageText.contains('fide') || stageText.contains('fidan')) {
+        return 'Fide gelişimi yavaş, daha fazla ışık ve dengeli gübreleme gerekli.';
+      } else if (stageText.contains('meyve')) {
+        return 'Meyvelenme durdurmak üzere, acilen toprak analizi yaptırın.';
+      } else if (stageText.contains('olgun')) {
+        return 'Olgunlaşma gecikiyor, su ve besin eksikliği olabilir.';
+      }
+      return 'Bakım koşullarında önemli iyileştirmeler gerekiyor. Toprak, ışık ve sulama programını gözden geçirin.';
+    } else {
+      return 'Acil müdahale gerektiren bir gelişim durumu görülüyor. Toprak değişimi, gübre takviyesi ve sulama düzeninde değişiklik düşünülmeli.';
+    }
+  }
+
+  /// Bitki açıklamasını oluşturan widget
+  Widget _buildDescriptionSection() {
+    final result = _analysisResult;
+    if (result == null) return const SizedBox.shrink();
+
+    // Konum bilgisini içermeyen bir açıklama oluştur
+    String description = result.description;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                CupertinoIcons.info,
+                color: AppColors.primary,
+                size: 14,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              "Hakkında",
+              style: AppTextTheme.subtitle1.copyWith(
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Text(
+          description,
+          style: AppTextTheme.bodyText2,
+        ),
+      ],
+    );
+  }
+
+  /// Gelişim skorunu gösteren widget
+  Widget _buildGrowthScoreIndicator(int score) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: score / 100,
+                  backgroundColor: CupertinoColors.systemGrey5,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    _getGrowthScoreColor(score),
+                  ),
+                  minHeight: 8,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '$score/100',
+              style: AppTextTheme.bodyText2.copyWith(
+                fontWeight: FontWeight.bold,
+                color: _getGrowthScoreColor(score),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Gelişim skoruna göre renk döndürür
+  Color _getGrowthScoreColor(int score) {
+    if (score >= 80) {
+      return CupertinoColors.systemGreen;
+    } else if (score >= 60) {
+      return AppColors.info;
+    } else if (score >= 40) {
+      return CupertinoColors.systemYellow;
+    } else if (score >= 20) {
+      return CupertinoColors.systemOrange;
+    } else {
+      return CupertinoColors.systemRed;
+    }
+  }
+
+  /// Gelişim skoruna göre açıklama metni döndürür
+  String _getGrowthScoreText(int score) {
+    if (score >= 80) {
+      return 'Bitkinin gelişimi mükemmel, ideal koşullarda büyüyor.';
+    } else if (score >= 60) {
+      return 'Bitkinin gelişimi iyi durumda, büyüme devam ediyor.';
+    } else if (score >= 40) {
+      return 'Ortalama bir gelişim gösteriyor, bakım koşulları iyileştirilebilir.';
+    } else if (score >= 20) {
+      return 'Gelişim yavaş, acil bakım ve müdahale gerekebilir.';
+    } else {
+      return 'Kritik gelişim seviyesi, acil müdahale gerekiyor.';
+    }
   }
 }

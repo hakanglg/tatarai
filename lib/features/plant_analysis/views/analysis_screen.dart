@@ -8,6 +8,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:tatarai/core/constants/app_constants.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
+import 'package:tatarai/core/theme/dimensions.dart';
 import 'package:tatarai/core/theme/text_theme.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/core/widgets/app_button.dart';
@@ -748,6 +749,52 @@ class _AnalysisScreenState extends State<AnalysisScreen>
     }
   }
 
+  // Resim seçenekleri menüsünü göster
+  void _showImageOptionsMenu() {
+    // Haptic feedback ekle
+    HapticFeedback.mediumImpact();
+
+    showCupertinoModalPopup(
+      context: context,
+      builder: (context) => CupertinoActionSheet(
+        title: const Text('Fotoğraf İşlemleri'),
+        message: const Text('Fotoğraf üzerinde ne yapmak istiyorsunuz?'),
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(context);
+              _showPhotoOptions(); // Mevcut fotoğraf ekleme yöntemi
+            },
+            child: Text(
+              'Değiştir',
+              style: AppTextTheme.headline6.copyWith(
+                color: CupertinoColors.activeBlue,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(context);
+              setState(() {
+                _selectedImage = null; // Fotoğrafı sil
+              });
+              // Fotoğraf silindiğinde animasyon yap
+              _animationController.reset();
+              _animationController.forward();
+            },
+            isDestructiveAction: true,
+            child: const Text('Fotoğrafı Sil'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('İptal'),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
@@ -858,81 +905,271 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(20),
                             child: _selectedImage != null
-                                ? Hero(
-                                    tag: 'plantImage',
-                                    child: Image.file(
-                                      _selectedImage!,
-                                      fit: BoxFit.cover,
-                                      width: double.infinity,
-                                      height: double.infinity,
-                                    ),
+                                ? Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      // Resim Hero animasyonu ile
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(
+                                            context.dimensions.radiusL),
+                                        child: Hero(
+                                          tag: 'plantImage',
+                                          child: Image.file(
+                                            _selectedImage!,
+                                            fit: BoxFit.cover,
+                                            width: double.infinity,
+                                            height: double.infinity,
+                                          ),
+                                        ),
+                                      ),
+                                      // Resim üstündeki yarı saydam kontrol katmanı - Cupertino uyumlu
+                                      GestureDetector(
+                                        onTap: isAnalyzing
+                                            ? null
+                                            : _showImageOptionsMenu,
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              begin: Alignment.bottomCenter,
+                                              end: Alignment.center,
+                                              colors: [
+                                                CupertinoColors.black
+                                                    .withOpacity(0.4),
+                                                CupertinoColors.transparent,
+                                              ],
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                                context.dimensions.radiusL),
+                                          ),
+                                          child: Align(
+                                            alignment: Alignment.bottomCenter,
+                                            child: Padding(
+                                              padding: EdgeInsets.only(
+                                                  bottom: context
+                                                      .dimensions.paddingM),
+                                              child: Container(
+                                                padding: EdgeInsets.symmetric(
+                                                  horizontal: context
+                                                      .dimensions.paddingM,
+                                                  vertical: context
+                                                      .dimensions.paddingXS,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: CupertinoColors.white
+                                                      .withOpacity(0.8),
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                          context.dimensions
+                                                              .radiusL),
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: CupertinoColors
+                                                          .black
+                                                          .withOpacity(0.1),
+                                                      blurRadius: 8,
+                                                      offset:
+                                                          const Offset(0, 2),
+                                                    ),
+                                                  ],
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    Icon(
+                                                      CupertinoIcons
+                                                          .camera_fill,
+                                                      color: AppColors.primary,
+                                                      size: context
+                                                          .dimensions.iconSizeS,
+                                                    ),
+                                                    SizedBox(
+                                                        width: context
+                                                            .dimensions
+                                                            .spaceXXS),
+                                                    Text(
+                                                      'Değiştir',
+                                                      style: AppTextTheme
+                                                          .subtitle2
+                                                          .copyWith(
+                                                        color:
+                                                            AppColors.primary,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+
+                                      // Bilgi simgesi (sağ üst köşe)
+                                      Positioned(
+                                        top: context.dimensions.paddingS,
+                                        right: context.dimensions.paddingS,
+                                        child: Container(
+                                          height:
+                                              context.dimensions.buttonHeight *
+                                                  0.7,
+                                          width:
+                                              context.dimensions.buttonHeight *
+                                                  0.7,
+                                          decoration: BoxDecoration(
+                                            color: CupertinoColors.white
+                                                .withOpacity(0.8),
+                                            shape: BoxShape.circle,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: CupertinoColors.black
+                                                    .withOpacity(0.1),
+                                                blurRadius: 8,
+                                                offset: const Offset(0, 2),
+                                              ),
+                                            ],
+                                          ),
+                                          child: Icon(
+                                            CupertinoIcons.info,
+                                            color: AppColors.primary,
+                                            size: context.dimensions.iconSizeS,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   )
                                 : GestureDetector(
                                     onTap:
                                         isAnalyzing ? null : _showPhotoOptions,
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        AnimatedContainer(
-                                          duration:
-                                              const Duration(milliseconds: 200),
-                                          width: 120,
-                                          height: 120,
-                                          decoration: BoxDecoration(
-                                            color: CupertinoColors.systemGrey6,
-                                            shape: BoxShape.circle,
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: CupertinoColors.white
-                                                    .withOpacity(0.9),
-                                                offset: const Offset(-3, -3),
-                                                blurRadius: 6,
-                                              ),
-                                              BoxShadow(
-                                                color: CupertinoColors
-                                                    .systemGrey3
-                                                    .withOpacity(0.2),
-                                                offset: const Offset(3, 3),
-                                                blurRadius: 6,
-                                              ),
-                                            ],
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: CupertinoColors.systemBackground,
+                                        borderRadius: BorderRadius.circular(
+                                            context.dimensions.radiusL),
+                                        border: Border.all(
+                                          color: CupertinoColors.systemGrey5,
+                                          width: 1.5,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: CupertinoColors.systemGrey5
+                                                .withOpacity(0.5),
+                                            blurRadius: 10,
+                                            offset: const Offset(0, 2),
                                           ),
-                                          child: Center(
-                                            child: Text(
-                                              'EKLE',
-                                              style: AppTextTheme.headline5
-                                                  .copyWith(
-                                                color: AppColors.primary,
-                                                fontWeight: FontWeight.w600,
-                                                letterSpacing: 1.2,
+                                        ],
+                                      ),
+                                      child: Stack(
+                                        alignment: Alignment.center,
+                                        children: [
+                                          // İçerik
+                                          Padding(
+                                            padding: EdgeInsets.all(
+                                                context.dimensions.paddingL),
+                                            child: Column(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                // İkon kısmı
+                                                Container(
+                                                  width: context.dimensions
+                                                          .screenWidth *
+                                                      0.25,
+                                                  height: context.dimensions
+                                                          .screenWidth *
+                                                      0.25,
+                                                  decoration: BoxDecoration(
+                                                    gradient: LinearGradient(
+                                                      colors: [
+                                                        AppColors.primary
+                                                            .withOpacity(0.1),
+                                                        AppColors.secondary
+                                                            .withOpacity(0.05),
+                                                      ],
+                                                      begin: Alignment.topLeft,
+                                                      end:
+                                                          Alignment.bottomRight,
+                                                    ),
+                                                    shape: BoxShape.circle,
+                                                    border: Border.all(
+                                                      color: AppColors.primary
+                                                          .withOpacity(0.2),
+                                                      width: 2,
+                                                    ),
+                                                  ),
+                                                  child: Icon(
+                                                    CupertinoIcons.camera,
+                                                    color: AppColors.primary,
+                                                    size: context
+                                                        .dimensions.iconSizeL,
+                                                  ),
+                                                ),
+                                                SizedBox(
+                                                    height: context
+                                                        .dimensions.spaceM),
+                                                Text(
+                                                  'Fotoğraf Ekleyin',
+                                                  style: AppTextTheme.subtitle1
+                                                      .copyWith(
+                                                    color:
+                                                        CupertinoColors.label,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                                SizedBox(
+                                                    height: context
+                                                        .dimensions.spaceXS),
+                                                Text(
+                                                  'Analizin doğru yapılabilmesi için bitkinizin net bir fotoğrafını ekleyin',
+                                                  style: AppTextTheme.bodyText2
+                                                      .copyWith(
+                                                    color: CupertinoColors
+                                                        .systemGrey,
+                                                  ),
+                                                  textAlign: TextAlign.center,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+
+                                          // Ekleme butonu (sağ alt köşede)
+                                          Positioned(
+                                            bottom: context.dimensions.paddingM,
+                                            right: context.dimensions.paddingM,
+                                            child: Container(
+                                              height: context
+                                                  .dimensions.buttonHeight,
+                                              width: context
+                                                  .dimensions.buttonHeight,
+                                              decoration: BoxDecoration(
+                                                gradient: LinearGradient(
+                                                  colors: [
+                                                    AppColors.primary,
+                                                    AppColors.secondary
+                                                  ],
+                                                  begin: Alignment.topLeft,
+                                                  end: Alignment.bottomRight,
+                                                ),
+                                                shape: BoxShape.circle,
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: AppColors.primary
+                                                        .withOpacity(0.3),
+                                                    blurRadius: 10,
+                                                    offset: const Offset(0, 4),
+                                                  ),
+                                                ],
+                                              ),
+                                              child: const Icon(
+                                                CupertinoIcons.plus,
+                                                color: CupertinoColors.white,
+                                                size: 28,
                                               ),
                                             ),
                                           ),
-                                        ),
-                                        const SizedBox(height: 16),
-                                        Text(
-                                          'Fotoğraf Ekleyin',
-                                          style:
-                                              AppTextTheme.headline6.copyWith(
-                                            color: AppColors.primary,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 32,
-                                          ),
-                                          child: Text(
-                                            'Analizin doğru yapılabilmesi için bitkinizin net bir fotoğrafını ekleyin',
-                                            style:
-                                                AppTextTheme.bodyText2.copyWith(
-                                              color: CupertinoColors.systemGrey,
-                                            ),
-                                            textAlign: TextAlign.center,
-                                          ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
                                   ),
                           ),
