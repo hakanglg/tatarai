@@ -1,258 +1,338 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:logger/logger.dart';
 import 'package:tatarai/core/base/base_service.dart';
+import 'package:tatarai/features/auth/models/user_model.dart';
+import 'package:tatarai/features/auth/models/user_role.dart';
 
 /// Firebase authentication servisi
 /// Firebase Auth ile ilgili temel işlemleri gerçekleştirir
 class AuthService extends BaseService {
-  final firebase_auth.FirebaseAuth _firebaseAuth;
-
-  /// Firebase Authentication örneğini alır
-  AuthService({firebase_auth.FirebaseAuth? firebaseAuth})
-      : _firebaseAuth = firebaseAuth ?? firebase_auth.FirebaseAuth.instance;
+  final Logger _logger = Logger();
+  final firebase_auth.FirebaseAuth _firebaseAuth =
+      firebase_auth.FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   /// Mevcut giriş yapmış kullanıcıyı stream olarak döndürür
-  Stream<firebase_auth.User?> get authStateChanges =>
-      _firebaseAuth.authStateChanges();
+  Stream<UserModel?> get userStream {
+    return _firebaseAuth.authStateChanges().asyncMap((user) async {
+      if (user == null) {
+        return null;
+      }
+
+      try {
+        return await getUserFromFirestore(user.uid);
+      } catch (e) {
+        _logger.e('Firestore\'dan kullanıcı bilgileri alınamadı: $e');
+        // Temel kullanıcı bilgileriyle devam et
+        return UserModel.fromFirebaseUser(user);
+      }
+    });
+  }
 
   /// Mevcut giriş yapmış kullanıcıyı döndürür
   firebase_auth.User? get currentUser => _firebaseAuth.currentUser;
 
   /// E-posta ve şifre ile kayıt olma işlemini yapar
-  Future<firebase_auth.User?> signUpWithEmailAndPassword({
+  Future<UserModel> signUpWithEmailAndPassword({
     required String email,
     required String password,
+    String? displayName,
   }) async {
     try {
+      _logger.i('E-posta ile kayıt başlatılıyor: $email');
+
       final userCredential = await _firebaseAuth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      logSuccess('Kayıt olma', 'Kullanıcı ID: ${userCredential.user?.uid}');
-      return userCredential.user;
+      final user = userCredential.user!;
+
+      // Kullanıcı profili güncelleme
+      if (displayName != null && displayName.isNotEmpty) {
+        await user.updateDisplayName(displayName);
+      }
+
+      // Firestore kullanıcı dökümanı oluştur
+      final userModel = UserModel(
+        id: user.uid,
+        email: email,
+        displayName: displayName,
+        isEmailVerified: false,
+        createdAt: DateTime.now(),
+        lastLoginAt: DateTime.now(),
+        role: UserRole.free,
+        analysisCredits: 3, // Yeni kullanıcılar için başlangıç kredisi
+        favoriteAnalysisIds: const [],
+      );
+
+      await saveUserToFirestore(userModel);
+
+      _logger.i('Kullanıcı kaydı başarılı: ${user.uid}');
+      return userModel;
     } on firebase_auth.FirebaseAuthException catch (e) {
-      final errorMessage = _handleFirebaseAuthError(e);
-      logWarning('Kayıt olma hatası', '$errorMessage (${e.code})');
-      throw Exception(errorMessage);
+      _logger.w('Kayıt olma hatası: ${e.code}');
+      throw _handleAuthException(e);
     } catch (e) {
-      handleError('Kayıt olma', e);
-      throw Exception('Kayıt sırasında beklenmeyen bir hata oluştu.');
+      _logger.e('Beklenmeyen kayıt hatası: $e');
+      throw Exception(
+          'Kayıt işlemi sırasında beklenmeyen bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
     }
   }
 
   /// E-posta ve şifre ile giriş yapma işlemini yapar
-  Future<firebase_auth.User?> signInWithEmailAndPassword({
+  Future<UserModel> signInWithEmailAndPassword({
     required String email,
     required String password,
   }) async {
     try {
+      _logger.i('E-posta ile giriş başlatılıyor: $email');
+
       final userCredential = await _firebaseAuth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      logSuccess('Giriş yapma', 'Kullanıcı ID: ${userCredential.user?.uid}');
-      return userCredential.user;
+      final user = userCredential.user!;
+      final userModel = await getUserFromFirestore(user.uid);
+
+      // Giriş zamanını güncelle
+      final updatedModel = userModel.copyWith(
+        lastLoginAt: DateTime.now(),
+      );
+
+      await saveUserToFirestore(updatedModel);
+
+      _logger.i('Giriş başarılı: ${user.uid}');
+      return updatedModel;
     } on firebase_auth.FirebaseAuthException catch (e) {
-      final errorMessage = _handleFirebaseAuthError(e);
-      logWarning('Giriş yapma hatası', '$errorMessage (${e.code})');
-      throw Exception(errorMessage);
+      _logger.w('Giriş hatası: ${e.code}');
+      throw _handleAuthException(e);
     } catch (e) {
-      handleError('Giriş yapma', e);
-      throw Exception('Giriş sırasında beklenmeyen bir hata oluştu.');
+      _logger.e('Beklenmeyen giriş hatası: $e');
+      throw Exception(
+          'Giriş işlemi sırasında beklenmeyen bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
     }
   }
 
-  /// E-posta doğrulama linki gönderir
+  /// Kullanıcı çıkışı
+  Future<void> signOut() async {
+    try {
+      _logger.i('Kullanıcı çıkışı başlatılıyor');
+      await _firebaseAuth.signOut();
+      _logger.i('Kullanıcı çıkışı başarılı');
+    } catch (e) {
+      _logger.e('Çıkış hatası: $e');
+      throw Exception(
+          'Çıkış yapılırken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
+    }
+  }
+
+  /// E-posta doğrulama gönderme
   Future<void> sendEmailVerification() async {
     try {
-      await _firebaseAuth.currentUser?.sendEmailVerification();
-      logSuccess('E-posta doğrulama linki gönderildi');
+      final user = _firebaseAuth.currentUser;
+      if (user == null) {
+        throw Exception('Oturum açık değil.');
+      }
+
+      await user.sendEmailVerification();
+      _logger.i('E-posta doğrulama bağlantısı gönderildi: ${user.email}');
     } catch (e) {
-      _handleFirebaseAuthError(e);
-      rethrow;
+      _logger.e('E-posta doğrulama hatası: $e');
+      throw Exception(
+          'E-posta doğrulama bağlantısı gönderilirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
     }
   }
 
-  /// Kullanıcının e-posta doğrulama durumunu yeniler
-  Future<bool> refreshEmailVerificationStatus() async {
+  /// E-posta doğrulama durumunu kontrol eder
+  Future<bool> checkEmailVerification() async {
     try {
-      // Kullanıcı bilgilerini Firebase'den yeniden çek
-      await _firebaseAuth.currentUser?.reload();
       final user = _firebaseAuth.currentUser;
+      await user?.reload(); // Kullanıcı bilgilerini yenile
 
       if (user != null && user.emailVerified) {
-        logSuccess('E-posta doğrulandı: ${user.email}');
+        _logger.i('E-posta doğrulandı: ${user.email}');
+
+        // Firestore'daki kullanıcı bilgilerini güncelle
+        final userModel = await getUserFromFirestore(user.uid);
+        final updatedModel = userModel.copyWith(isEmailVerified: true);
+        await saveUserToFirestore(updatedModel);
+
         return true;
       } else {
-        logInfo('E-posta henüz doğrulanmadı');
+        _logger.i('E-posta henüz doğrulanmadı');
         return false;
       }
     } catch (e) {
-      _handleFirebaseAuthError(e);
+      _logger.e('E-posta doğrulama hatası: $e');
       return false;
     }
   }
 
-  /// Şifre sıfırlama e-postası gönderir
+  /// Şifre sıfırlama e-postası gönderme
   Future<void> sendPasswordResetEmail(String email) async {
     try {
+      _logger.i('Şifre sıfırlama e-postası gönderiliyor: $email');
       await _firebaseAuth.sendPasswordResetEmail(email: email);
-      logSuccess('Şifre sıfırlama e-postası gönderme', email);
+      _logger.i('Şifre sıfırlama e-postası gönderildi: $email');
     } on firebase_auth.FirebaseAuthException catch (e) {
-      logWarning('Şifre sıfırlama hatası', '${e.code}: ${e.message}');
-      final errorMessage = _handleFirebaseAuthError(e);
-      throw Exception(errorMessage);
+      _logger.w('Şifre sıfırlama hatası: ${e.code}');
+      throw _handleAuthException(e);
     } catch (e) {
-      handleError('Şifre sıfırlama', e);
-      throw Exception('Şifre sıfırlama sırasında bir hata oluştu.');
+      _logger.e('Beklenmeyen şifre sıfırlama hatası: $e');
+      throw Exception(
+          'Şifre sıfırlama e-postası gönderilirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
     }
   }
 
-  /// Oturum kapatma
-  Future<void> signOut() async {
-    try {
-      await _firebaseAuth.signOut();
-      logSuccess('Çıkış yapma');
-    } catch (e) {
-      handleError('Çıkış yapma', e);
-      throw Exception('Çıkış yapma sırasında bir hata oluştu.');
-    }
-  }
-
-  /// Kullanıcı hesabını silme
+  /// Hesap silme
   Future<void> deleteAccount() async {
-    try {
-      await _firebaseAuth.currentUser?.delete();
-      logSuccess('Hesap silme');
-    } on firebase_auth.FirebaseAuthException catch (e) {
-      logWarning('Hesap silme hatası', '${e.code}: ${e.message}');
-      final errorMessage = _handleFirebaseAuthError(e);
-      throw Exception(errorMessage);
-    } catch (e) {
-      handleError('Hesap silme', e);
-      throw Exception('Hesap silme sırasında bir hata oluştu.');
-    }
-  }
-
-  /// Firebase'de kullanıcı profilini günceller
-  Future<void> updateProfile({String? displayName, String? photoURL}) async {
     try {
       final user = _firebaseAuth.currentUser;
       if (user == null) {
-        throw Exception('Oturum açmış kullanıcı bulunamadı');
+        throw Exception('Oturum açık değil.');
       }
 
-      await user.updateDisplayName(displayName);
-      await user.updatePhotoURL(photoURL);
+      // Önce Firestore'dan kullanıcı verilerini sil
+      await _firestore.collection('users').doc(user.uid).delete();
 
-      // Profil güncellemesinden sonra kullanıcı bilgilerini yenile
-      // Bu, sonraki işlemlerde güncel kullanıcı bilgilerine erişim sağlar
-      await user.reload();
-
-      logSuccess('Profil güncelleme');
+      // Sonra Authentication hesabını sil
+      await user.delete();
+      _logger.i('Hesap silindi: ${user.uid}');
+    } on firebase_auth.FirebaseAuthException catch (e) {
+      _logger.w('Hesap silme hatası: ${e.code}');
+      throw _handleAuthException(e);
     } catch (e) {
-      handleError('Profil güncelleme', e);
+      _logger.e('Hesap silme hatası: $e');
+      throw Exception(
+          'Hesap silme sırasında bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
+    }
+  }
+
+  /// Kullanıcı hesabını güncelleme
+  Future<UserModel> updateUserProfile({
+    String? displayName,
+    String? photoURL,
+  }) async {
+    try {
+      final user = _firebaseAuth.currentUser;
+      if (user == null) {
+        throw Exception('Oturum açık değil.');
+      }
+
+      _logger.i('Kullanıcı profili güncelleniyor: ${user.uid}');
+
+      if (displayName != null) {
+        await user.updateDisplayName(displayName);
+      }
+
+      if (photoURL != null) {
+        await user.updatePhotoURL(photoURL);
+      }
+
+      // Mevcut kullanıcı bilgilerini al ve güncelle
+      final userModel = await getUserFromFirestore(user.uid);
+      final updatedUserModel = userModel.copyWith(
+        displayName: displayName ?? userModel.displayName,
+        photoURL: photoURL ?? userModel.photoURL,
+      );
+
+      await saveUserToFirestore(updatedUserModel);
+
+      _logger.i('Kullanıcı profili güncellendi: ${user.uid}');
+      return updatedUserModel;
+    } catch (e) {
+      _logger.e('Profil güncelleme hatası: $e');
+      throw Exception(
+          'Kullanıcı profili güncellenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
+    }
+  }
+
+  /// Analiz kredisi güncelleme
+  Future<UserModel> updateAnalysisCredits(String userId, int credits) async {
+    try {
+      _logger.i('Kullanıcı kredisi güncelleniyor: $userId, credits: $credits');
+
+      // Mevcut kullanıcı bilgilerini al ve güncelle
+      final userModel = await getUserFromFirestore(userId);
+      final updatedUserModel = userModel.copyWith(
+        analysisCredits: credits,
+      );
+
+      await saveUserToFirestore(updatedUserModel);
+
+      _logger
+          .i('Kullanıcı kredisi güncellendi: $userId, yeni krediler: $credits');
+      return updatedUserModel;
+    } catch (e) {
+      _logger.e('Kredi güncelleme hatası: $e');
+      throw Exception(
+          'Kullanıcı kredileri güncellenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
+    }
+  }
+
+  /// Firestore'dan kullanıcı bilgilerini alma
+  Future<UserModel> getUserFromFirestore(String userId) async {
+    try {
+      final doc = await _firestore.collection('users').doc(userId).get();
+
+      if (!doc.exists || doc.data() == null) {
+        _logger.w('Kullanıcı dökümanı bulunamadı: $userId');
+
+        // Firebase Auth'tan temel kullanıcı bilgilerini al
+        final authUser = _firebaseAuth.currentUser;
+        if (authUser?.uid == userId) {
+          return UserModel.fromFirebaseUser(authUser!);
+        }
+
+        throw Exception('Kullanıcı bilgileri bulunamadı.');
+      }
+
+      return UserModel.fromFirestore(doc);
+    } catch (e) {
+      _logger.e('Firestore kullanıcı bilgisi alma hatası: $e');
       rethrow;
     }
   }
 
-  /// Firebase token'ını yeniler - Firebase 5.5.2+ versiyonları için gerekli
-  Future<String?> getIdToken() async {
+  /// Firestore'a kullanıcı bilgilerini kaydetme
+  Future<void> saveUserToFirestore(UserModel user) async {
     try {
-      final user = _firebaseAuth.currentUser;
-      if (user == null) {
-        logWarning('Token yenileme', 'Kullanıcı oturum açmamış');
-        return null;
-      }
-
-      // Force refresh token
-      final idToken = await user.getIdToken(true);
-      logSuccess('Token yenileme', 'Token başarıyla alındı');
-      return idToken;
+      await _firestore.collection('users').doc(user.id).set(
+            user.toFirestore(),
+            SetOptions(merge: true),
+          );
     } catch (e) {
-      handleError('Token yenileme', e);
-      return null;
+      _logger.e('Firestore kullanıcı kaydetme hatası: $e');
+      throw Exception('Kullanıcı bilgileri kaydedilirken bir hata oluştu.');
     }
   }
 
-  /// Firebase Auth hata mesajlarını işler
-  String _handleFirebaseAuthError(Object error) {
-    if (error is firebase_auth.FirebaseAuthException) {
-      final code = error.code;
-      logWarning(
-        'Firebase Auth hatası',
-        'Bir hata oluştu: ${error.message} [ $code',
-      );
-
-      // Hata kodlarına göre anlamlı mesajlar döndür
-      switch (code) {
-        case 'email-already-in-use':
-          return 'Bu e-posta adresi zaten kullanımda.';
-        case 'invalid-email':
-          return 'Geçersiz e-posta adresi.';
-        case 'user-not-found':
-          return 'Bu e-posta adresiyle kayıtlı kullanıcı bulunamadı.';
-        case 'wrong-password':
-          return 'Yanlış şifre.';
-        case 'weak-password':
-          return 'Şifre çok zayıf. En az 6 karakter içermelidir.';
-        case 'operation-not-allowed':
-          return 'Bu işlem şu anda izin verilmiyor.';
-        case 'user-disabled':
-          return 'Bu kullanıcı hesabı devre dışı bırakılmıştır.';
-        case 'too-many-requests':
-          return 'Çok fazla istek. Lütfen daha sonra tekrar deneyin.';
-        case 'requires-recent-login':
-          return 'Bu işlem için yakın zamanda giriş yapmanız gerekiyor.';
-        case 'network-request-failed':
-          return 'Ağ bağlantısı hatası. İnternet bağlantınızı kontrol edin.';
-        case 'invalid-verification-code':
-          return 'Geçersiz doğrulama kodu.';
-        case 'invalid-verification-id':
-          return 'Geçersiz doğrulama kimliği.';
-        case 'account-exists-with-different-credential':
-          return 'Bu e-posta adresi farklı bir giriş yöntemiyle ilişkilendirilmiş.';
-        default:
-          return 'Bir hata oluştu: ${error.message}';
-      }
-    } else {
-      logWarning('Firebase Auth hatası', 'Bilinmeyen hata: $error');
-      return 'Bir hata oluştu: $error';
-    }
-  }
-
-  /// Firebase Auth hata kodundan anlamlı mesaj döndürür
-  String getMessageFromErrorCode(String code) {
-    switch (code) {
+  /// Firebase Auth hatalarını düzgün mesajlara dönüştürme
+  String _handleAuthException(firebase_auth.FirebaseAuthException e) {
+    switch (e.code) {
       case 'email-already-in-use':
-        return 'Bu e-posta adresi zaten kullanımda.';
+        return 'Bu e-posta adresi zaten kullanılıyor.';
       case 'invalid-email':
-        return 'Geçersiz e-posta adresi.';
+        return 'Geçersiz e-posta adresi formatı.';
+      case 'user-disabled':
+        return 'Bu kullanıcı hesabı devre dışı bırakılmış.';
       case 'user-not-found':
-        return 'Bu e-posta adresiyle kayıtlı kullanıcı bulunamadı.';
+        return 'Bu e-posta adresine sahip bir kullanıcı bulunamadı.';
       case 'wrong-password':
-        return 'Yanlış şifre.';
+        return 'Hatalı şifre girdiniz.';
       case 'weak-password':
-        return 'Şifre çok zayıf. En az 6 karakter içermelidir.';
+        return 'Şifre çok zayıf. Lütfen daha güçlü bir şifre seçin.';
       case 'operation-not-allowed':
         return 'Bu işlem şu anda izin verilmiyor.';
-      case 'user-disabled':
-        return 'Bu kullanıcı hesabı devre dışı bırakılmıştır.';
       case 'too-many-requests':
-        return 'Çok fazla istek. Lütfen daha sonra tekrar deneyin.';
-      case 'requires-recent-login':
-        return 'Bu işlem için yakın zamanda giriş yapmanız gerekiyor.';
+        return 'Çok fazla istekte bulundunuz. Lütfen daha sonra tekrar deneyin.';
       case 'network-request-failed':
-        return 'Ağ bağlantısı hatası. İnternet bağlantınızı kontrol edin.';
-      case 'invalid-verification-code':
-        return 'Geçersiz doğrulama kodu.';
-      case 'invalid-verification-id':
-        return 'Geçersiz doğrulama kimliği.';
-      case 'account-exists-with-different-credential':
-        return 'Bu e-posta adresi farklı bir giriş yöntemiyle ilişkilendirilmiş.';
+        return 'Ağ bağlantısı hatası. Lütfen internet bağlantınızı kontrol edin.';
       default:
-        return 'Bir hata oluştu: $code';
+        return 'Bir hata oluştu: ${e.message ?? e.code}';
     }
   }
 }

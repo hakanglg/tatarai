@@ -16,7 +16,7 @@ import 'package:tatarai/core/theme/text_theme.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/core/widgets/app_button.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
-import 'package:tatarai/features/auth/models/auth_state.dart';
+import 'package:tatarai/features/auth/cubits/auth_state.dart';
 import 'package:tatarai/features/auth/models/user_model.dart';
 import 'package:tatarai/features/auth/repositories/user_repository.dart';
 import 'package:tatarai/features/auth/services/auth_service.dart';

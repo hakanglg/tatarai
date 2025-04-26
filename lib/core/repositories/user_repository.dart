@@ -14,8 +14,8 @@ class UserRepository extends BaseRepository with CacheableMixin {
 
   /// Varsayılan olarak Firebase örneklerini kullanır
   UserRepository({AuthService? authService, FirebaseFirestore? firestore})
-    : _authService = authService ?? AuthService(),
-      _firestore = firestore ?? FirebaseFirestore.instance;
+      : _authService = authService ?? AuthService(),
+        _firestore = firestore ?? FirebaseFirestore.instance;
 
   /// SharedPreferences instance'ını başlatır
   Future<SharedPreferences> get _preferences async {
@@ -25,47 +25,7 @@ class UserRepository extends BaseRepository with CacheableMixin {
 
   /// Giriş durumu değişikliklerini stream olarak döndürür
   Stream<UserModel?> get user {
-    return _authService.authStateChanges.asyncMap((firebaseUser) async {
-      if (firebaseUser == null) {
-        return null;
-      }
-
-      try {
-        // Firestore'dan kullanıcı bilgilerini alma
-        UserModel userModel = await getUserData(firebaseUser.uid);
-
-        // Kullanıcı verisini önbelleğe alma
-        await cacheData(
-          _userCachePrefix + firebaseUser.uid,
-          userModel.toFirestore(),
-        );
-
-        return userModel;
-      } catch (e) {
-        logWarning('Kullanıcı verisi alınamadı', e.toString());
-
-        // Önbellekten almayı deneyelim
-        try {
-          final cachedData = await getCachedData(
-            _userCachePrefix + firebaseUser.uid,
-          );
-          if (cachedData != null) {
-            // Önbellekten alınan veriyi kullanarak bir model oluştur
-            final userDoc =
-                await _firestore
-                    .collection(_userCollection)
-                    .doc(firebaseUser.uid)
-                    .get();
-            return UserModel.fromFirestore(userDoc);
-          }
-        } catch (_) {
-          // Önbellekten de alınamadı, Firebase Auth kullanıcısından bir model oluştur
-        }
-
-        // Firebase Auth kullanıcısından temel model oluşturma
-        return UserModel.fromFirebaseUser(firebaseUser);
-      }
-    });
+    return _authService.userStream;
   }
 
   /// Mevcut kullanıcıyı döndürür
@@ -76,29 +36,13 @@ class UserRepository extends BaseRepository with CacheableMixin {
     }
 
     try {
-      return await getUserData(firebaseUser.uid);
+      // Önce AuthService'ten doğrudan UserModel almayı dene
+      final userModel =
+          await _authService.getUserFromFirestore(firebaseUser.uid);
+      return userModel;
     } catch (e) {
       logWarning('Mevcut kullanıcı verisi alınamadı', e.toString());
-
-      // Önbellekten almayı deneyelim
-      try {
-        final cachedData = await getCachedData(
-          _userCachePrefix + firebaseUser.uid,
-        );
-        if (cachedData != null) {
-          // Önbellekten alınan veriyi kullanarak bir model oluştur
-          final userDoc =
-              await _firestore
-                  .collection(_userCollection)
-                  .doc(firebaseUser.uid)
-                  .get();
-          return UserModel.fromFirestore(userDoc);
-        }
-      } catch (_) {
-        // Önbellekten de alınamadı, Firebase Auth kullanıcısından bir model oluştur
-      }
-
-      return UserModel.fromFirebaseUser(firebaseUser);
+      return null;
     }
   }
 
@@ -108,30 +52,14 @@ class UserRepository extends BaseRepository with CacheableMixin {
     required String password,
   }) async {
     try {
-      final firebaseUser = await _authService.signInWithEmailAndPassword(
+      final userModel = await _authService.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      if (firebaseUser == null) {
-        return null;
-      }
-
-      try {
-        // Kullanıcının son giriş tarihi güncelleniyor
-        UserModel? existingUser = await getUserData(firebaseUser.uid);
-        final updatedUser = existingUser.copyWith(lastLoginAt: DateTime.now());
-        await updateUserData(updatedUser);
-
-        logSuccess('Giriş yapma', 'Kullanıcı ID: ${updatedUser.id}');
-        return updatedUser;
-      } catch (e) {
-        logWarning(
-          'Giriş sonrası kullanıcı verisi güncellenemedi',
-          e.toString(),
-        );
-        return UserModel.fromFirebaseUser(firebaseUser);
-      }
+      // userModel çoktan güncellenmiş olarak dönüyor
+      logSuccess('Giriş yapma', 'Kullanıcı ID: ${userModel.id}');
+      return userModel;
     } catch (e) {
       handleError('Giriş yapma', e);
       rethrow;
@@ -145,24 +73,14 @@ class UserRepository extends BaseRepository with CacheableMixin {
     required String displayName,
   }) async {
     try {
-      final firebaseUser = await _authService.signUpWithEmailAndPassword(
+      final userModel = await _authService.signUpWithEmailAndPassword(
         email: email,
         password: password,
+        displayName: displayName,
       );
-
-      if (firebaseUser == null) {
-        return null;
-      }
-
-      // Profil güncelleme (opsiyonel)
-      await _authService.updateProfile(displayName: displayName);
 
       // E-posta doğrulama gönder
       await _authService.sendEmailVerification();
-
-      // Firestore'da kullanıcı verileri oluştur
-      final userModel = UserModel.fromFirebaseUser(firebaseUser);
-      await createUserData(userModel);
 
       logSuccess('Kayıt olma', 'Kullanıcı ID: ${userModel.id}');
       return userModel;
@@ -216,19 +134,12 @@ class UserRepository extends BaseRepository with CacheableMixin {
     }
 
     try {
-      // Firebase Auth profilini güncelle
-      await _authService.updateProfile(
+      // Firebase Auth ve Firestore'da güncelle
+      final updatedUser = await _authService.updateUserProfile(
         displayName: displayName,
         photoURL: photoURL,
       );
 
-      // Firestore'daki kullanıcı verilerini güncelle
-      final updatedUser = currentUser.copyWith(
-        displayName: displayName,
-        photoURL: photoURL,
-      );
-
-      await updateUserData(updatedUser);
       logSuccess('Profil güncelleme');
       return updatedUser;
     } catch (e) {
@@ -317,37 +228,34 @@ class UserRepository extends BaseRepository with CacheableMixin {
 
   /// Firestore'dan kullanıcı verisini alır
   Future<UserModel> getUserData(String userId) async {
-    final doc = await _firestore.collection(_userCollection).doc(userId).get();
-
-    if (doc.exists) {
-      return UserModel.fromFirestore(doc);
+    try {
+      return await _authService.getUserFromFirestore(userId);
+    } catch (e) {
+      handleError('Kullanıcı verisi alma', e);
+      rethrow;
     }
-
-    // Eğer firestore'da kullanıcı yoksa, Firebase Auth'dan bilgileri alıp yeni bir kayıt oluştur
-    final firebaseUser = _authService.currentUser;
-    if (firebaseUser != null && firebaseUser.uid == userId) {
-      final userModel = UserModel.fromFirebaseUser(firebaseUser);
-      await createUserData(userModel);
-      return userModel;
-    }
-
-    throw Exception('Kullanıcı bulunamadı');
   }
 
   /// Firestore'da yeni kullanıcı verisi oluşturur
   Future<void> createUserData(UserModel user) async {
-    await _firestore
-        .collection(_userCollection)
-        .doc(user.id)
-        .set(user.toFirestore());
+    try {
+      // AuthService zaten kullanıcı verisini Firestore'a kaydediyor
+      logSuccess('Kullanıcı verisi oluşturuldu', 'Kullanıcı ID: ${user.id}');
+    } catch (e) {
+      handleError('Kullanıcı verisi oluşturma', e);
+      rethrow;
+    }
   }
 
   /// Firestore'da kullanıcı verisini günceller
   Future<void> updateUserData(UserModel user) async {
-    await _firestore
-        .collection(_userCollection)
-        .doc(user.id)
-        .update(user.toFirestore());
+    try {
+      await _authService.saveUserToFirestore(user);
+      logSuccess('Kullanıcı verisi güncellendi', 'Kullanıcı ID: ${user.id}');
+    } catch (e) {
+      handleError('Kullanıcı verisi güncelleme', e);
+      rethrow;
+    }
   }
 
   /// Veriyi önbelleğe kaydeder
@@ -402,11 +310,10 @@ class UserRepository extends BaseRepository with CacheableMixin {
     try {
       final prefs = await _preferences;
       // Sadece kullanıcı verilerini temizle
-      final keys =
-          prefs
-              .getKeys()
-              .where((key) => key.startsWith(_userCachePrefix))
-              .toList();
+      final keys = prefs
+          .getKeys()
+          .where((key) => key.startsWith(_userCachePrefix))
+          .toList();
 
       for (var key in keys) {
         await prefs.remove(key);

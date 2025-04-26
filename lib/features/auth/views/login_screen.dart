@@ -7,7 +7,7 @@ import 'package:tatarai/core/theme/color_scheme.dart';
 import 'package:tatarai/core/theme/dimensions.dart';
 import 'package:tatarai/core/widgets/app_button.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
-import 'package:tatarai/features/auth/models/auth_state.dart';
+import 'package:tatarai/features/auth/cubits/auth_state.dart';
 
 /// Kullanıcı giriş ekranı
 class LoginScreen extends StatefulWidget {
@@ -35,9 +35,9 @@ class _LoginScreenState extends State<LoginScreen> {
   void _signIn() {
     if (_formKey.currentState?.validate() ?? false) {
       context.read<AuthCubit>().signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
+            email: _emailController.text.trim(),
+            password: _passwordController.text.trim(),
+          );
     }
   }
 
@@ -49,11 +49,16 @@ class _LoginScreenState extends State<LoginScreen> {
     return BlocListener<AuthCubit, AuthState>(
       listener: (context, state) {
         if (state.isAuthenticated) {
-          // Başarılı giriş
+          // Başarılı giriş - hata mesajını temizle ve ana sayfaya yönlendir
+          context.read<AuthCubit>().clearErrorMessage();
           context.goNamed(RouteNames.home);
-        } else if (state.errorMessage != null) {
-          // Hata durumu
+        } else if (state.errorMessage != null && !state.isLoading) {
+          // Hata durumu - yükleme tamamlandıysa ve hata varsa göster
           _showErrorDialog(context, state.errorMessage!);
+          // Hata mesajını gösterdikten sonra temizle
+          Future.delayed(Duration.zero, () {
+            context.read<AuthCubit>().clearErrorMessage();
+          });
         }
       },
       child: CupertinoPageScaffold(
@@ -227,17 +232,16 @@ class _LoginScreenState extends State<LoginScreen> {
   void _showErrorDialog(BuildContext context, String message) {
     showCupertinoDialog(
       context: context,
-      builder:
-          (context) => CupertinoAlertDialog(
-            title: const Text('Hata'),
-            content: Text(message),
-            actions: [
-              CupertinoDialogAction(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Tamam'),
-              ),
-            ],
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('Hata'),
+        content: Text(message),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Tamam'),
           ),
+        ],
+      ),
     );
   }
 
@@ -322,18 +326,17 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     try {
                       await context.read<AuthCubit>().sendPasswordResetEmail(
-                        email,
-                      );
+                            email,
+                          );
                       if (context.mounted) {
                         Navigator.of(context).pop();
                         _showPasswordResetSuccessDialog(context);
                       }
                     } catch (e) {
                       setState(() {
-                        errorText =
-                            e is FirebaseAuthException
-                                ? context.read<AuthCubit>().getErrorMessage(e)
-                                : 'Şifre sıfırlama işlemi sırasında bir hata oluştu.';
+                        errorText = e is FirebaseAuthException
+                            ? context.read<AuthCubit>().getErrorMessage(e)
+                            : 'Şifre sıfırlama işlemi sırasında bir hata oluştu.';
                       });
                     }
                   },
@@ -350,21 +353,20 @@ class _LoginScreenState extends State<LoginScreen> {
   void _showPasswordResetSuccessDialog(BuildContext context) {
     showCupertinoDialog(
       context: context,
-      builder:
-          (context) => CupertinoAlertDialog(
-            title: const Text('Bağlantı Gönderildi'),
-            content: const Text(
-              'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi. '
-              'Lütfen e-postanızı kontrol edin ve bağlantıya tıklayarak şifrenizi sıfırlayın.',
-            ),
-            actions: [
-              CupertinoDialogAction(
-                isDefaultAction: true,
-                child: const Text('Tamam'),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ],
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('Bağlantı Gönderildi'),
+        content: const Text(
+          'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi. '
+          'Lütfen e-postanızı kontrol edin ve bağlantıya tıklayarak şifrenizi sıfırlayın.',
+        ),
+        actions: [
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            child: const Text('Tamam'),
+            onPressed: () => Navigator.of(context).pop(),
           ),
+        ],
+      ),
     );
   }
 }

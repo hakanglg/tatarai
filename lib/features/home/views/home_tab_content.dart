@@ -7,7 +7,7 @@ import 'package:tatarai/core/theme/text_theme.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/core/widgets/app_button.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
-import 'package:tatarai/features/auth/models/auth_state.dart';
+import 'package:tatarai/features/auth/cubits/auth_state.dart';
 import 'package:tatarai/features/navbar/navigation_manager.dart';
 import 'package:tatarai/features/plant_analysis/cubits/plant_analysis_cubit.dart';
 import 'package:tatarai/features/plant_analysis/models/plant_analysis_result.dart';
@@ -267,7 +267,7 @@ class _HomeTabContentState extends State<HomeTabContent> {
                                 const SizedBox(height: 16),
                                 AppButton(
                                   text: 'Analiz Yap',
-                                  type: AppButtonType.secondary,
+                                  type: AppButtonType.text,
                                   onPressed: () {
                                     final navManager =
                                         Provider.of<NavigationManager>(

@@ -6,7 +6,7 @@ import 'package:tatarai/core/routing/route_names.dart';
 import 'package:tatarai/core/routing/route_paths.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
-import 'package:tatarai/features/auth/models/auth_state.dart';
+import 'package:tatarai/features/auth/cubits/auth_state.dart';
 import 'package:tatarai/features/auth/views/login_screen.dart';
 import 'package:tatarai/features/auth/views/register_screen.dart';
 import 'package:tatarai/features/home/views/home_screen.dart';
@@ -26,67 +26,66 @@ class AppRouter {
 
   /// Go Router örneği oluşturur
   GoRouter get router => GoRouter(
-    initialLocation: RoutePaths.splash,
-    debugLogDiagnostics: true,
-    routes: _routes,
-    redirect: _handleRedirect,
-    refreshListenable: GoRouterRefreshStream(authCubit.stream),
-  );
+        initialLocation: RoutePaths.splash,
+        debugLogDiagnostics: true,
+        routes: _routes,
+        redirect: _handleRedirect,
+        refreshListenable: GoRouterRefreshStream(authCubit.stream),
+      );
 
   /// Router yönlendirme kuralları
   List<RouteBase> get _routes => [
-    GoRoute(
-      path: RoutePaths.splash,
-      name: RouteNames.splash,
-      builder: (context, state) => const SplashScreen(),
-    ),
-    GoRoute(
-      path: RoutePaths.login,
-      name: RouteNames.login,
-      builder: (context, state) => const LoginScreen(),
-    ),
-    GoRoute(
-      path: RoutePaths.register,
-      name: RouteNames.register,
-      builder: (context, state) => const RegisterScreen(),
-    ),
-    GoRoute(
-      path: RoutePaths.home,
-      name: RouteNames.home,
-      builder: (context, state) => const HomeScreen(),
-    ),
-    GoRoute(
-      path: RoutePaths.analysis,
-      name: RouteNames.analysis,
-      builder: (context, state) => const AnalysisScreen(),
-    ),
-    GoRoute(
-      path: '${RoutePaths.analysisResult}/:id',
-      name: RouteNames.analysisResult,
-      builder: (context, state) {
-        final id = state.pathParameters['id'] ?? '';
-        return AnalysisResultScreen(analysisId: id);
-      },
-    ),
-    GoRoute(
-      path: RoutePaths.profile,
-      name: RouteNames.profile,
-      builder: (context, state) => const ProfileScreen(),
-    ),
-    GoRoute(
-      path: RoutePaths.premium,
-      name: RouteNames.premium,
-      builder: (context, state) => const PremiumScreen(),
-    ),
-  ];
+        GoRoute(
+          path: RoutePaths.splash,
+          name: RouteNames.splash,
+          builder: (context, state) => const SplashScreen(),
+        ),
+        GoRoute(
+          path: RoutePaths.login,
+          name: RouteNames.login,
+          builder: (context, state) => const LoginScreen(),
+        ),
+        GoRoute(
+          path: RoutePaths.register,
+          name: RouteNames.register,
+          builder: (context, state) => const RegisterScreen(),
+        ),
+        GoRoute(
+          path: RoutePaths.home,
+          name: RouteNames.home,
+          builder: (context, state) => const HomeScreen(),
+        ),
+        GoRoute(
+          path: RoutePaths.analysis,
+          name: RouteNames.analysis,
+          builder: (context, state) => const AnalysisScreen(),
+        ),
+        GoRoute(
+          path: '${RoutePaths.analysisResult}/:id',
+          name: RouteNames.analysisResult,
+          builder: (context, state) {
+            final id = state.pathParameters['id'] ?? '';
+            return AnalysisResultScreen(analysisId: id);
+          },
+        ),
+        GoRoute(
+          path: RoutePaths.profile,
+          name: RouteNames.profile,
+          builder: (context, state) => const ProfileScreen(),
+        ),
+        GoRoute(
+          path: RoutePaths.premium,
+          name: RouteNames.premium,
+          builder: (context, state) => const PremiumScreen(),
+        ),
+      ];
 
   /// Yönlendirme kuralları
   String? _handleRedirect(BuildContext context, GoRouterState state) {
     final authState = authCubit.state;
     final isLoggedIn = authState.isAuthenticated;
     final isSplash = state.matchedLocation == RoutePaths.splash;
-    final isLoggingIn =
-        state.matchedLocation == RoutePaths.login ||
+    final isLoggingIn = state.matchedLocation == RoutePaths.login ||
         state.matchedLocation == RoutePaths.register;
 
     // Uygulama başlangıcında durumu logla

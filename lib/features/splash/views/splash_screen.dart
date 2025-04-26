@@ -7,7 +7,7 @@ import 'package:tatarai/core/base/base_state_widget.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
-import 'package:tatarai/features/auth/models/auth_state.dart';
+import 'package:tatarai/features/auth/cubits/auth_state.dart';
 import 'package:tatarai/features/navbar/navigation_manager.dart';
 
 /// Uygulama başlangıç ekranı

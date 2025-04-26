@@ -39,31 +39,7 @@ class UserRepository extends BaseRepository with CacheableMixin {
 
   /// Giriş durumu değişikliklerini stream olarak döndürür
   Stream<UserModel?> get user {
-    return _authService.authStateChanges.asyncMap((firebaseUser) async {
-      if (firebaseUser == null) {
-        return null;
-      }
-
-      // Firebase Auth kullanıcısı mevcut, Firestore'da dinleme yapmak için stream başlat
-      // İlk değeri hemen döndürmek için
-      try {
-        // Kullanıcı verilerini önce normal olarak al
-        final userData = await getUserData(firebaseUser.uid);
-
-        // Arka planda stream'i başlat
-        getUserStream(firebaseUser.uid).listen((updatedUser) {
-          // Stream kullanıcı değişikliklerini otomatik olarak dinleyecek
-          // Herhangi bir şey yapmamıza gerek yok, Bloc/Cubit bunu dinliyor olacak
-        });
-
-        return userData;
-      } catch (e) {
-        // Hata durumunda en azından temel kullanıcı modelini döndür
-        logWarning('Kullanıcı verisi alınamadı, temel model döndürülüyor',
-            e.toString());
-        return UserModel.fromFirebaseUser(firebaseUser);
-      }
-    });
+    return _authService.userStream;
   }
 
   /// Belirli bir kullanıcı ID'si için Firestore değişikliklerini gerçek zamanlı dinler
@@ -148,28 +124,14 @@ class UserRepository extends BaseRepository with CacheableMixin {
     required String password,
   }) async {
     try {
-      final firebaseUser = await _authService.signInWithEmailAndPassword(
+      final userModel = await _authService.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      if (firebaseUser == null) {
-        return null;
-      }
-
-      try {
-        // Kullanıcının son giriş tarihi güncelleniyor
-        UserModel? existingUser = await getUserData(firebaseUser.uid);
-        final updatedUser = existingUser.copyWith(lastLoginAt: DateTime.now());
-        await updateUserData(updatedUser);
-        return updatedUser;
-      } catch (e) {
-        logWarning(
-          'Giriş sonrası kullanıcı verisi güncellenemedi',
-          e.toString(),
-        );
-        return UserModel.fromFirebaseUser(firebaseUser);
-      }
+      // userModel çoktan güncellenmiş olarak dönüyor
+      logSuccess('Giriş yapma', 'Kullanıcı ID: ${userModel.id}');
+      return userModel;
     } catch (e) {
       handleError('Giriş yapma', e);
       rethrow;
@@ -183,33 +145,14 @@ class UserRepository extends BaseRepository with CacheableMixin {
     String? displayName,
   }) async {
     try {
-      final firebaseUser = await _authService.signUpWithEmailAndPassword(
+      final userModel = await _authService.signUpWithEmailAndPassword(
         email: email,
         password: password,
+        displayName: displayName,
       );
-
-      if (firebaseUser == null) {
-        return null;
-      }
-
-      // Profil güncelleme (opsiyonel)
-      if (displayName != null) {
-        await _authService.updateProfile(displayName: displayName);
-      }
 
       // E-posta doğrulama gönder
       await _authService.sendEmailVerification();
-
-      // Firestore'da kullanıcı verileri oluştur
-      final UserModel userModel = UserModel.fromFirebaseUser(
-        firebaseUser,
-      ).copyWith(
-        displayName: displayName,
-        analysisCredits:
-            AppConstants.FREE_ANALYSIS_CREDITS, // Her yeni kullanıcıya 1 kredi
-      );
-
-      await createUserData(userModel);
 
       logSuccess('Kayıt olma', 'Kullanıcı ID: ${userModel.id}');
       return userModel;
@@ -250,26 +193,16 @@ class UserRepository extends BaseRepository with CacheableMixin {
         return null;
       }
 
-      // Firebase'den kullanıcı bilgilerini yenile
-      await currentUser.reload();
+      // E-posta doğrulama durumunu kontrol et ve güncelle
+      final isVerified = await _authService.checkEmailVerification();
 
-      // Güncellenmiş kullanıcı bilgilerini al
-      final refreshedUser = _authService.currentUser;
-
-      if (refreshedUser != null) {
-        // Güncel bilgilerle UserModel oluştur
-        final updatedUserModel = UserModel.fromFirebaseUser(refreshedUser);
-
-        // Eğer kullanıcı bilgileri Firestore'da da tutuluyorsa
-        // ve e-posta doğrulama durumu değiştiyse, Firestore'u da güncelle
-        if (updatedUserModel.isEmailVerified) {
-          await updateUserData(updatedUserModel);
-        }
-
-        return updatedUserModel;
+      // checkEmailVerification metodu zaten Firestore güncelleme yapar
+      if (isVerified) {
+        logSuccess('E-posta doğrulama durumu güncellendi');
       }
 
-      return null;
+      // Güncel kullanıcı modelini döndür
+      return await getCurrentUser();
     } catch (e) {
       handleError('E-posta doğrulama durumu yenileme', e);
       rethrow;
@@ -299,25 +232,13 @@ class UserRepository extends BaseRepository with CacheableMixin {
         return null;
       }
 
-      // Firebase Auth'ta güncelle
-      await _authService.updateProfile(
+      // Firebase Auth ve Firestore'da güncelle
+      final updatedUser = await _authService.updateUserProfile(
         displayName: displayName,
         photoURL: photoURL,
       );
 
-      // Mevcut kullanıcı verisini al
-      final user = await getUserData(firebaseUser.uid);
-
-      // Kullanıcı modelini güncelle
-      final updatedUser = user.copyWith(
-        displayName: displayName ?? user.displayName,
-        photoURL: photoURL ?? user.photoURL,
-      );
-
-      // Firestore'da güncelle
-      await updateUserData(updatedUser);
-
-      logSuccess('Profil güncelleme', 'Kullanıcı ID: ${user.id}');
+      logSuccess('Profil güncelleme', 'Kullanıcı ID: ${updatedUser.id}');
       return updatedUser;
     } catch (e) {
       handleError('Profil güncelleme', e);

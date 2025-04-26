@@ -28,10 +28,11 @@ class AuthState extends BaseState {
   }
 
   /// Kullanıcı çıkış yapmış
-  factory AuthState.unauthenticated() {
-    return const AuthState(
+  factory AuthState.unauthenticated({String? errorMessage}) {
+    return AuthState(
       status: AuthStatus.unauthenticated,
       isLoading: false,
+      errorMessage: errorMessage,
     );
   }
 
@@ -56,11 +57,13 @@ class AuthState extends BaseState {
     UserModel? user,
     String? errorMessage,
     bool? isLoading,
+    bool clearUser = false,
+    bool clearError = false,
   }) {
     return AuthState(
       status: status ?? this.status,
-      user: user ?? this.user,
-      errorMessage: errorMessage ?? this.errorMessage,
+      user: clearUser ? null : (user ?? this.user),
+      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       isLoading: isLoading ?? this.isLoading,
     );
   }
@@ -70,16 +73,22 @@ class AuthState extends BaseState {
       status == AuthStatus.authenticated && user != null;
 
   /// Kullanıcının premium olup olmadığını kontrol eder
-  bool get isPremium => user?.role == 'premium';
+  bool get isPremium => user?.isPremium ?? false;
 
   /// Kullanıcının admin olup olmadığını kontrol eder
-  bool get isAdmin => user?.role == 'admin';
+  bool get isAdmin => user?.isAdmin ?? false;
 
   /// Kullanıcının yeterli analiz kredisine sahip olup olmadığını kontrol eder
-  bool get hasAnalysisCredits => (user?.analysisCredits ?? 0) > 0;
+  bool get hasAnalysisCredits => user?.hasAnalysisCredits ?? false;
 
   @override
   List<Object?> get props => [...super.props, status, user];
+
+  /// State'in durumunu kontrol eden kolaylık metodları
+  bool get isInitial => status == AuthStatus.initial;
+  bool get isLoggingIn => isLoading && status != AuthStatus.authenticated;
+  bool get isUnauthenticated => status == AuthStatus.unauthenticated;
+  bool get hasError => errorMessage != null && errorMessage!.isNotEmpty;
 }
 
 /// Kimlik doğrulama durumları
