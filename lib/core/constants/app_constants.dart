@@ -1,3 +1,5 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 /// Uygulama genelinde kullanılacak sabitler
 class AppConstants {
   AppConstants._();
@@ -7,13 +9,9 @@ class AppConstants {
   static const String appVersion = '1.0.0';
 
   // API Endpoint'leri
-  static const String plantIdApiBaseUrl = 'https://api.plant.id/v2';
-  static const String plantIdHealthEndpoint = '/health_assessment';
-  static const String plantIdIdentifyEndpoint = '/identify';
 
   // Gemini API
-  static const String geminiApiKey =
-      'AIzaSyDdzP00LZPUVLzuPyZSy46yOFMeOXXgxpU'; // Gemini API anahtarı
+  static String get geminiApiKey => dotenv.env['GEMINI_API_KEY'] ?? '';
 
   // Ücretsiz kullanıcı için analiz kredisi
   static const int FREE_ANALYSIS_CREDITS = 1;

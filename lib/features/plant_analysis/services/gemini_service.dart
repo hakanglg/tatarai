@@ -16,9 +16,15 @@ class GeminiService {
   /// Gemini modelini yapılandırır
   void _initializeModel() {
     try {
+      final apiKey = AppConstants.geminiApiKey;
+      if (apiKey.isEmpty) {
+        throw Exception(
+            'Gemini API anahtarı bulunamadı. Lütfen .env dosyasını kontrol edin.');
+      }
+
       _model = GenerativeModel(
         model: 'gemini-2.0-flash',
-        apiKey: AppConstants.geminiApiKey,
+        apiKey: apiKey,
       );
       AppLogger.i('Gemini modeli başarıyla başlatıldı');
     } catch (e) {

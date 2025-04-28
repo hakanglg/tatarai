@@ -7,6 +7,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:tatarai/core/constants/app_constants.dart';
 import 'package:tatarai/core/repositories/plant_analysis_repository.dart';
 import 'package:tatarai/core/routing/app_router.dart';
@@ -29,6 +30,33 @@ void main() async {
     () async {
       // Widget ağacı başlatılmadan önce Flutter bağlamını başlat
       WidgetsFlutterBinding.ensureInitialized();
+
+      // Environment değişkenlerini yükle
+      try {
+        await dotenv.load(fileName: ".env");
+        AppLogger.i('Environment değişkenleri başarıyla yüklendi');
+
+        // Gerekli environment değişkenlerini kontrol et
+        final requiredEnvVars = [
+          'GEMINI_API_KEY',
+          'FIREBASE_API_KEY',
+          'FIREBASE_APP_ID',
+          'FIREBASE_MESSAGING_SENDER_ID',
+          'FIREBASE_PROJECT_ID',
+        ];
+
+        final missingVars = requiredEnvVars
+            .where((envVar) => dotenv.env[envVar]?.isEmpty ?? true)
+            .toList();
+        if (missingVars.isNotEmpty) {
+          throw Exception(
+              'Eksik environment değişkenleri: ${missingVars.join(", ")}');
+        }
+      } catch (e) {
+        AppLogger.e('Environment değişkenleri yüklenirken hata oluştu', e);
+        // Uygulama başlatılamaz - kritik hata
+        rethrow;
+      }
 
       // Ana thread'de hata yakalama
       FlutterError.onError = (FlutterErrorDetails details) {
