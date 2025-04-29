@@ -2,27 +2,30 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:tatarai/core/base/base_service.dart';
 import 'package:tatarai/core/constants/app_constants.dart';
-import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/features/plant_analysis/services/gemini_service.dart';
+import 'package:tatarai/features/auth/services/auth_service.dart';
 
 /// Bitki analizi servisi
 /// Kullanıcının analiz hakkı kontrolünü yaparak Gemini servisine yönlendirir
-class PlantAnalysisService {
+class PlantAnalysisService extends BaseService {
   final GeminiService _geminiService;
   final FirebaseFirestore _firestore;
+  final FirebaseStorage _storage;
+  final AuthService _authService;
 
   /// Servis oluşturulurken gerekli bağımlılıkları alır
   PlantAnalysisService({
     GeminiService? geminiService,
-    FirebaseFirestore? firestore,
+    required FirebaseFirestore firestore,
+    required FirebaseStorage storage,
+    required AuthService authService,
   })  : _geminiService = geminiService ?? GeminiService(),
-        _firestore = firestore ??
-            FirebaseFirestore.instanceFor(
-              app: Firebase.app(),
-              databaseId: 'tatarai',
-            );
+        _firestore = firestore,
+        _storage = storage,
+        _authService = authService;
 
   /// Bitki analizi yapar ve kullanıcı kredisini kontrol eder
   ///
@@ -45,28 +48,34 @@ class PlantAnalysisService {
     String? fieldName,
   }) async {
     try {
-      // Eğer konum bilgisi verilmemişse varsayılan konumu kullan
-      final String locationInfo = location ?? 'Tekirdağ/Tatarlı';
+      final user = _authService.currentUser;
+      if (user == null) {
+        logError('Kullanıcı oturum açmamış');
+        throw Exception('Kullanıcı oturum açmamış');
+      }
 
       // Kullanıcı kredi kontrolü
-      final userDoc = await _firestore
+      final userDocRef = await _firestore
           .collection(AppConstants.usersCollection)
           .doc(userId)
           .get();
-      final userData = userDoc.data();
+      final userDataMap = userDocRef.data();
 
-      if (userData == null) {
+      if (userDataMap == null) {
+        logWarning('Kullanıcı bilgileri bulunamadı', 'userId: $userId');
         return AnalysisResponse(
           success: false,
           message: 'Kullanıcı bilgileri bulunamadı.',
         );
       }
 
-      final int credits = userData['analysisCredits'] ?? 0;
-      final bool isPremium = userData['isPremium'] ?? false;
+      final int userCredits = userDataMap['analysisCredits'] ?? 0;
+      final bool isPremium = userDataMap['isPremium'] ?? false;
 
       // Eğer kullanıcı premium değilse ve kredisi yoksa analiz yapılamaz
-      if (credits <= 0 && !isPremium) {
+      if (userCredits <= 0 && !isPremium) {
+        logWarning('Kullanıcının kredisi yok',
+            'userId: $userId, credits: $userCredits');
         return AnalysisResponse(
           success: false,
           message:
@@ -74,6 +83,11 @@ class PlantAnalysisService {
           needsPremium: true,
         );
       }
+
+      logInfo('Bitki analizi başlatılıyor...');
+
+      // Eğer konum bilgisi verilmemişse varsayılan konumu kullan
+      final String locationInfo = location ?? 'Tekirdağ/Tatarlı';
 
       // Kredi var veya premium kullanıcı - analizi yap
       final result = await _geminiService.analyzeImage(
@@ -94,12 +108,12 @@ class PlantAnalysisService {
             .update({'analysisCredits': FieldValue.increment(-1)});
 
         // Kalan kredi sayısını log'la
-        final int remainingCredits = credits - 1;
-        AppLogger.i(
-          'Kullanıcı kredisi düşürüldü. Kalan kredi: $remainingCredits',
-        );
+        final int remainingCredits = userCredits - 1;
+        logInfo(
+            'Kullanıcı kredisi düşürüldü', 'Kalan kredi: $remainingCredits');
       }
 
+      logSuccess('Bitki analizi başarıyla tamamlandı', 'userId: $userId');
       return AnalysisResponse(
         success: true,
         message: 'Analiz başarıyla tamamlandı.',
@@ -108,7 +122,7 @@ class PlantAnalysisService {
         fieldName: fieldName, // Tarla adını yanıta ekle
       );
     } catch (e) {
-      AppLogger.e('Bitki analizi sırasında hata oluştu', e);
+      logError('Bitki analizi sırasında hata oluştu', e.toString());
       return AnalysisResponse(
         success: false,
         message: 'Analiz sırasında bir hata oluştu: ${e.toString()}',
@@ -125,15 +139,24 @@ class PlantAnalysisService {
     String userId,
   ) async {
     try {
+      final user = _authService.currentUser;
+      if (user == null) {
+        logError('Kullanıcı oturum açmamış');
+        throw Exception('Kullanıcı oturum açmamış');
+      }
+
       // Kullanıcının premium olup olmadığını kontrol et
-      final userDoc = await _firestore
+      final userDocRef = await _firestore
           .collection(AppConstants.usersCollection)
           .doc(userId)
           .get();
-      final bool isPremium = userDoc.data()?['isPremium'] ?? false;
+      final userDataMap = userDocRef.data();
+      final bool isPremium = userDataMap?['isPremium'] ?? false;
 
       // Bu özellik sadece premium kullanıcılar için
       if (!isPremium) {
+        logWarning('Premium olmayan kullanıcı hastalık önerisi istedi',
+            'userId: $userId');
         return AnalysisResponse(
           success: false,
           message:
@@ -147,13 +170,15 @@ class PlantAnalysisService {
         diseaseName,
       );
 
+      logSuccess('Hastalık önerileri başarıyla getirildi',
+          'userId: $userId, disease: $diseaseName');
       return AnalysisResponse(
         success: true,
         message: 'Hastalık önerileri başarıyla getirildi.',
         result: result,
       );
     } catch (e) {
-      AppLogger.e('Hastalık önerileri alınırken hata oluştu', e);
+      logError('Hastalık önerileri alınırken hata oluştu', e.toString());
       return AnalysisResponse(
         success: false,
         message: 'Öneriler alınırken bir hata oluştu: ${e.toString()}',
@@ -163,61 +188,59 @@ class PlantAnalysisService {
 
   /// Görsel olmadan bitki bakım tavsiyeleri alır
   ///
-  /// [plantName] bitki adı
+  /// [plantId] bitki adı
   /// [userId] kullanıcı kimliği
   Future<AnalysisResponse> getPlantCareAdvice(
-    String plantName,
+    String plantId,
     String userId,
   ) async {
     try {
+      final user = _authService.currentUser;
+      if (user == null) {
+        logError('Kullanıcı oturum açmamış');
+        throw Exception('Kullanıcı oturum açmamış');
+      }
+
       // Kullanıcının premium olup olmadığını kontrol et
-      final userDoc = await _firestore
+      final userDocRef = await _firestore
           .collection(AppConstants.usersCollection)
           .doc(userId)
           .get();
-      final userData = userDoc.data();
+      final userDataMap = userDocRef.data();
+      final bool isPremium = userDataMap?['isPremium'] ?? false;
 
-      if (userData == null) {
-        return AnalysisResponse(
-          success: false,
-          message: 'Kullanıcı bilgileri bulunamadı.',
-        );
-      }
-
-      final int credits = userData['analysisCredits'] ?? 0;
-      final bool isPremium = userData['isPremium'] ?? false;
-
-      // Normal kullanıcılar için kredi kontrolü yap
-      if (!isPremium && credits <= 0) {
+      // Bu özellik sadece premium kullanıcılar için
+      if (!isPremium) {
+        logWarning('Premium olmayan kullanıcı bakım önerisi istedi',
+            'userId: $userId');
         return AnalysisResponse(
           success: false,
           message:
-              'Bakım tavsiyeleri almak için krediniz tükendi. Premium üyelik satın alarak sınırsız tavsiye alabilirsiniz.',
+              'Detaylı bakım önerileri sadece premium kullanıcılar için sunulmaktadır.',
           needsPremium: true,
         );
       }
 
-      // Bakım tavsiyesi al
-      final result = await _geminiService.getPlantCareAdvice(plantName);
+      logInfo('Bitki bakım önerisi alınıyor...');
 
-      // Premium değilse, krediyi azalt
-      if (!isPremium) {
-        await _firestore
-            .collection(AppConstants.usersCollection)
-            .doc(userId)
-            .update({'analysisCredits': FieldValue.increment(-1)});
-      }
+      // Premium kullanıcı - öneri al
+      final result = await _geminiService.getPlantCareAdvice(
+        plantId,
+      );
 
+      logSuccess('Bitki bakım önerileri başarıyla getirildi',
+          'userId: $userId, plantId: $plantId');
       return AnalysisResponse(
         success: true,
-        message: 'Bakım tavsiyeleri başarıyla getirildi.',
+        message: 'Bitki bakım önerileri başarıyla getirildi.',
         result: result,
       );
     } catch (e) {
-      AppLogger.e('Bakım tavsiyeleri alınırken hata oluştu', e);
+      logError('Bitki bakım önerisi alınırken hata oluştu', e.toString());
       return AnalysisResponse(
         success: false,
-        message: 'Tavsiyeler alınırken bir hata oluştu: ${e.toString()}',
+        message:
+            'Bitki bakım önerisi alınırken bir hata oluştu: ${e.toString()}',
       );
     }
   }
@@ -229,7 +252,7 @@ class PlantAnalysisService {
     try {
       return await file.readAsBytes();
     } catch (e) {
-      AppLogger.e('Dosyadan bayt dizisi oluşturma hatası', e);
+      logError('Dosyadan bayt dizisi oluşturma hatası', e.toString());
       rethrow;
     }
   }

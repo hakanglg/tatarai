@@ -1,4 +1,4 @@
-import 'package:tatarai/core/base/base_cubit.dart';
+import 'package:tatarai/core/base/base_state.dart';
 import 'package:tatarai/features/auth/models/user_model.dart';
 
 /// Kimlik doğrulama durumunu temsil eden sınıf

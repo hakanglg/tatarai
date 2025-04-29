@@ -1,7 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:tatarai/core/theme/color_scheme.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/features/home/views/home_tab_content.dart';
 import 'package:tatarai/features/navbar/navigation_manager.dart';
@@ -55,23 +54,25 @@ class _HomeScreenState extends State<HomeScreen> {
       value: navManager,
       child: Consumer<NavigationManager>(
         builder: (context, navManager, _) {
-          return CupertinoTabScaffold(
-            tabBar: AppBottomNavigationBar(
-              currentIndex: navManager.currentIndex,
-              onTabSelected: (index) {
-                AppLogger.i('Tab seçildi: $index');
-                navManager.switchToTab(index);
-              },
-              items: NavigationItems.allTabs,
-            ),
-            tabBuilder: (context, index) {
-              return CupertinoTabView(
-                builder: (context) {
-                  return _buildScreenWrapper(index, navManager);
+          return Scaffold(
+            body: CupertinoTabScaffold(
+              tabBar: AppBottomNavigationBar(
+                currentIndex: navManager.currentIndex,
+                onTabSelected: (index) {
+                  AppLogger.i('Tab seçildi: $index');
+                  navManager.switchToTab(index);
                 },
-              );
-            },
-            controller: navManager.tabController,
+                items: NavigationItems.allTabs,
+              ),
+              tabBuilder: (context, index) {
+                return CupertinoTabView(
+                  builder: (context) {
+                    return _buildScreenWrapper(index, navManager);
+                  },
+                );
+              },
+              controller: navManager.tabController,
+            ),
           );
         },
       ),

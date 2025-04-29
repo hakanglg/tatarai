@@ -14,7 +14,7 @@ import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/core/widgets/app_button.dart';
 import 'package:tatarai/features/plant_analysis/cubits/plant_analysis_cubit.dart';
 import 'package:tatarai/features/plant_analysis/models/location_models.dart';
-import 'package:tatarai/features/plant_analysis/models/plant_analysis_state.dart';
+import 'package:tatarai/features/plant_analysis/cubits/plant_analysis_state.dart';
 import 'package:tatarai/features/plant_analysis/services/location_service.dart';
 import 'package:tatarai/features/plant_analysis/views/analysis_result_screen.dart';
 
@@ -68,16 +68,6 @@ class _AnalysisScreenState extends State<AnalysisScreen>
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
-
-  // Önceden tanımlanmış tarlalar
-  final List<String> _predefinedFields = [
-    "Ana Tarla",
-    "Dere Kenarı",
-    "Tepe Tarla",
-    "Batı Tarla",
-    "Doğu Tarla",
-    "Kuzey Çiftlik"
-  ];
 
   @override
   void initState() {
@@ -866,23 +856,21 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             'Bitkiniz Hakkında Bilgi Alın',
-                            style: AppTextTheme.headline3,
+                            style: AppTextTheme.headlineSmall,
                           ),
                           const SizedBox(height: 8),
                           Text(
                             'Bitkinin net bir fotoğrafını çekin veya yükleyin. Yapay zeka, hastalık durumunu ve öneriler sunacak.',
-                            style: AppTextTheme.bodyText1.copyWith(
+                            style: AppTextTheme.bodyLarge.copyWith(
                               color: CupertinoColors.systemGrey,
                             ),
                           ),
                         ],
                       ),
                     ),
-
                     const SizedBox(height: 16),
-
                     // Fotoğraf önizleme alanı
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),

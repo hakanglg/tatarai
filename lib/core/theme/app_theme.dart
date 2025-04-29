@@ -27,12 +27,12 @@ class AppTheme {
       useMaterial3: true,
       colorScheme: AppColors.colorScheme,
       scaffoldBackgroundColor: AppColors.background,
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         backgroundColor: AppColors.background,
         elevation: 0,
         centerTitle: true,
-        iconTheme: IconThemeData(color: AppColors.primary),
-        titleTextStyle: AppTextTheme.headline5,
+        iconTheme: const IconThemeData(color: AppColors.primary),
+        titleTextStyle: AppTextTheme.headlineMedium,
       ),
       cardTheme: CardTheme(
         elevation: 4,

@@ -1,52 +1,36 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show Colors;
-
-import '../theme/app_text_styles.dart';
+import 'package:sprung/sprung.dart';
+import 'package:tatarai/core/theme/text_theme.dart';
 import '../theme/color_scheme.dart';
 
-/// Buton tipleri
+/// Buton tipleri - Apple HIG'e uygun olarak düzenlenmiştir
 enum AppButtonType {
-  /// Ana buton - yeşil arka plan, beyaz metin
+  /// Ana buton - Prominent action
   primary,
 
-  /// İkincil buton - beyaz arka plan, yeşil metin
+  /// İkincil buton - Default action
   secondary,
 
-  /// Tehlikeli işlem butonu - kırmızı arka plan, beyaz metin
+  /// Tehlikeli işlem butonu - Destructive action
   destructive,
 
-  /// Text buton - transparan arka plan, yeşil metin
+  /// Text buton - Plain button
   text,
 }
 
-/// Uygulama genelinde kullanılacak standart buton bileşeni
-/// Tüm uygulamada tutarlı görünüm sağlar
-class AppButton extends StatelessWidget {
-  /// Buton metni
+/// Apple Human Interface Guidelines'a uygun olarak tasarlanmış buton bileşeni.
+/// Cupertino tasarım dilini ve spring animasyonlarını kullanır.
+class AppButton extends StatefulWidget {
   final String text;
-
-  /// Butona tıklandığında çalışacak işlev
   final VoidCallback? onPressed;
-
-  /// Buton tipi (primary, secondary, destructive)
   final AppButtonType type;
-
-  /// Yükleniyor göstergesi
   final bool isLoading;
-
-  /// Butonun tam genişlikte olup olmayacağı
   final bool isFullWidth;
-
-  /// Buton metni yanında gösterilecek ikon (opsiyonel)
   final IconData? icon;
-
-  /// Buton yüksekliği
   final double height;
-
-  /// Buton içi dolgu boşluğu
   final EdgeInsets? padding;
 
-  /// Yapıcı metot
   const AppButton({
     super.key,
     required this.text,
@@ -60,95 +44,159 @@ class AppButton extends StatelessWidget {
   });
 
   @override
+  State<AppButton> createState() => _AppButtonState();
+}
+
+class _AppButtonState extends State<AppButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _pressController;
+  late Animation<double> _scaleAnimation;
+  bool _isPressed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _pressController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 150),
+    );
+
+    _scaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.95,
+    ).animate(CurvedAnimation(
+      parent: _pressController,
+      curve: Sprung.custom(
+        mass: 1.0,
+        stiffness: 400.0,
+        damping: 15.0,
+      ),
+    ));
+  }
+
+  @override
+  void dispose() {
+    _pressController.dispose();
+    super.dispose();
+  }
+
+  void _handlePress() {
+    if (!widget.isLoading && widget.onPressed != null) {
+      widget.onPressed!();
+    }
+  }
+
+  void _handleTapDown() {
+    if (!widget.isLoading && widget.onPressed != null) {
+      setState(() => _isPressed = true);
+      _pressController.forward();
+    }
+  }
+
+  void _handleTapUp() {
+    if (!widget.isLoading && widget.onPressed != null) {
+      setState(() => _isPressed = false);
+      _pressController.reverse();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final buttonChild = CupertinoButton(
-      padding: padding ?? EdgeInsets.zero,
-      onPressed: isLoading ? null : onPressed,
-      color: _getBackgroundColor(),
-      disabledColor: _getBackgroundColor().withOpacity(0.5),
-      borderRadius: BorderRadius.circular(10),
-      child: _buildContent(),
-    );
-
-    Widget finalButton = buttonChild;
-
-    // Secondary butona kenarlık ekle
-    if (type == AppButtonType.secondary) {
-      finalButton = Container(
+    final buttonContent = ScaleTransition(
+      scale: _scaleAnimation,
+      child: Container(
+        height: widget.height,
+        padding: widget.padding ?? const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
-          border:
-              Border.all(color: AppColors.primary.withOpacity(0.3), width: 1),
+          color: _getBackgroundColor(),
           borderRadius: BorderRadius.circular(10),
+          border: widget.type == AppButtonType.secondary
+              ? Border.all(color: AppColors.primary.withOpacity(0.3), width: 1)
+              : null,
+          boxShadow: widget.type != AppButtonType.text
+              ? [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
-        child: buttonChild,
-      );
-    }
+        child: _buildContent(),
+      ),
+    );
 
-    if (isFullWidth) {
-      return SizedBox(
-        width: double.infinity,
-        height: height,
-        child: finalButton,
-      );
-    } else {
-      // Esnek olmayan mod - sadece içeriği kadar genişlikte
-      return SizedBox(height: height, child: finalButton);
-    }
-  }
+    final buttonChild = CupertinoButton(
+      padding: EdgeInsets.zero,
+      onPressed: widget.isLoading ? null : widget.onPressed,
+      child: buttonContent,
+    );
 
-  /// Buton içeriğini oluşturur
-  Widget _buildContent() {
-    if (isLoading) {
-      return CupertinoActivityIndicator(color: _getTextColor());
-    }
-
-    if (icon != null) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: _getTextColor(), size: 18),
-          const SizedBox(width: 8),
-          Text(
-            text,
-            style: AppTextStyles.buttonText.copyWith(color: _getTextColor()),
-          ),
-        ],
-      );
-    }
-
-    return Text(
-      text,
-      style: AppTextStyles.buttonText.copyWith(color: _getTextColor()),
+    return GestureDetector(
+      onTapDown: (_) => _handleTapDown(),
+      onTapUp: (_) => _handleTapUp(),
+      onTapCancel: () => _handleTapUp(),
+      child: widget.isFullWidth
+          ? SizedBox(
+              width: double.infinity,
+              height: widget.height,
+              child: buttonChild,
+            )
+          : SizedBox(height: widget.height, child: buttonChild),
     );
   }
 
-  /// Buton tipine göre arkaplan rengini döndürür
-  Color _getBackgroundColor() {
-    switch (type) {
-      case AppButtonType.primary:
-        return AppColors.primary;
-      case AppButtonType.secondary:
-        return AppColors.surface;
-      case AppButtonType.destructive:
-        return AppColors.error;
-      case AppButtonType.text:
-        return Colors.transparent;
-    }
+  Widget _buildContent() {
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 200),
+      opacity: widget.isLoading || widget.onPressed == null ? 0.5 : 1.0,
+      child: Center(
+        child: widget.isLoading
+            ? CupertinoActivityIndicator(color: _getTextColor())
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (widget.icon != null) ...[
+                    Icon(widget.icon, color: _getTextColor(), size: 18),
+                    const SizedBox(width: 8),
+                  ],
+                  Text(
+                    widget.text,
+                    style: AppTextTheme.labelLarge.copyWith(
+                      color: _getTextColor(),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+      ),
+    );
   }
 
-  /// Buton tipine göre metin rengini döndürür
-  Color _getTextColor() {
-    switch (type) {
-      case AppButtonType.primary:
-        return AppColors.onPrimary;
-      case AppButtonType.secondary:
-        return AppColors.primary;
-      case AppButtonType.destructive:
-        return AppColors.onPrimary;
-      case AppButtonType.text:
-        return AppColors.primary;
+  Color _getBackgroundColor() {
+    final baseColor = switch (widget.type) {
+      AppButtonType.primary => AppColors.primary,
+      AppButtonType.secondary => AppColors.surface,
+      AppButtonType.destructive => AppColors.error,
+      AppButtonType.text => Colors.transparent,
+    };
+
+    if (_isPressed && widget.onPressed != null && !widget.isLoading) {
+      return baseColor.withOpacity(0.8);
     }
+
+    return baseColor;
+  }
+
+  Color _getTextColor() {
+    return switch (widget.type) {
+      AppButtonType.primary => AppColors.onPrimary,
+      AppButtonType.secondary => AppColors.primary,
+      AppButtonType.destructive => AppColors.onPrimary,
+      AppButtonType.text => AppColors.primary,
+    };
   }
 }
 

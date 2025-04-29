@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart' show CircleAvatar;
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -16,13 +14,11 @@ import 'package:tatarai/core/theme/text_theme.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/core/widgets/app_button.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
-import 'package:tatarai/features/auth/cubits/auth_state.dart';
 import 'package:tatarai/features/auth/models/user_model.dart';
-import 'package:tatarai/features/auth/repositories/user_repository.dart';
-import 'package:tatarai/features/auth/services/auth_service.dart';
 import 'package:tatarai/features/payment/views/premium_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:tatarai/features/profile/cubits/profile_cubit.dart';
+import 'package:sprung/sprung.dart';
 
 /// Kullanıcı profil bilgilerini gösteren ve düzenleyen ekran
 class ProfileScreen extends StatefulWidget {
@@ -33,10 +29,29 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen>
+    with SingleTickerProviderStateMixin {
   final ImagePicker _imagePicker = ImagePicker();
   File? _selectedProfileImage;
   bool _isUploading = false;
+  late AnimationController _animationController;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Animasyon kontrolcüsü başlat
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,8 +60,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildScreenContent(BuildContext context) {
     return CupertinoPageScaffold(
+      backgroundColor: CupertinoColors.systemBackground,
       navigationBar: CupertinoNavigationBar(
-        middle: const Text('Profil'),
+        middle: Text(
+          'Profilim',
+          style: AppTextTheme.headline6.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        backgroundColor: CupertinoColors.systemBackground.withOpacity(0.9),
+        border: null,
       ),
       child: SafeArea(
         child: BlocBuilder<ProfileCubit, ProfileState>(
@@ -83,31 +106,54 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildUserProfile(BuildContext context, UserModel user) {
     return CustomScrollView(
+      physics: const BouncingScrollPhysics(),
       slivers: [
         SliverToBoxAdapter(
           child: Padding(
             padding: EdgeInsets.all(context.dimensions.paddingL),
-            child: Column(
-              children: [
-                // Profil Fotoğrafı Bölümü
-                _buildProfilePhoto(user),
+            child: AnimatedBuilder(
+              animation: _animationController,
+              builder: (context, child) {
+                return Transform.translate(
+                  offset: Offset(
+                      0,
+                      20 *
+                          (1 -
+                              Sprung.criticallyDamped
+                                  .transform(_animationController.value))),
+                  child: Opacity(
+                    opacity: _animationController.value,
+                    child: child,
+                  ),
+                );
+              },
+              child: Column(
+                children: [
+                  // Profil Fotoğrafı Bölümü
+                  _buildProfilePhoto(user),
 
-                // Kullanıcı Bilgileri
-                SizedBox(height: context.dimensions.spaceL),
-                Text(
-                  user.displayName ?? user.email.split('@')[0],
-                  style: AppTextTheme.headline2,
-                ),
-                SizedBox(height: context.dimensions.spaceXS),
-                Text(user.email,
+                  // Kullanıcı Bilgileri
+                  SizedBox(height: context.dimensions.spaceL),
+                  Text(
+                    user.displayName ?? user.email.split('@')[0],
+                    style: AppTextTheme.headline2.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: context.dimensions.spaceXS),
+                  Text(
+                    user.email,
                     style: AppTextTheme.subtitle1.copyWith(
-                      color: CupertinoColors.systemGrey,
-                    )),
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
 
-                // Üyelik Bilgileri Kartı
-                SizedBox(height: context.dimensions.spaceL),
-                _buildMembershipCard(user),
-              ],
+                  // Üyelik Bilgileri Kartı
+                  SizedBox(height: context.dimensions.spaceL),
+                  _buildMembershipCard(user),
+                ],
+              ),
             ),
           ),
         ),
@@ -222,7 +268,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               header: 'Satın Alma',
               items: [
                 _buildSettingsItem(
-                  title: 'Premium\'a Yükselt',
+                  title:
+                      user.isPremium ? 'Premium Üyelik' : 'Premium\'a Yükselt',
                   subtitle: user.isPremium
                       ? 'Premium üyeliğiniz aktif'
                       : 'Sınırsız analiz ve özel özellikler',
@@ -262,7 +309,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 _buildSettingsItem(
                   title: 'Kredi Satın Al',
-                  subtitle: 'Mevcut krediniz: ${user.analysisCredits}',
+                  subtitle: user.isPremium
+                      ? 'Premium üyelik ile sınırsız analiz yapabilirsiniz'
+                      : 'Mevcut krediniz: ${user.analysisCredits}',
                   icon: CupertinoIcons.cart_fill,
                   iconColor: AppColors.secondary,
                   onTap: () {
@@ -328,13 +377,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           // Profil fotoğrafı
           Container(
-            width: 100,
-            height: 100,
+            width: 120,
+            height: 120,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
                 color: CupertinoColors.systemGrey5,
-                width: 2,
+                width: 3,
               ),
               boxShadow: [
                 BoxShadow(
@@ -345,9 +394,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
             child: _isUploading
-                ? const Center(child: CupertinoActivityIndicator(radius: 16))
+                ? const Center(child: CupertinoActivityIndicator(radius: 20))
                 : CircleAvatar(
-                    radius: 48,
+                    radius: 58,
                     backgroundColor: CupertinoColors.systemGrey6,
                     backgroundImage: _selectedProfileImage != null
                         ? FileImage(_selectedProfileImage!)
@@ -358,7 +407,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         user.photoURL == null && _selectedProfileImage == null
                             ? Icon(
                                 CupertinoIcons.person_fill,
-                                size: 60,
+                                size: 70,
                                 color: AppColors.primary.withOpacity(0.7),
                               )
                             : null,
@@ -370,19 +419,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
             bottom: 0,
             right: 0,
             child: Container(
-              padding: const EdgeInsets.all(4),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: AppColors.primary,
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: CupertinoColors.white,
-                  width: 2,
+                  width: 3,
                 ),
               ),
               child: const Icon(
                 CupertinoIcons.camera_fill,
                 color: CupertinoColors.white,
-                size: 16,
+                size: 20,
               ),
             ),
           ),
@@ -392,6 +441,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildMembershipCard(UserModel user) {
+    // Üyelik tipini belirle
+    final membershipType = user.role.toString(); // free, premium veya admin
+
+    // Premium renkler
+    final premiumGradient = [
+      const Color(0xFF1E7D32), // Daha koyu yeşil
+      const Color(0xFF2E7D32), // Ana yeşil
+      const Color(0xFF388E3C), // Açık yeşil
+    ];
+
+    // Standart renkler
+    final standardGradient = [
+      const Color(0xFF78909C), // Gri-mavi
+      const Color(0xFF607D8B), // Daha koyu gri-mavi
+      const Color(0xFF546E7A), // En koyu gri-mavi
+    ];
+
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(context.dimensions.paddingL),
@@ -399,17 +465,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: user.isPremium
-              ? [
-                  const Color(0xFF1E7D32), // Daha koyu yeşil
-                  const Color(0xFF2E7D32), // Ana yeşil
-                  const Color(0xFF388E3C), // Açık yeşil
-                ]
-              : [
-                  const Color(0xFF78909C), // Gri-mavi
-                  const Color(0xFF607D8B), // Daha koyu gri-mavi
-                  const Color(0xFF546E7A), // En koyu gri-mavi
-                ],
+          colors: user.isPremium ? premiumGradient : standardGradient,
           stops: const [0.0, 0.6, 1.0],
         ),
         borderRadius: BorderRadius.circular(context.dimensions.radiusL),
@@ -466,8 +522,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Row(
                     children: [
                       Container(
-                        width: 40,
-                        height: 40,
+                        width: 45,
+                        height: 45,
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.2),
                           shape: BoxShape.circle,
@@ -477,7 +533,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ? CupertinoIcons.star_fill
                               : CupertinoIcons.person_fill,
                           color: Colors.white,
-                          size: 20,
+                          size: 24,
                         ),
                       ),
                       SizedBox(width: context.dimensions.spaceM),
@@ -494,7 +550,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           SizedBox(height: 2),
                           Text(
                             user.isPremium
-                                ? 'Tüm özelliklere erişim'
+                                ? 'Sınırsız analiz hakkınız var'
                                 : 'Sınırlı erişim',
                             style: AppTextTheme.caption.copyWith(
                               color: Colors.white.withOpacity(0.7),
@@ -531,7 +587,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                           SizedBox(width: 4),
                           Text(
-                            'PRO',
+                            'PREMIUM',
                             style: TextStyle(
                               color: Colors.amber,
                               fontWeight: FontWeight.bold,
@@ -546,21 +602,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               SizedBox(height: context.dimensions.spaceL),
 
-              // Analiz kredileri göstergesi
+              // Kalan analiz hakkı veya sınırsız premium
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Kalan Analiz',
-                        style: AppTextTheme.bodyText2.copyWith(
-                          color: Colors.white.withOpacity(0.8),
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            'Kalan Analiz',
+                            style: AppTextTheme.bodyText2.copyWith(
+                              color: Colors.white.withOpacity(0.8),
+                            ),
+                          ),
+                          SizedBox(width: 4),
+                          GestureDetector(
+                            onTap: () {
+                              context.read<ProfileCubit>().refreshUserData();
+                            },
+                            child: Icon(
+                              CupertinoIcons.refresh,
+                              color: Colors.white.withOpacity(0.8),
+                              size: 14,
+                            ),
+                          ),
+                        ],
                       ),
                       Text(
-                        '${user.analysisCredits}',
+                        user.isPremium ? 'Sınırsız' : '${user.analysisCredits}',
                         style: AppTextTheme.headline6.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -570,20 +641,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   SizedBox(height: context.dimensions.spaceS),
 
-                  // İlerleme çubuğu
+                  // İlerleme çubuğu - Premium için sınırsız, free için kredi bazlı
                   ClipRRect(
                     borderRadius:
                         BorderRadius.circular(context.dimensions.radiusS),
                     child: LinearProgressIndicator(
                       value: user.isPremium
                           ? 1.0
-                          : (user.analysisCredits / 10)
-                              .clamp(0.0, 1.0), // 10 maksimum kredi varsayımı
+                          : (user.analysisCredits / 10).clamp(0.0, 1.0),
                       backgroundColor: Colors.white.withOpacity(0.2),
                       valueColor: AlwaysStoppedAnimation<Color>(
                         user.isPremium ? Colors.amber : Colors.white,
                       ),
-                      minHeight: 6,
+                      minHeight: 8,
                     ),
                   ),
                 ],
@@ -593,7 +663,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               // Premium olmayan kullanıcılar için yükseltme butonu
               if (!user.isPremium)
-                Container(
+                SizedBox(
                   width: double.infinity,
                   child: CupertinoButton(
                     padding: EdgeInsets.symmetric(

@@ -3,7 +3,7 @@ import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/features/auth/models/user_model.dart';
-import 'package:tatarai/features/auth/repositories/user_repository.dart';
+import 'package:tatarai/core/repositories/user_repository.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
 
 /// Profil ekranı için state sınıfı
@@ -13,6 +13,7 @@ class ProfileState extends Equatable {
   final String? errorMessage;
   final bool isProfileUpdated;
   final bool isImageUploading;
+  final bool isRefreshing;
 
   const ProfileState({
     this.user,
@@ -20,6 +21,7 @@ class ProfileState extends Equatable {
     this.errorMessage,
     this.isProfileUpdated = false,
     this.isImageUploading = false,
+    this.isRefreshing = false,
   });
 
   /// Başlangıç state'i
@@ -34,6 +36,7 @@ class ProfileState extends Equatable {
     String? errorMessage,
     bool? isProfileUpdated,
     bool? isImageUploading,
+    bool? isRefreshing,
   }) {
     return ProfileState(
       user: user ?? this.user,
@@ -41,6 +44,7 @@ class ProfileState extends Equatable {
       errorMessage: errorMessage,
       isProfileUpdated: isProfileUpdated ?? this.isProfileUpdated,
       isImageUploading: isImageUploading ?? this.isImageUploading,
+      isRefreshing: isRefreshing ?? this.isRefreshing,
     );
   }
 
@@ -51,6 +55,7 @@ class ProfileState extends Equatable {
         errorMessage,
         isProfileUpdated,
         isImageUploading,
+        isRefreshing,
       ];
 }
 
@@ -146,6 +151,50 @@ class ProfileCubit extends Cubit<ProfileState> {
     }
   }
 
+  /// Firestore'dan kullanıcı bilgilerini taze olarak yeniden yükler
+  Future<void> refreshUserData() async {
+    try {
+      // Mevcut kullanıcı kimliğini al
+      final currentUser = await _userRepository.getCurrentUser();
+      if (currentUser == null) {
+        AppLogger.w('Kullanıcı verisi yenilenemedi: Kullanıcı bulunamadı');
+        emit(state.copyWith(
+          errorMessage: 'Kullanıcı verisi yenilenemedi: Kullanıcı bulunamadı',
+          isRefreshing: false,
+        ));
+        return;
+      }
+
+      emit(state.copyWith(isRefreshing: true, errorMessage: null));
+      AppLogger.i('Firestore\'dan kullanıcı verisi yenileniyor...');
+
+      // UserRepository'nin bu metodu Firestore'dan taze veriyi alacak
+      final refreshedUser =
+          await _userRepository.fetchFreshUserData(currentUser.id);
+
+      if (refreshedUser != null) {
+        emit(state.copyWith(
+          user: refreshedUser,
+          isRefreshing: false,
+        ));
+        AppLogger.i(
+            'Kullanıcı verisi başarıyla yenilendi. Analiz kredisi: ${refreshedUser.analysisCredits}, Rol: ${refreshedUser.role}');
+      } else {
+        emit(state.copyWith(
+          isRefreshing: false,
+          errorMessage: 'Kullanıcı verisi yenilenemedi',
+        ));
+        AppLogger.w('Kullanıcı verisi yenilenemedi');
+      }
+    } catch (e) {
+      AppLogger.e('Kullanıcı verisi yenileme hatası', e);
+      emit(state.copyWith(
+        isRefreshing: false,
+        errorMessage: 'Kullanıcı verisi yenilenirken bir hata oluştu: $e',
+      ));
+    }
+  }
+
   /// Kullanıcı profilini günceller
   Future<void> updateProfile({String? displayName, String? photoURL}) async {
     try {
@@ -237,7 +286,7 @@ class ProfileCubit extends Cubit<ProfileState> {
       emit(state.copyWith(isLoading: true, errorMessage: null));
 
       if (_authCubit != null) {
-        await _authCubit!.deleteAccount();
+        await _authCubit.deleteAccount();
       } else {
         await _userRepository.deleteAccount();
       }
@@ -259,7 +308,7 @@ class ProfileCubit extends Cubit<ProfileState> {
       emit(state.copyWith(isLoading: true, errorMessage: null));
 
       if (_authCubit != null) {
-        await _authCubit!.signOut();
+        await _authCubit.signOut();
       } else {
         await _userRepository.signOut();
       }

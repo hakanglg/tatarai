@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:tatarai/core/base/base_cubit.dart';
 import 'package:tatarai/core/repositories/plant_analysis_repository.dart';
 import 'package:tatarai/core/utils/logger.dart';
-import 'package:tatarai/features/plant_analysis/models/plant_analysis_state.dart';
+import 'package:tatarai/features/plant_analysis/cubits/plant_analysis_state.dart';
 
 /// Plant Analysis Cubit - Bitki analizi iş mantığını yönetir
 class PlantAnalysisCubit extends BaseCubit<PlantAnalysisState> {

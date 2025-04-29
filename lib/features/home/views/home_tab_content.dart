@@ -1,21 +1,22 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:provider/provider.dart';
 import 'package:tatarai/core/constants/app_constants.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
 import 'package:tatarai/core/theme/text_theme.dart';
 import 'package:tatarai/core/utils/logger.dart';
-import 'package:tatarai/core/widgets/app_button.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
 import 'package:tatarai/features/auth/cubits/auth_state.dart';
+import 'package:tatarai/features/home/cubits/home_cubit.dart';
 import 'package:tatarai/features/navbar/navigation_manager.dart';
 import 'package:tatarai/features/plant_analysis/cubits/plant_analysis_cubit.dart';
 import 'package:tatarai/features/plant_analysis/models/plant_analysis_result.dart';
-import 'package:tatarai/features/plant_analysis/models/plant_analysis_state.dart';
+import 'package:tatarai/features/plant_analysis/cubits/plant_analysis_state.dart';
 import 'package:tatarai/features/plant_analysis/views/analysis_result_screen.dart';
 import 'package:tatarai/features/plant_analysis/views/all_analyses_screen.dart';
+import 'package:tatarai/core/theme/dimensions.dart';
+import 'package:sprung/sprung.dart';
 
-/// Ana ekran tab içeriği - Karşılama ekranı ve hızlı erişim seçenekleri
+/// Ana ekran tab içeriği - Modern tasarım, hızlı erişim seçenekleri ve bitki analiz geçmişi
 class HomeTabContent extends StatefulWidget {
   const HomeTabContent({super.key});
 
@@ -23,322 +24,361 @@ class HomeTabContent extends StatefulWidget {
   State<HomeTabContent> createState() => _HomeTabContentState();
 }
 
-class _HomeTabContentState extends State<HomeTabContent> {
+class _HomeTabContentState extends State<HomeTabContent>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  final _scrollController = ScrollController();
+
   @override
   void initState() {
     super.initState();
 
+    // Animasyon kontrolcüsü
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    )..forward();
+
     // Geçmiş analizleri yükle
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<PlantAnalysisCubit>().loadPastAnalyses();
+      context.read<HomeCubit>().refresh();
     });
   }
 
   @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<AuthCubit, AuthState>(
-      builder: (context, state) {
-        final user = state.user;
-        final userName =
-            user?.displayName ?? user?.email.split('@').first ?? 'Çiftçi';
+  void dispose() {
+    _animationController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
 
-        return CupertinoPageScaffold(
-          navigationBar: CupertinoNavigationBar(
-            middle: Text(AppConstants.appName),
-            // iOS stil navigation bar
-            backgroundColor: CupertinoColors.systemBackground,
-            brightness: Brightness.light,
-            border: Border(
-              bottom: BorderSide(color: CupertinoColors.separator, width: 0.5),
-            ),
-            padding: EdgeInsetsDirectional.zero,
+  // Analiz ekranına geçiş için helper metod
+  void _navigateToAnalysis() {
+    if (NavigationManager.instance != null) {
+      NavigationManager.instance!.switchToTab(1); // Analiz tabına geçiş
+    } else {
+      AppLogger.w('NavigationManager instance bulunamadı');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoPageScaffold(
+      backgroundColor: CupertinoColors.systemBackground,
+      navigationBar: CupertinoNavigationBar(
+        middle: Text(
+          AppConstants.appName,
+          style: AppTextTheme.headline6.copyWith(
+            fontWeight: FontWeight.w600,
           ),
-          child: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.only(top: 16.0),
+        ),
+        backgroundColor: CupertinoColors.systemBackground.withOpacity(0.9),
+        border: null,
+      ),
+      child: SafeArea(
+        child: CustomScrollView(
+          controller: _scrollController,
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(
+              child: _buildHeader(context),
+            ),
+            SliverToBoxAdapter(
+              child: _buildQuickActions(context),
+            ),
+            _buildRecentAnalysesSection(context),
+            SliverToBoxAdapter(
+              child: SizedBox(height: context.dimensions.spaceL),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: context.dimensions.paddingM,
+        vertical: context.dimensions.paddingS,
+      ),
+      child: BlocBuilder<AuthCubit, AuthState>(
+        builder: (context, state) {
+          final userName = state.user?.displayName ?? 'Misafir';
+
+          return AnimatedBuilder(
+            animation: _animationController,
+            builder: (context, child) {
+              return Opacity(
+                opacity: _animationController.value,
+                child: child,
+              );
+            },
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(height: context.dimensions.spaceXS),
+                Text(
+                  'Merhaba,',
+                  style: AppTextTheme.bodyText1.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                SizedBox(height: 3),
+                Text(
+                  userName,
+                  style: AppTextTheme.headline3.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: context.dimensions.spaceXS),
+                Text(
+                  'Bitkilerinin sağlığını kontrol etmeye hazır mısın?',
+                  style: AppTextTheme.bodyText2.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                SizedBox(height: context.dimensions.spaceM),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildQuickActions(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: context.dimensions.paddingM),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AnimatedBuilder(
+            animation: _animationController,
+            builder: (context, child) {
+              return Transform.translate(
+                offset: Offset(
+                    0,
+                    20 *
+                        (1 -
+                            Sprung.criticallyDamped
+                                .transform(_animationController.value))),
+                child: Opacity(
+                  opacity: _animationController.value,
+                  child: child,
+                ),
+              );
+            },
+            child: _buildActionCard(
+              context,
+              title: 'Yeni Analiz',
+              subtitle: 'Bir fotoğraf çekerek bitkini analiz et',
+              iconData: CupertinoIcons.camera,
+              color: AppColors.primary,
+              onTap: _navigateToAnalysis,
+            ),
+          ),
+          SizedBox(height: context.dimensions.spaceM),
+          AnimatedBuilder(
+            animation: _animationController,
+            builder: (context, child) {
+              return Transform.translate(
+                offset: Offset(
+                    0,
+                    30 *
+                        (1 -
+                            Sprung.criticallyDamped
+                                .transform(_animationController.value))),
+                child: Opacity(
+                  opacity: _animationController.value,
+                  child: child,
+                ),
+              );
+            },
+            child: _buildActionCard(
+              context,
+              title: 'Tüm Analizler',
+              subtitle: 'Geçmiş analiz sonuçlarına göz at',
+              iconData: CupertinoIcons.doc_chart,
+              color: CupertinoColors.activeOrange,
+              onTap: () {
+                Navigator.of(context).push(
+                  CupertinoPageRoute(
+                    builder: (context) => AllAnalysesScreen(),
+                  ),
+                );
+              },
+            ),
+          ),
+          SizedBox(height: context.dimensions.spaceM),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionCard(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required IconData iconData,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.all(context.dimensions.paddingM),
+        decoration: BoxDecoration(
+          color: CupertinoColors.systemBackground,
+          borderRadius: BorderRadius.circular(context.dimensions.radiusM),
+          border: Border.all(
+            color: CupertinoColors.systemGrey5,
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: CupertinoColors.systemGrey6,
+              blurRadius: 5,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(context.dimensions.radiusS),
+              ),
+              child: Icon(
+                iconData,
+                size: 22,
+                color: color,
+              ),
+            ),
+            SizedBox(width: context.dimensions.spaceM),
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Karşılama başlığı
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Merhaba, $userName',
-                          style: AppTextTheme.headline2,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Bitki sağlığını yapay zeka ile analiz etmeye hazır mısın?',
-                          style: AppTextTheme.bodyText1.copyWith(
-                            color: CupertinoColors.systemGrey,
-                          ),
-                        ),
-                      ],
+                  Text(
+                    title,
+                    style: AppTextTheme.bodyText1.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: color,
                     ),
                   ),
-
-                  const SizedBox(height: 24),
-
-                  // Hızlı başlangıç kartı
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisSize: MainAxisSize.max,
-                            children: [
-                              const Icon(
-                                CupertinoIcons.camera_fill,
-                                color: AppColors.primary,
-                                size: 32,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      'Hızlı Analiz',
-                                      style: AppTextTheme.headline5,
-                                    ),
-                                    Text(
-                                      'Bitkinin fotoğrafını çekerek analizini başlat',
-                                      style: AppTextTheme.bodyText2.copyWith(
-                                        color: CupertinoColors.systemGrey,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            width: double.infinity,
-                            child: AppButton(
-                              text: 'Fotoğraf Çek',
-                              onPressed: () {
-                                try {
-                                  // NavigationManager üzerinden sekmeyi değiştir
-                                  final navManager =
-                                      Provider.of<NavigationManager>(
-                                    context,
-                                    listen: false,
-                                  );
-                                  navManager.switchToTab(
-                                    1,
-                                  ); // Analiz sekmesine geç
-                                } catch (e, stack) {
-                                  AppLogger.e(
-                                    'Tab geçişi yapılamadı',
-                                    e,
-                                    stack,
-                                  );
-                                }
-                              },
-                              height: 44,
-                            ),
-                          ),
-                        ],
-                      ),
+                  SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: AppTextTheme.bodyText2.copyWith(
+                      color: AppColors.textSecondary,
                     ),
                   ),
-
-                  const SizedBox(height: 16),
-
-                  // Son analizler başlığı
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16.0,
-                      vertical: 8.0,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Son Analizler',
-                          style: AppTextTheme.headline5,
-                        ),
-                        SizedBox(
-                          height: 32,
-                          child: AppButton(
-                            text: 'Tümünü Gör',
-                            type: AppButtonType.text,
-                            height: 32,
-                            isFullWidth: false,
-                            onPressed: () {
-                              // Tüm analizleri görüntüleme ekranına geçiş yapılacak
-                              Navigator.of(context).push(
-                                CupertinoPageRoute(
-                                  builder: (context) =>
-                                      const AllAnalysesScreen(),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Son analizler listesi - Gerçek verilerle
-                  BlocBuilder<PlantAnalysisCubit, PlantAnalysisState>(
-                    builder: (context, state) {
-                      // Yükleniyor durumu
-                      if (state.isLoading) {
-                        return const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(24.0),
-                            child: CupertinoActivityIndicator(),
-                          ),
-                        );
-                      }
-
-                      // Hata durumu
-                      if (state.errorMessage != null) {
-                        return Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Center(
-                            child: Column(
-                              children: [
-                                const Icon(
-                                  CupertinoIcons.exclamationmark_circle,
-                                  color: CupertinoColors.systemRed,
-                                  size: 48,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Analizler yüklenirken hata oluştu',
-                                  style: AppTextTheme.subtitle1,
-                                ),
-                                const SizedBox(height: 8),
-                                AppButton(
-                                  text: 'Tekrar Dene',
-                                  type: AppButtonType.secondary,
-                                  onPressed: () {
-                                    context
-                                        .read<PlantAnalysisCubit>()
-                                        .loadPastAnalyses();
-                                  },
-                                  isFullWidth: false,
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }
-
-                      // Veri yok durumu
-                      if (state.analysisList.isEmpty) {
-                        return Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Center(
-                            child: Column(
-                              children: [
-                                const SizedBox(height: 16),
-                                const Icon(
-                                  CupertinoIcons.doc,
-                                  color: CupertinoColors.systemGrey,
-                                  size: 48,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Henüz analiz yapılmamış',
-                                  style: AppTextTheme.subtitle1,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Hemen ilk analizini yap!',
-                                  style: AppTextTheme.bodyText2.copyWith(
-                                    color: CupertinoColors.systemGrey,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                AppButton(
-                                  text: 'Analiz Yap',
-                                  type: AppButtonType.text,
-                                  onPressed: () {
-                                    final navManager =
-                                        Provider.of<NavigationManager>(
-                                      context,
-                                      listen: false,
-                                    );
-                                    navManager.switchToTab(1);
-                                  },
-                                  isFullWidth: false,
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }
-
-                      // Analizleri göster - en fazla 3 tane
-                      final analyses = state.analysisList;
-                      final displayCount =
-                          analyses.length > 3 ? 3 : analyses.length;
-
-                      return Column(
-                        children: List.generate(
-                          displayCount,
-                          (index) =>
-                              _buildAnalysisItem(context, analyses[index]),
-                        ),
-                      );
-                    },
-                  ),
-
-                  // Bilgi kartları başlığı
-                  const Padding(
-                    padding: EdgeInsets.only(
-                      left: 16.0,
-                      right: 16.0,
-                      top: 16.0,
-                      bottom: 8.0,
-                    ),
-                    child: Text(
-                      'Bilginizi Artırın',
-                      style: AppTextTheme.headline5,
-                    ),
-                  ),
-
-                  // Bilgi kartları
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: _buildInfoCard(
-                      context,
-                      'Bitki Hastalıkları',
-                      'Yaygın bitki hastalıkları ve tedavi yöntemleri hakkında bilgi edinin.',
-                      CupertinoIcons.book_fill,
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: _buildInfoCard(
-                      context,
-                      'Optimum Sulama',
-                      'Bitki türlerine göre en uygun sulama teknikleri.',
-                      CupertinoIcons.drop_fill,
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
                 ],
               ),
+            ),
+            Icon(
+              CupertinoIcons.chevron_right,
+              color: CupertinoColors.systemGrey,
+              size: 16,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecentAnalysesSection(BuildContext context) {
+    return BlocBuilder<PlantAnalysisCubit, PlantAnalysisState>(
+      builder: (context, state) {
+        // Yükleniyor durumu
+        if (state.isLoading) {
+          return SliverToBoxAdapter(
+            child: Center(
+              child: Padding(
+                padding: EdgeInsets.all(context.dimensions.paddingL),
+                child: const CupertinoActivityIndicator(),
+              ),
+            ),
+          );
+        }
+
+        // Analiz listesi boş
+        if (state.analysisList.isEmpty) {
+          return SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.all(context.dimensions.paddingM),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: EdgeInsets.only(
+                      left: context.dimensions.paddingXS,
+                      bottom: context.dimensions.paddingXS,
+                    ),
+                    child: Text(
+                      'Son Analizler',
+                      style: AppTextTheme.headline6.copyWith(
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  _buildEmptyAnalysisState(context),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // Analizleri göster
+        return SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: context.dimensions.paddingM,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Son Analizler',
+                      style: AppTextTheme.headline6.copyWith(
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      child: Text(
+                        'Tümünü Gör',
+                        style: AppTextTheme.button.copyWith(
+                          color: AppColors.primary,
+                          fontSize: context.dimensions.fontSizeS,
+                        ),
+                      ),
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          CupertinoPageRoute(
+                            builder: (context) => const AllAnalysesScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+                SizedBox(height: context.dimensions.spaceXS),
+                ...state.analysisList.take(3).map((analysis) => Padding(
+                      padding:
+                          EdgeInsets.only(bottom: context.dimensions.spaceS),
+                      child: _buildAnalysisCard(context, analysis),
+                    )),
+              ],
             ),
           ),
         );
@@ -346,222 +386,198 @@ class _HomeTabContentState extends State<HomeTabContent> {
     );
   }
 
-  // Analiz öğesi widget'ı - gerçek veriler için güncellenmiş
-  Widget _buildAnalysisItem(
-    BuildContext context,
-    PlantAnalysisResult analysis,
-  ) {
-    // Tarih formatı, eğer analizde tarih bilgisi yok ise şu anki zamanı kullan
-    final DateTime createdAt =
-        DateTime.now(); // Örnek değer, gerçek uygulamada Firestore'dan gelecek
-    final String formattedDate =
-        '${createdAt.day} ${_getMonthName(createdAt.month)} ${createdAt.year}';
-
-    // Durum rengi
-    final Color statusColor = analysis.isHealthy
-        ? CupertinoColors.systemGreen
-        : analysis.diseases.isEmpty
-            ? CupertinoColors.systemGrey
-            : analysis.diseases.any((d) => d.probability > 0.7)
-                ? CupertinoColors.systemRed
-                : CupertinoColors.systemYellow;
-
-    // Durum metni
-    final String statusText = analysis.isHealthy
-        ? 'Sağlıklı'
-        : analysis.diseases.isEmpty
-            ? 'Bilinmiyor'
-            : analysis.diseases.any((d) => d.probability > 0.7)
-                ? 'Ciddi Hastalık'
-                : 'Hafif Hastalık';
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
-      child: GestureDetector(
-        onTap: () {
-          // Analiz detayı ekranına git
-          Navigator.of(context).push(
-            CupertinoPageRoute(
-              builder: (context) =>
-                  AnalysisResultScreen(analysisId: analysis.id),
+  Widget _buildEmptyAnalysisState(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animationController,
+      builder: (context, child) {
+        return Transform.translate(
+          offset: Offset(
+              0,
+              30 *
+                  (1 -
+                      Sprung.criticallyDamped
+                          .transform(_animationController.value))),
+          child: Opacity(
+            opacity: _animationController.value,
+            child: child,
+          ),
+        );
+      },
+      child: Container(
+        padding: EdgeInsets.all(context.dimensions.paddingM),
+        decoration: BoxDecoration(
+          color: CupertinoColors.systemBackground,
+          borderRadius: BorderRadius.circular(context.dimensions.radiusM),
+          border: Border.all(
+            color: CupertinoColors.systemGrey5,
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: CupertinoColors.systemGrey6,
+              blurRadius: 5,
+              offset: const Offset(0, 2),
             ),
-          );
-        },
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: CupertinoColors.systemBackground,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: CupertinoColors.systemGrey6.withOpacity(0.3),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+          ],
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: CupertinoColors.systemGrey5,
+                borderRadius: BorderRadius.circular(context.dimensions.radiusM),
               ),
-            ],
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: CupertinoColors.systemGrey6,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: analysis.imageUrl.isNotEmpty
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: Image.network(
-                          analysis.imageUrl,
-                          fit: BoxFit.cover,
-                          width: 60,
-                          height: 60,
-                          errorBuilder: (context, error, stackTrace) {
-                            return const Center(
-                              child: Icon(
-                                CupertinoIcons.photo,
-                                color: CupertinoColors.systemGrey,
-                              ),
-                            );
-                          },
-                        ),
-                      )
-                    : const Center(
-                        child: Icon(
-                          CupertinoIcons.photo,
-                          color: CupertinoColors.systemGrey,
-                        ),
-                      ),
+              child: Icon(
+                CupertinoIcons.leaf_arrow_circlepath,
+                size: 28,
+                color: CupertinoColors.systemGrey,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Tarla adını title olarak göster, yoksa bitki adını kullan
-                    Text(
-                      analysis.fieldName != null &&
-                              analysis.fieldName!.isNotEmpty
-                          ? analysis.fieldName!
-                          : analysis.plantName,
-                      style: AppTextTheme.headline6,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    // Bitki adını subtitle olarak göster
-                    Text(
-                      analysis.plantName,
-                      style: AppTextTheme.bodyText2.copyWith(
-                        color: CupertinoColors.systemGrey,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    // Analiz tarihi
-                    Text(formattedDate, style: AppTextTheme.caption),
-                  ],
-                ),
+            ),
+            SizedBox(height: context.dimensions.spaceM),
+            Text(
+              'Henüz analiz yok',
+              style: AppTextTheme.headline6.copyWith(
+                fontSize: context.dimensions.fontSizeM,
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
+            ),
+            SizedBox(height: context.dimensions.spaceXS),
+            Text(
+              'İlk bitki analizini yapmak için Yeni Analiz kartına dokunabilirsin',
+              textAlign: TextAlign.center,
+              style: AppTextTheme.bodyText2.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            SizedBox(height: context.dimensions.spaceM),
+            SizedBox(
+              width: double.infinity,
+              child: CupertinoButton(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(context.dimensions.radiusS),
+                onPressed: _navigateToAnalysis,
                 child: Text(
-                  statusText,
-                  style: AppTextTheme.subtitle2.copyWith(color: statusColor),
+                  'Analiz Yap',
+                  style: AppTextTheme.button.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  // Ay adını döndüren yardımcı metot
-  String _getMonthName(int month) {
-    const months = [
-      'Ocak',
-      'Şubat',
-      'Mart',
-      'Nisan',
-      'Mayıs',
-      'Haziran',
-      'Temmuz',
-      'Ağustos',
-      'Eylül',
-      'Ekim',
-      'Kasım',
-      'Aralık',
-    ];
-    return months[month - 1];
-  }
-
-  // Bilgi kartı widget'ı (değişmedi)
-  Widget _buildInfoCard(
+  /// Analiz kartı widget'ı
+  Widget _buildAnalysisCard(
     BuildContext context,
-    String title,
-    String description,
-    IconData icon,
+    PlantAnalysisResult analysis,
   ) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: CupertinoColors.systemBackground,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: CupertinoColors.systemGrey6.withOpacity(0.3),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: AppColors.secondary.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Center(
-              child: Icon(icon, color: AppColors.secondary, size: 28),
+    // Tarih için temel bir değer kullan, API'den gelmediği için
+    final formattedDate = 'Yeni Analiz';
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          CupertinoPageRoute(
+            builder: (context) => AnalysisResultScreen(
+              analysisId: analysis.id,
             ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(title, style: AppTextTheme.headline6),
-                const SizedBox(height: 4),
-                Text(
-                  description,
-                  style: AppTextTheme.bodyText2.copyWith(
-                    color: CupertinoColors.systemGrey,
+        );
+      },
+      child: Container(
+        padding: EdgeInsets.all(context.dimensions.paddingM),
+        decoration: BoxDecoration(
+          color: CupertinoColors.systemBackground,
+          borderRadius: BorderRadius.circular(context.dimensions.radiusM),
+          border: Border.all(
+            color: CupertinoColors.systemGrey5,
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: CupertinoColors.systemGrey6,
+              blurRadius: 5,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: analysis.diseases.isEmpty
+                    ? AppColors.primary.withOpacity(0.1)
+                    : CupertinoColors.systemRed.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(context.dimensions.radiusS),
+              ),
+              child: Icon(
+                analysis.diseases.isEmpty
+                    ? CupertinoIcons.leaf_arrow_circlepath
+                    : CupertinoIcons.exclamationmark_circle,
+                size: 24,
+                color: analysis.diseases.isEmpty
+                    ? AppColors.primary
+                    : CupertinoColors.systemRed,
+              ),
+            ),
+            SizedBox(width: context.dimensions.spaceM),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          analysis.plantName ?? 'Bilinmeyen Bitki',
+                          style: AppTextTheme.bodyText1.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Text(
+                        formattedDate,
+                        style: AppTextTheme.caption,
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                  SizedBox(height: 3),
+                  if (analysis.diseases.isNotEmpty)
+                    Text(
+                      analysis.diseases.first.name,
+                      style: AppTextTheme.bodyText2.copyWith(
+                        color: CupertinoColors.systemRed,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    )
+                  else
+                    Text(
+                      'Sağlıklı',
+                      style: AppTextTheme.bodyText2.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          const Icon(
-            CupertinoIcons.chevron_right,
-            color: CupertinoColors.systemGrey,
-          ),
-        ],
+            Icon(
+              CupertinoIcons.chevron_right,
+              color: CupertinoColors.systemGrey,
+              size: 16,
+            ),
+          ],
+        ),
       ),
     );
   }

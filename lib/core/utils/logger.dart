@@ -13,6 +13,7 @@ class AppLogger {
       printTime: true,
     ),
     level: Level.verbose,
+    output: ConsoleOutput(),
   );
 
   /// Verbose seviyesinde log

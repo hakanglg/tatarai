@@ -54,7 +54,16 @@ class _LoginScreenState extends State<LoginScreen> {
           context.goNamed(RouteNames.home);
         } else if (state.errorMessage != null && !state.isLoading) {
           // Hata durumu - yükleme tamamlandıysa ve hata varsa göster
-          _showErrorDialog(context, state.errorMessage!);
+          if (state.errorMessage!.contains('unavailable')) {
+            // Bağlantı hatası durumunda özel mesaj göster
+            _showErrorDialog(
+              context,
+              'Sunucuya bağlanırken bir sorun oluştu. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.',
+            );
+          } else {
+            _showErrorDialog(context, state.errorMessage!);
+          }
+
           // Hata mesajını gösterdikten sonra temizle
           Future.delayed(Duration.zero, () {
             context.read<AuthCubit>().clearErrorMessage();
@@ -190,7 +199,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       AppButton(
                         text: 'Giriş Yap',
                         isLoading: state.isLoading,
-                        onPressed: _signIn,
+                        onPressed: () {
+                          print('Giriş Yap butonuna basıldı!');
+                          _signIn();
+                        },
                         height: dim.buttonHeight,
                       ),
                       SizedBox(height: dim.spaceL),

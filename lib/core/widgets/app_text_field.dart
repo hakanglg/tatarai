@@ -1,7 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-
-import '../theme/app_text_styles.dart';
+import 'package:flutter/services.dart';
+import 'package:tatarai/core/theme/dimensions.dart';
+import 'package:tatarai/core/theme/text_theme.dart';
 import '../theme/color_scheme.dart';
 
 /// Uygulama genelinde kullanılacak standart metin giriş bileşeni
@@ -19,9 +20,16 @@ class AppTextField extends StatefulWidget {
   final VoidCallback? onEditingComplete;
   final ValueChanged<String>? onSubmitted;
   final IconData? prefixIcon;
-  final Widget? suffix;
+  final IconData? suffixIcon;
+  final VoidCallback? onSuffixIconTap;
   final int? maxLines;
+  final int? minLines;
   final int? maxLength;
+  final bool expands;
+  final TextCapitalization textCapitalization;
+  final List<TextInputFormatter>? inputFormatters;
+  final AutovalidateMode? autovalidateMode;
+  final String? Function(String?)? validator;
   final bool enabled;
 
   const AppTextField({
@@ -39,9 +47,16 @@ class AppTextField extends StatefulWidget {
     this.onEditingComplete,
     this.onSubmitted,
     this.prefixIcon,
-    this.suffix,
+    this.suffixIcon,
+    this.onSuffixIconTap,
     this.maxLines = 1,
+    this.minLines,
     this.maxLength,
+    this.expands = false,
+    this.textCapitalization = TextCapitalization.none,
+    this.inputFormatters,
+    this.autovalidateMode,
+    this.validator,
     this.enabled = true,
   });
 
@@ -81,10 +96,9 @@ class _AppTextFieldState extends State<AppTextField> {
   Widget build(BuildContext context) {
     final bool hasError =
         widget.errorText != null && widget.errorText!.isNotEmpty;
-    final Color borderColor =
-        hasError
-            ? AppColors.error
-            : _focused
+    final Color borderColor = hasError
+        ? AppColors.error
+        : _focused
             ? AppColors.primary
             : AppColors.border;
 
@@ -94,17 +108,17 @@ class _AppTextFieldState extends State<AppTextField> {
         if (widget.labelText != null) ...[
           Text(
             widget.labelText!,
-            style: AppTextStyles.labelMedium.copyWith(
+            style: AppTextTheme.bodyLarge.copyWith(
               color: hasError ? AppColors.error : AppColors.textSecondary,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: context.dimensions.spaceXS),
         ],
         Container(
           decoration: BoxDecoration(
             color:
                 widget.enabled ? AppColors.surface : AppColors.surfaceVariant,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(context.dimensions.radiusS),
             border: Border.all(color: borderColor, width: 1.0),
           ),
           child: CupertinoTextField(
@@ -112,28 +126,43 @@ class _AppTextFieldState extends State<AppTextField> {
             focusNode: _focusNode,
             decoration: BoxDecoration(
               color: Colors.transparent,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(context.dimensions.radiusS),
             ),
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: EdgeInsets.symmetric(
+              horizontal: context.dimensions.paddingM,
+              vertical: context.dimensions.paddingM,
+            ),
             placeholder: widget.hintText,
-            placeholderStyle: AppTextStyles.bodyMedium.copyWith(
+            placeholderStyle: AppTextTheme.bodyMedium.copyWith(
               color: AppColors.textTertiary,
             ),
-            style: AppTextStyles.bodyMedium.copyWith(
+            style: AppTextTheme.bodyMedium.copyWith(
               color: AppColors.textPrimary,
             ),
-            prefix:
-                widget.prefixIcon != null
-                    ? Padding(
-                      padding: const EdgeInsets.only(left: 12.0),
+            prefix: widget.prefixIcon != null
+                ? Padding(
+                    padding: EdgeInsets.only(left: context.dimensions.paddingM),
+                    child: Icon(
+                      widget.prefixIcon,
+                      color: AppColors.textSecondary,
+                      size: context.dimensions.iconSizeM,
+                    ),
+                  )
+                : null,
+            suffix: widget.suffixIcon != null
+                ? GestureDetector(
+                    onTap: widget.onSuffixIconTap,
+                    child: Padding(
+                      padding:
+                          EdgeInsets.only(right: context.dimensions.paddingM),
                       child: Icon(
-                        widget.prefixIcon,
+                        widget.suffixIcon,
                         color: AppColors.textSecondary,
-                        size: 20,
+                        size: context.dimensions.iconSizeM,
                       ),
-                    )
-                    : null,
-            suffix: widget.obscureText ? _buildPasswordToggle() : widget.suffix,
+                    ),
+                  )
+                : null,
             obscureText: _obscureText,
             keyboardType: widget.keyboardType,
             textInputAction: widget.textInputAction,
@@ -142,36 +171,22 @@ class _AppTextFieldState extends State<AppTextField> {
             onEditingComplete: widget.onEditingComplete,
             onSubmitted: widget.onSubmitted,
             maxLines: widget.maxLines,
+            minLines: widget.minLines,
             maxLength: widget.maxLength,
+            expands: widget.expands,
+            textCapitalization: widget.textCapitalization,
+            inputFormatters: widget.inputFormatters,
             enabled: widget.enabled,
           ),
         ),
         if (hasError) ...[
-          const SizedBox(height: 4),
+          SizedBox(height: context.dimensions.spaceXXS),
           Text(
             widget.errorText!,
-            style: AppTextStyles.labelSmall.copyWith(color: AppColors.error),
+            style: AppTextTheme.bodyLarge.copyWith(color: AppColors.error),
           ),
         ],
       ],
-    );
-  }
-
-  Widget _buildPasswordToggle() {
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _obscureText = !_obscureText;
-        });
-      },
-      child: Padding(
-        padding: const EdgeInsets.only(right: 12.0),
-        child: Icon(
-          _obscureText ? CupertinoIcons.eye : CupertinoIcons.eye_slash,
-          color: AppColors.textSecondary,
-          size: 20,
-        ),
-      ),
     );
   }
 }

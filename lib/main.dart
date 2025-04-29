@@ -1,9 +1,6 @@
 import 'dart:async';
-import 'dart:io';
-import 'dart:ui';
 
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -11,229 +8,245 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:tatarai/core/constants/app_constants.dart';
 import 'package:tatarai/core/repositories/plant_analysis_repository.dart';
 import 'package:tatarai/core/routing/app_router.dart';
+import 'package:tatarai/core/services/firebase_manager.dart';
 import 'package:tatarai/core/theme/app_theme.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
-import 'package:tatarai/features/auth/repositories/user_repository.dart';
+import 'package:tatarai/core/repositories/user_repository.dart';
 import 'package:tatarai/features/auth/services/auth_service.dart';
+import 'package:tatarai/features/home/cubits/home_cubit.dart';
 import 'package:tatarai/features/plant_analysis/cubits/plant_analysis_cubit.dart';
 import 'package:tatarai/features/plant_analysis/services/gemini_service.dart';
 import 'package:tatarai/features/plant_analysis/services/plant_analysis_service.dart';
 import 'package:tatarai/features/profile/cubits/profile_cubit.dart';
 import 'package:tatarai/firebase_options.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/rendering.dart';
+import 'package:tatarai/core/utils/network_util.dart';
+import 'package:tatarai/core/utils/firebase_test_utils.dart';
 
 /// Uygulama başlangıç noktası
-void main() async {
-  // Tüm hataları yakalayacak bir wrapper oluştur
-  runZonedGuarded(
-    () async {
-      // Widget ağacı başlatılmadan önce Flutter bağlamını başlat
-      WidgetsFlutterBinding.ensureInitialized();
+Future<void> main() async {
+  // Hata yakalama
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
 
-      // Environment değişkenlerini yükle
-      try {
-        await dotenv.load(fileName: ".env");
-        AppLogger.i('Environment değişkenleri başarıyla yüklendi');
+    // Debug özellikleri kapatılıyor
+    debugPaintSizeEnabled = false;
+    debugPaintBaselinesEnabled = false;
+    debugPaintLayerBordersEnabled = false;
+    debugPaintPointersEnabled = false;
 
-        // Gerekli environment değişkenlerini kontrol et
-        final requiredEnvVars = [
-          'GEMINI_API_KEY',
-          'FIREBASE_API_KEY',
-          'FIREBASE_APP_ID',
-          'FIREBASE_MESSAGING_SENDER_ID',
-          'FIREBASE_PROJECT_ID',
-        ];
+    // Network bağlantı izlemeyi başlat (Firebase'den önce)
+    NetworkUtil().startMonitoring();
 
-        final missingVars = requiredEnvVars
-            .where((envVar) => dotenv.env[envVar]?.isEmpty ?? true)
-            .toList();
-        if (missingVars.isNotEmpty) {
-          throw Exception(
-              'Eksik environment değişkenleri: ${missingVars.join(", ")}');
-        }
-      } catch (e) {
-        AppLogger.e('Environment değişkenleri yüklenirken hata oluştu', e);
-        // Uygulama başlatılamaz - kritik hata
-        rethrow;
-      }
-
-      // Ana thread'de hata yakalama
-      FlutterError.onError = (FlutterErrorDetails details) {
-        AppLogger.e(
-          'Flutter hatası: ${details.exception}',
-          details.exception,
-          details.stack,
-        );
-      };
-
-      // PlatformDispatcher hatalarını yakala
-      PlatformDispatcher.instance.onError = (error, stack) {
-        AppLogger.e('Platform hatası: $error', error, stack);
-        return true;
-      };
-
-      // Bellek ayarlamaları ve performans iyileştirmesi
-      SystemChrome.setPreferredOrientations([
-        DeviceOrientation.portraitUp,
-        DeviceOrientation.portraitDown,
-      ]);
-
-      SystemChrome.setSystemUIOverlayStyle(
-        const SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          systemNavigationBarColor: Colors.white,
-        ),
-      );
-
-      // Firebase async olarak başlat, ama bekletme (splash ekranında başlatılacak)
-      _initializeFirebase().then((initialized) {
-        runApp(TatarAI(firebaseInitialized: initialized));
-      }).catchError((error, stack) {
-        AppLogger.e('Firebase başlatma hatası', error, stack);
-        // Firebase hatası olsa bile uygulamayı aç
-        runApp(const TatarAI(firebaseInitialized: false));
-      });
-    },
-    (error, stackTrace) {
-      // Zone dışındaki hataları yakala
-      AppLogger.e('Yakalanmamış hata: $error', error, stackTrace);
-    },
-  );
-}
-
-/// Firebase'i arkaplanda başlatır
-Future<bool> _initializeFirebase() async {
-  try {
-    // Emülatör olup olmadığını kontrol et
-    bool isEmulator = false;
-    if (Platform.isAndroid) {
-      isEmulator = await _isAndroidEmulator();
-      AppLogger.i('Emülatör tespiti: $isEmulator');
+    // Çevre değişkenlerini yükle (Firebase'den önce)
+    try {
+      await dotenv.load(fileName: ".env");
+      AppLogger.i('Çevre değişkenleri yüklendi');
+    } catch (e) {
+      AppLogger.e('Çevre değişkenleri yükleme hatası', e);
     }
 
-    // Firebase başlatma
-    try {
-      // Firebase 11.10.0 için güncellenmiş başlatma
-      if (isEmulator) {
-        await Firebase.initializeApp();
-        AppLogger.i('Firebase emülatör modunda başlatıldı');
-        return true;
-      } else {
-        // Firebase options bilgilerini logla
-        AppLogger.i(
-            'Firebase Options - Project ID: ${DefaultFirebaseOptions.currentPlatform.projectId}');
-        AppLogger.i(
-            'Firebase Options - Storage Bucket: ${DefaultFirebaseOptions.currentPlatform.storageBucket}');
+    // Firebase başlatma - daha sağlam hata yakalama ile
+    bool firebaseInitialized = false;
+    int retryCount = 0;
+    const int maxRetries = 3;
 
-        // Yeni sürüm için options'ı doğru şekilde yapılandır
+    while (!firebaseInitialized && retryCount < maxRetries) {
+      try {
+        retryCount++;
+        AppLogger.i('Firebase başlatma denemesi $retryCount/$maxRetries');
+
         await Firebase.initializeApp(
           options: DefaultFirebaseOptions.currentPlatform,
         );
+        AppLogger.i('Firebase Core başarıyla başlatıldı');
 
-        // Firestore'u kontrol et
+        // Firebase testlerini çalıştır
         try {
-          // Özel veritabanı adı ile Firestore'u başlat
-          final firestore = FirebaseFirestore.instanceFor(
-            app: Firebase.app(),
-            databaseId: 'tatarai',
-          );
-          AppLogger.i('Firestore başlatıldı - App Name: ${firestore.app.name}');
-          AppLogger.i(
-              'Firestore Project ID: ${firestore.app.options.projectId}');
-          AppLogger.i('Firestore Database ID: tatarai');
+          final testResults =
+              await FirebaseTestUtils.testAllFirebaseConnections();
+          if (testResults['success']) {
+            AppLogger.i('Firebase bağlantı testleri başarılı: $testResults');
+          } else {
+            AppLogger.w(
+                'Firebase bağlantı testlerinde sorunlar tespit edildi: $testResults');
 
-          // Firestore ayarlarını kontrol et ve logla
-          final settings = firestore.settings;
-          AppLogger.i(
-              'Firestore Settings - Host: ${settings.host}, SSL: ${settings.sslEnabled}');
-
-          // Firestore bağlantısını test et
-          try {
-            AppLogger.i('Firestore test koleksiyonuna erişim deneniyor...');
-            final testDoc = await firestore
-                .collection('_test_connection')
-                .doc('test')
-                .get();
-            AppLogger.i(
-                'Firestore erişim testi: ${testDoc.exists ? "Belge var" : "Belge yok"}');
-
-            // Yeni bir belge eklemeyi dene
-            AppLogger.i('Firestore test belge yazma deneniyor...');
-            await firestore
-                .collection('_test_connection')
-                .doc('test_write')
-                .set({
-              'timestamp': FieldValue.serverTimestamp(),
-              'test': true,
-              'message': 'Test bağlantısı başarılı'
-            });
-            AppLogger.i('Firestore test belgesi başarıyla yazıldı');
-          } catch (writeError) {
-            AppLogger.e('Firestore yazma hatası: $writeError', writeError);
-            if (writeError.toString().contains('permission-denied')) {
-              AppLogger.e(
-                  'Firestore izin hatası - Güvenlik kurallarını kontrol edin',
-                  writeError);
-            } else if (writeError.toString().contains('unavailable')) {
-              AppLogger.e(
-                  'Firestore servis kullanılamıyor - Veritabanının oluşturulduğundan ve bölgenin doğru olduğundan emin olun',
-                  writeError);
+            if (!testResults['firestore_tatar-ai'] &&
+                testResults['firestore_default']) {
+              AppLogger.w(
+                  "'tatar-ai' veritabanına erişilemedi ancak varsayılan veritabanı çalışıyor. Uygulamaya devam ediliyor.");
             }
           }
-        } catch (firestoreError) {
-          AppLogger.e('Firestore erişim hatası', firestoreError);
+        } catch (testError) {
+          AppLogger.e('Firebase test hatası', testError);
         }
 
-        // Storage ve Auth servislerini yapılandır
-        AppLogger.i('Firebase başlatıldı');
-        return true;
-      }
-    } catch (e) {
-      // Firebase başlatma hatası - detaylı loglama
-      AppLogger.e('Firebase başlatma ilk denemede başarısız: $e', e);
+        firebaseInitialized = true;
 
-      try {
-        // Alternatif başlatma yöntemi
-        await Firebase.initializeApp();
-        AppLogger.i('Firebase fallback modunda başlatıldı');
-        return true;
-      } catch (e2) {
-        AppLogger.e('Firebase fallback başlatma denemesi başarısız: $e2', e2);
-        return false;
+        // Firestore veritabanı bilgilerini kontrol et
+        try {
+          // "tatarai" veritabanı testi
+          final tatarDbSuccess =
+              await FirebaseTestUtils.testFirestoreConnection('tatarai');
+          if (tatarDbSuccess) {
+            AppLogger.i("'tatarai' veritabanı bağlantısı başarılı");
+          } else {
+            AppLogger.w(
+                "'tatarai' veritabanına bağlanılamadı, varsayılan veritabanı kullanılacak");
+
+            // Varsayılan veritabanını dene
+            final defaultDbSuccess =
+                await FirebaseTestUtils.testFirestoreConnection('');
+            if (defaultDbSuccess) {
+              AppLogger.i("Varsayılan veritabanı bağlantısı başarılı");
+            } else {
+              AppLogger.e("Hiçbir Firestore veritabanına bağlanılamadı!");
+            }
+          }
+        } catch (dbTestError) {
+          AppLogger.e('Veritabanı test hatası', dbTestError);
+        }
+
+        // Firebase yöneticisini başlat
+        final firebaseManager = FirebaseManager();
+        // Başlatılırken hataları yakala
+        await firebaseManager.initialize().catchError((e) {
+          AppLogger.e('FirebaseManager başlatma hatası', e);
+        });
+
+        // Kullanıcının kimlik doğrulama durumunu kontrol et
+        final _ = firebaseManager.auth;
+      } catch (e, stackTrace) {
+        AppLogger.e(
+            'Firebase Core başlatma hatası (deneme $retryCount/$maxRetries)',
+            e,
+            stackTrace);
+
+        if (retryCount >= maxRetries) {
+          // Maksimum yeniden deneme sayısına ulaşıldı, devam et
+          AppLogger.w(
+              'Firebase başlatılamadı, uygulama sınırlı modda çalışacak');
+        } else {
+          // Kısa bir bekleme süresi sonra tekrar dene
+          await Future.delayed(Duration(seconds: retryCount * 2));
+        }
       }
     }
-  } catch (e) {
-    AppLogger.e('Firebase başlatma hatası: $e', e);
-    return false;
-  }
-}
 
-/// Android cihazın emülatör olup olmadığını kontrol et
-Future<bool> _isAndroidEmulator() async {
-  if (!Platform.isAndroid) {
-    return false;
-  }
+    // Sistem ayarları
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
 
-  try {
-    // Emülatör olduğunu varsayalım (device_info_plus kütüphanesi eklenebilir)
-    return true; // Her zaman emülatör olarak kabul et - geliştirme amacıyla
-  } catch (e) {
-    AppLogger.e('Emülatör tespiti sırasında hata: $e', e);
-    return true; // Hata durumunda emülatör kabul et
-  }
+    // Hata ayıklama modunda performans optimizasyonları
+    if (kDebugMode) {
+      debugPrint = (String? message, {int? wrapWidth}) {
+        if (message != null) {
+          AppLogger.d(message);
+        }
+      };
+    }
+
+    // Uygulamayı başlat
+    runApp(TatarAI(firebaseInitialized: firebaseInitialized));
+  }, (error, stack) {
+    AppLogger.e('Yakalanmamış hata', error, stack);
+  });
 }
 
 /// TatarAI uygulama kök widget'ı
-class TatarAI extends StatelessWidget {
+class TatarAI extends StatefulWidget {
   final bool firebaseInitialized;
 
   const TatarAI({super.key, this.firebaseInitialized = false});
 
   @override
+  State<TatarAI> createState() => _TatarAIState();
+}
+
+class _TatarAIState extends State<TatarAI> {
+  bool _firebaseManagerInitialized = false;
+  String? _firebaseError;
+
+  // FirebaseManager'i State içinde referans tutuyoruz
+  final FirebaseManager _firebaseManager = FirebaseManager();
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeFirebaseManager();
+  }
+
+  Future<void> _initializeFirebaseManager() async {
+    if (!widget.firebaseInitialized) {
+      setState(() {
+        _firebaseError = 'Firebase başlatılamadı';
+        _firebaseManagerInitialized = false;
+      });
+      return;
+    }
+
+    try {
+      // Firebase Manager'ı arka planda başlat
+      await _firebaseManager.initialize();
+
+      // Eğer başarılıysa, UI'ı güncelle
+      if (mounted) {
+        setState(() {
+          _firebaseManagerInitialized = true;
+          _firebaseError = null;
+        });
+      }
+
+      AppLogger.i('FirebaseManager başarıyla başlatıldı');
+    } catch (e, stack) {
+      AppLogger.e('FirebaseManager başlatma hatası', e, stack);
+
+      if (mounted) {
+        setState(() {
+          _firebaseError = 'Firebase servisleri başlatılamadı: ${e.toString()}';
+          _firebaseManagerInitialized = false;
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Bağımlılıklar
-    final authService = AuthService();
+    // Hata varsa veya Firebase henüz başlatılmamışsa kullanılacak widget
+    if (!widget.firebaseInitialized || _firebaseError != null) {
+      return MaterialApp(
+        title: AppConstants.appName,
+        theme: ThemeData(useMaterial3: true),
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(
+          body: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 20),
+                Text(_firebaseError ?? 'Uygulama başlatılıyor...'),
+                if (_firebaseError != null) ...[
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: _initializeFirebaseManager,
+                    child: const Text('Tekrar Dene'),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Normal Firebase başlatılmış durum için uygulama UI'ı
+    // Bağımlılıklar - State içindeki _firebaseManager referansını kullan
+    final authService = AuthService(firebaseManager: _firebaseManager);
     final userRepository = UserRepository(authService: authService);
 
     // Gemini servisi
@@ -242,6 +255,9 @@ class TatarAI extends StatelessWidget {
     // Bitki analiz servisi
     final plantAnalysisService = PlantAnalysisService(
       geminiService: geminiService,
+      firestore: _firebaseManager.firestore,
+      storage: _firebaseManager.storage,
+      authService: authService,
     );
 
     final plantAnalysisRepository = PlantAnalysisRepository(
@@ -250,43 +266,44 @@ class TatarAI extends StatelessWidget {
       authService: authService,
     );
 
-    // Auth Cubit'i
-    final authCubit = AuthCubit(
-      userRepository: userRepository,
-      authService: authService,
-    );
-
-    // App Router
-    final appRouter = AppRouter(authCubit: authCubit);
-
     return MultiBlocProvider(
       providers: [
-        // Auth Cubit'i
-        BlocProvider<AuthCubit>(create: (context) => authCubit),
-        // Bitki analizi Cubit'i
-        BlocProvider<PlantAnalysisCubit>(
-          create: (context) =>
-              PlantAnalysisCubit(repository: plantAnalysisRepository),
+        BlocProvider<AuthCubit>(
+          create: (context) => AuthCubit(
+            userRepository: userRepository,
+            authService: authService,
+          ),
         ),
-        // Profil Cubit'i
+        BlocProvider<PlantAnalysisCubit>(
+          create: (context) => PlantAnalysisCubit(
+            repository: plantAnalysisRepository,
+          ),
+        ),
         BlocProvider<ProfileCubit>(
           create: (context) => ProfileCubit(
             userRepository: userRepository,
-            authCubit: authCubit,
           ),
         ),
-        // Diğer Cubit'ler eklenecek (payment, vb.)
+        BlocProvider<HomeCubit>(
+          create: (context) => HomeCubit(
+            userRepository: userRepository,
+            plantAnalysisRepository: plantAnalysisRepository,
+          ),
+        ),
       ],
-      child: CupertinoApp.router(
-        title: AppConstants.appName,
-        theme: AppTheme.cupertinoTheme,
-        debugShowCheckedModeBanner: false,
-        routerConfig: appRouter.router,
-        localizationsDelegates: const [
-          DefaultMaterialLocalizations.delegate,
-          DefaultCupertinoLocalizations.delegate,
-          DefaultWidgetsLocalizations.delegate,
-        ],
+      child: Builder(
+        builder: (context) => MaterialApp.router(
+          title: AppConstants.appName,
+          theme: AppTheme.materialTheme,
+          darkTheme: AppTheme.materialTheme.copyWith(
+            brightness: Brightness.dark,
+          ),
+          themeMode: ThemeMode.system,
+          debugShowCheckedModeBanner: false,
+          routerConfig: AppRouter(
+            authCubit: context.read<AuthCubit>(),
+          ).router,
+        ),
       ),
     );
   }

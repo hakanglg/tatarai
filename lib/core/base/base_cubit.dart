@@ -1,21 +1,6 @@
-import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:tatarai/core/base/base_state.dart';
 import 'package:tatarai/core/utils/logger.dart';
-
-/// Temel durum sınıfı - tüm state sınıfları için temel yapı
-abstract class BaseState extends Equatable {
-  /// Yükleniyor durumu
-  final bool isLoading;
-
-  /// Hata mesajı
-  final String? errorMessage;
-
-  /// Default constructor
-  const BaseState({this.isLoading = false, this.errorMessage});
-
-  @override
-  List<Object?> get props => [isLoading, errorMessage];
-}
 
 /// Temel Cubit sınıfı - tüm Cubit'ler için temel yapı
 abstract class BaseCubit<T extends BaseState> extends Cubit<T> {

@@ -147,20 +147,22 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return CupertinoPageScaffold(
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CupertinoActivityIndicator(radius: 16),
-              SizedBox(height: 16),
-              Text(
-                'Analiz sonucu yükleniyor...',
-                style: TextStyle(
-                  color: CupertinoColors.systemGrey,
+      return Scaffold(
+        body: CupertinoPageScaffold(
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CupertinoActivityIndicator(radius: 16),
+                SizedBox(height: 16),
+                Text(
+                  'Analiz sonucu yükleniyor...',
+                  style: TextStyle(
+                    color: CupertinoColors.systemGrey,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       );

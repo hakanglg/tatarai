@@ -1,17 +1,63 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:logger/logger.dart';
 import 'package:tatarai/core/base/base_service.dart';
+import 'package:tatarai/core/services/firebase_manager.dart';
 import 'package:tatarai/features/auth/models/user_model.dart';
 import 'package:tatarai/features/auth/models/user_role.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 /// Firebase authentication servisi
 /// Firebase Auth ile ilgili temel işlemleri gerçekleştirir
 class AuthService extends BaseService {
   final Logger _logger = Logger();
-  final firebase_auth.FirebaseAuth _firebaseAuth =
-      firebase_auth.FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final firebase_auth.FirebaseAuth _firebaseAuth;
+  final FirebaseFirestore _firestore;
+
+  /// Maksimum yeniden deneme sayısı
+  static const int _maxRetries = 3;
+
+  /// Yeniden denemeler arasındaki bekleme süresi (milisaniye)
+  static const int _retryDelay = 2000;
+
+  /// Varsayılan constructor
+  AuthService({
+    firebase_auth.FirebaseAuth? firebaseAuth,
+    FirebaseFirestore? firestore,
+    FirebaseManager? firebaseManager,
+  })  : _firebaseAuth =
+            firebaseAuth ?? (firebaseManager?.auth ?? FirebaseManager().auth),
+        _firestore = firestore ??
+            (firebaseManager?.firestore ??
+                FirebaseFirestore.instanceFor(
+                  app: Firebase.app(),
+                  databaseId: 'tatarai',
+                ));
+
+  /// Yeniden deneme mekanizması ile işlem yapma
+  Future<T> _withRetry<T>(Future<T> Function() operation) async {
+    int retryCount = 0;
+    while (retryCount < _maxRetries) {
+      try {
+        return await operation();
+      } catch (e) {
+        retryCount++;
+        _logger.w(
+          'İşlem başarısız oldu (Deneme $retryCount/$_maxRetries): $e',
+        );
+
+        if (retryCount < _maxRetries) {
+          _logger.i('$_retryDelay ms sonra yeniden denenecek...');
+          await Future.delayed(Duration(milliseconds: _retryDelay));
+        } else {
+          _logger.e('Maksimum deneme sayısına ulaşıldı: $e');
+          rethrow;
+        }
+      }
+    }
+    throw Exception('Beklenmeyen bir hata oluştu');
+  }
 
   /// Mevcut giriş yapmış kullanıcıyı stream olarak döndürür
   Stream<UserModel?> get userStream {
@@ -21,7 +67,7 @@ class AuthService extends BaseService {
       }
 
       try {
-        return await getUserFromFirestore(user.uid);
+        return await _withRetry(() => getUserFromFirestore(user.uid));
       } catch (e) {
         _logger.e('Firestore\'dan kullanıcı bilgileri alınamadı: $e');
         // Temel kullanıcı bilgileriyle devam et
@@ -39,46 +85,49 @@ class AuthService extends BaseService {
     required String password,
     String? displayName,
   }) async {
-    try {
-      _logger.i('E-posta ile kayıt başlatılıyor: $email');
+    return _withRetry(() async {
+      try {
+        _logger.i('E-posta ile kayıt başlatılıyor: $email');
 
-      final userCredential = await _firebaseAuth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+        final userCredential =
+            await _firebaseAuth.createUserWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
 
-      final user = userCredential.user!;
+        final user = userCredential.user!;
 
-      // Kullanıcı profili güncelleme
-      if (displayName != null && displayName.isNotEmpty) {
-        await user.updateDisplayName(displayName);
+        // Kullanıcı profili güncelleme
+        if (displayName != null && displayName.isNotEmpty) {
+          await user.updateDisplayName(displayName);
+        }
+
+        // Firestore kullanıcı dökümanı oluştur
+        final userModel = UserModel(
+          id: user.uid,
+          email: email,
+          displayName: displayName,
+          isEmailVerified: false,
+          createdAt: DateTime.now(),
+          lastLoginAt: DateTime.now(),
+          role: UserRole.free,
+          analysisCredits: 3, // Yeni kullanıcılar için başlangıç kredisi
+          favoriteAnalysisIds: const [],
+        );
+
+        await saveUserToFirestore(userModel);
+
+        _logger.i('Kullanıcı kaydı başarılı: ${user.uid}');
+        return userModel;
+      } on firebase_auth.FirebaseAuthException catch (e) {
+        _logger.w('Kayıt olma hatası: ${e.code}');
+        throw _handleAuthException(e);
+      } catch (e) {
+        _logger.e('Beklenmeyen kayıt hatası: $e');
+        throw Exception(
+            'Kayıt işlemi sırasında beklenmeyen bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
       }
-
-      // Firestore kullanıcı dökümanı oluştur
-      final userModel = UserModel(
-        id: user.uid,
-        email: email,
-        displayName: displayName,
-        isEmailVerified: false,
-        createdAt: DateTime.now(),
-        lastLoginAt: DateTime.now(),
-        role: UserRole.free,
-        analysisCredits: 3, // Yeni kullanıcılar için başlangıç kredisi
-        favoriteAnalysisIds: const [],
-      );
-
-      await saveUserToFirestore(userModel);
-
-      _logger.i('Kullanıcı kaydı başarılı: ${user.uid}');
-      return userModel;
-    } on firebase_auth.FirebaseAuthException catch (e) {
-      _logger.w('Kayıt olma hatası: ${e.code}');
-      throw _handleAuthException(e);
-    } catch (e) {
-      _logger.e('Beklenmeyen kayıt hatası: $e');
-      throw Exception(
-          'Kayıt işlemi sırasında beklenmeyen bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
-    }
+    });
   }
 
   /// E-posta ve şifre ile giriş yapma işlemini yapar
@@ -86,47 +135,51 @@ class AuthService extends BaseService {
     required String email,
     required String password,
   }) async {
-    try {
-      _logger.i('E-posta ile giriş başlatılıyor: $email');
+    return _withRetry(() async {
+      try {
+        _logger.i('E-posta ile giriş başlatılıyor: $email');
 
-      final userCredential = await _firebaseAuth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+        final userCredential = await _firebaseAuth.signInWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
 
-      final user = userCredential.user!;
-      final userModel = await getUserFromFirestore(user.uid);
+        final user = userCredential.user!;
+        final userModel = await getUserFromFirestore(user.uid);
 
-      // Giriş zamanını güncelle
-      final updatedModel = userModel.copyWith(
-        lastLoginAt: DateTime.now(),
-      );
+        // Giriş zamanını güncelle
+        final updatedModel = userModel.copyWith(
+          lastLoginAt: DateTime.now(),
+        );
 
-      await saveUserToFirestore(updatedModel);
+        await saveUserToFirestore(updatedModel);
 
-      _logger.i('Giriş başarılı: ${user.uid}');
-      return updatedModel;
-    } on firebase_auth.FirebaseAuthException catch (e) {
-      _logger.w('Giriş hatası: ${e.code}');
-      throw _handleAuthException(e);
-    } catch (e) {
-      _logger.e('Beklenmeyen giriş hatası: $e');
-      throw Exception(
-          'Giriş işlemi sırasında beklenmeyen bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
-    }
+        _logger.i('Giriş başarılı: ${user.uid}');
+        return updatedModel;
+      } on firebase_auth.FirebaseAuthException catch (e) {
+        _logger.w('Giriş hatası: ${e.code}');
+        throw _handleAuthException(e);
+      } catch (e) {
+        _logger.e('Beklenmeyen giriş hatası: $e');
+        throw Exception(
+            'Giriş işlemi sırasında beklenmeyen bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
+      }
+    });
   }
 
   /// Kullanıcı çıkışı
   Future<void> signOut() async {
-    try {
-      _logger.i('Kullanıcı çıkışı başlatılıyor');
-      await _firebaseAuth.signOut();
-      _logger.i('Kullanıcı çıkışı başarılı');
-    } catch (e) {
-      _logger.e('Çıkış hatası: $e');
-      throw Exception(
-          'Çıkış yapılırken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
-    }
+    return _withRetry(() async {
+      try {
+        _logger.i('Kullanıcı çıkışı başlatılıyor');
+        await _firebaseAuth.signOut();
+        _logger.i('Kullanıcı çıkışı başarılı');
+      } catch (e) {
+        _logger.e('Çıkış hatası: $e');
+        throw Exception(
+            'Çıkış yapılırken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
+      }
+    });
   }
 
   /// E-posta doğrulama gönderme
@@ -275,39 +328,86 @@ class AuthService extends BaseService {
 
   /// Firestore'dan kullanıcı bilgilerini alma
   Future<UserModel> getUserFromFirestore(String userId) async {
-    try {
-      final doc = await _firestore.collection('users').doc(userId).get();
+    return _withRetry(() async {
+      try {
+        // Önce önbellekten okumayı dene
+        final docSnapshot = await _firestore
+            .collection('users')
+            .doc(userId)
+            .get(const GetOptions(source: Source.cache));
 
-      if (!doc.exists || doc.data() == null) {
-        _logger.w('Kullanıcı dökümanı bulunamadı: $userId');
+        // Eğer önbellekte varsa ve geçerliyse kullan
+        if (docSnapshot.exists && docSnapshot.data() != null) {
+          _logger.i('Kullanıcı bilgileri önbellekten alındı: $userId');
+          return UserModel.fromFirestore(docSnapshot);
+        }
 
-        // Firebase Auth'tan temel kullanıcı bilgilerini al
+        // Önbellekte yoksa veya geçersizse sunucudan al
+        _logger.i('Kullanıcı bilgileri sunucudan alınıyor: $userId');
+
+        // Firestore ayarlarını kontrol et ve güncelle
+        if (_firestore.settings.host != 'firestore.googleapis.com') {
+          _firestore.settings = const Settings(
+            persistenceEnabled: true,
+            cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+            sslEnabled: true,
+            host: 'firestore.googleapis.com',
+          );
+        }
+
+        final doc = await _firestore
+            .collection('users')
+            .doc(userId)
+            .get(const GetOptions(source: Source.server));
+
+        if (!doc.exists || doc.data() == null) {
+          _logger.w('Kullanıcı dökümanı bulunamadı: $userId');
+
+          // Firebase Auth'tan temel kullanıcı bilgilerini al
+          final authUser = _firebaseAuth.currentUser;
+          if (authUser?.uid == userId) {
+            return UserModel.fromFirebaseUser(authUser!);
+          }
+
+          throw Exception('Kullanıcı bilgileri bulunamadı.');
+        }
+
+        // Başarılı okuma durumunda önbelleğe kaydet
+        await _firestore
+            .collection('users')
+            .doc(userId)
+            .set(doc.data()!, SetOptions(merge: true));
+
+        return UserModel.fromFirestore(doc);
+      } catch (e) {
+        _logger.e('Firestore kullanıcı bilgisi alma hatası: $e');
+
+        // Hata durumunda Firebase Auth'tan temel bilgileri almayı dene
         final authUser = _firebaseAuth.currentUser;
         if (authUser?.uid == userId) {
+          _logger.i(
+              'Firebase Auth\'dan temel kullanıcı bilgileri alınıyor: $userId');
           return UserModel.fromFirebaseUser(authUser!);
         }
 
-        throw Exception('Kullanıcı bilgileri bulunamadı.');
+        rethrow;
       }
-
-      return UserModel.fromFirestore(doc);
-    } catch (e) {
-      _logger.e('Firestore kullanıcı bilgisi alma hatası: $e');
-      rethrow;
-    }
+    });
   }
 
   /// Firestore'a kullanıcı bilgilerini kaydetme
   Future<void> saveUserToFirestore(UserModel user) async {
-    try {
-      await _firestore.collection('users').doc(user.id).set(
-            user.toFirestore(),
-            SetOptions(merge: true),
-          );
-    } catch (e) {
-      _logger.e('Firestore kullanıcı kaydetme hatası: $e');
-      throw Exception('Kullanıcı bilgileri kaydedilirken bir hata oluştu.');
-    }
+    return _withRetry(() async {
+      try {
+        await _firestore.collection('users').doc(user.id).set(
+              user.toFirestore(),
+              SetOptions(merge: true),
+            );
+      } catch (e) {
+        _logger.e('Firestore kullanıcı kaydetme hatası: $e');
+        throw Exception('Kullanıcı bilgileri kaydedilirken bir hata oluştu.');
+      }
+    });
   }
 
   /// Firebase Auth hatalarını düzgün mesajlara dönüştürme

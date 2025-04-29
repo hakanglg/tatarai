@@ -3,7 +3,9 @@ import 'package:logger/logger.dart';
 /// Tüm servislerin temel sınıfı.
 /// Loglama ve hata yönetimi için ortak metotlar içerir.
 abstract class BaseService {
-  final Logger _logger = Logger();
+  final Logger _logger = Logger(
+    output: ConsoleOutput(),
+  );
 
   /// Bilgi seviyesinde log mesajı
   void logInfo(String title, [String? message]) {

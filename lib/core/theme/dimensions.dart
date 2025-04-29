@@ -47,31 +47,12 @@ class AppDimensions {
   /// Aşırı büyük padding: 48dp veya ekran genişliğine göre ölçeklendirilmiş değer
   double get paddingXXL => isSmallScreen ? unit * 9.6 : 48;
 
-  // Margin değerleri (padding değerlerine benzer)
-  /// Küçük margin: 8dp veya ekran genişliğine göre ölçeklendirilmiş değer
-  double get marginXS => paddingXS;
-
-  /// Normal margin: 12dp veya ekran genişliğine göre ölçeklendirilmiş değer
-  double get marginS => paddingS;
-
-  /// Orta margin: 16dp veya ekran genişliğine göre ölçeklendirilmiş değer
-  double get marginM => paddingM;
-
-  /// Büyük margin: 24dp veya ekran genişliğine göre ölçeklendirilmiş değer
-  double get marginL => paddingL;
-
-  /// Çok büyük margin: 32dp veya ekran genişliğine göre ölçeklendirilmiş değer
-  double get marginXL => paddingXL;
-
-  /// Aşırı büyük margin: 48dp veya ekran genişliğine göre ölçeklendirilmiş değer
-  double get marginXXL => paddingXXL;
-
   // Widget boyutları
   /// Buton yüksekliği: 48dp veya ekran genişliğine göre ölçeklendirilmiş değer
   double get buttonHeight => isSmallScreen ? unit * 10 : 48;
 
-  /// Büyük buton yüksekliği: 56dp veya ekran genişliğine göre ölçeklendirilmiş değer
-  double get buttonHeightL => isSmallScreen ? unit * 12 : 56;
+  /// Çok büyük icon boyutu: 48dp veya ekran genişliğine göre ölçeklendirilmiş değer
+  double get iconSizeXL => isSmallScreen ? unit * 9 : 48;
 
   /// Büyük icon boyutu: 32dp veya ekran genişliğine göre ölçeklendirilmiş değer
   double get iconSizeL => isSmallScreen ? unit * 7 : 32;
@@ -86,7 +67,7 @@ class AppDimensions {
   double get iconSizeXS => isSmallScreen ? unit * 3 : 16;
 
   // Font boyutları
-  /// Başlık font boyutu: 32dp veya ekran genişliğine göre ölçeklendirilmiş değer
+  /// Aşırı büyük font boyutu: 32dp veya ekran genişliğine göre ölçeklendirilmiş değer
   double get fontSizeXXL => isSmallScreen ? unit * 6.4 : 32;
 
   /// Alt başlık font boyutu: 24dp veya ekran genişliğine göre ölçeklendirilmiş değer
@@ -116,9 +97,6 @@ class AppDimensions {
 
   /// Büyük border radius: 16dp veya ekran genişliğine göre ölçeklendirilmiş değer
   double get radiusL => isSmallScreen ? unit * 3.2 : 16;
-
-  /// Çok büyük border radius: 24dp veya ekran genişliğine göre ölçeklendirilmiş değer
-  double get radiusXL => isSmallScreen ? unit * 4.8 : 24;
 
   // Boşluk değerleri
   /// Çok küçük boşluk: 4dp veya ekran genişliğine göre ölçeklendirilmiş değer

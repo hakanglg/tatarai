@@ -1,15 +1,14 @@
 import 'dart:async';
 
-import 'package:bloc/bloc.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:tatarai/core/utils/logger.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:tatarai/core/base/base_cubit.dart';
 import 'package:tatarai/features/auth/cubits/auth_state.dart';
 import 'package:tatarai/features/auth/models/user_model.dart';
-import 'package:tatarai/features/auth/repositories/user_repository.dart';
+import 'package:tatarai/core/repositories/user_repository.dart';
 import 'package:tatarai/features/auth/services/auth_service.dart';
 
 /// Kimlik doğrulama ve kullanıcı yönetimi için Cubit
-class AuthCubit extends Cubit<AuthState> {
+class AuthCubit extends BaseCubit<AuthState> {
   final UserRepository _userRepository;
   final AuthService _authService;
   StreamSubscription<UserModel?>? _userSubscription;
@@ -27,21 +26,22 @@ class AuthCubit extends Cubit<AuthState> {
   /// Kullanıcı verilerini gerçek zamanlı olarak dinleyen stream
   Stream<UserModel?> get userStream => _userRepository.user;
 
-  // Log metotları
-  void logInfo(String message) {
-    AppLogger.i('AuthCubit: $message');
+  @override
+  void emitErrorState(String errorMessage) {
+    emit(state.copyWith(
+      status: AuthStatus.error,
+      errorMessage: errorMessage,
+      isLoading: false,
+    ));
   }
 
-  void logError(String message, Object error, [StackTrace? stackTrace]) {
-    AppLogger.e('AuthCubit: $message', error, stackTrace);
-  }
-
-  void logSuccess(String message) {
-    AppLogger.i('AuthCubit: $message');
-  }
-
-  void logWarning(String message) {
-    AppLogger.w('AuthCubit: $message');
+  @override
+  void emitLoadingState() {
+    emit(state.copyWith(
+      status: AuthStatus.loading,
+      isLoading: true,
+      errorMessage: null,
+    ));
   }
 
   /// Cubit başlangıç fonksiyonu - user subscription'ı başlatır
@@ -50,13 +50,8 @@ class AuthCubit extends Cubit<AuthState> {
       logInfo('AuthCubit başlatılıyor');
       _subscribeToUserChanges();
     } catch (e, stack) {
-      logError('AuthCubit başlatma hatası', e, stack);
-      emit(
-        state.copyWith(
-          status: AuthStatus.error,
-          errorMessage: 'Kimlik doğrulama servisi başlatılamadı',
-        ),
-      );
+      handleError('AuthCubit başlatma', e, stack);
+      emitErrorState('Kimlik doğrulama servisi başlatılamadı');
     }
   }
 
@@ -100,13 +95,13 @@ class AuthCubit extends Cubit<AuthState> {
         stopEmailVerificationCheck();
       }
     } catch (e, stack) {
-      logError('Kullanıcı durumu işleme hatası', e, stack);
+      handleError('Kullanıcı durumu işleme', e, stack);
     }
   }
 
   /// Kullanıcı stream'inde hata olduğunda çağrılır
   void _onUserError(Object error, StackTrace stack) {
-    logError('Kullanıcı dinleme hatası', error, stack);
+    handleError('Kullanıcı dinleme', error, stack);
     emit(
       state.copyWith(
         status: AuthStatus.unauthenticated,
@@ -120,21 +115,21 @@ class AuthCubit extends Cubit<AuthState> {
 
   /// Asenkron işlem başlatma
   void _startLoading() {
-    emit(state.copyWith(isLoading: true, errorMessage: null));
+    emitLoadingState();
   }
 
   /// Asenkron işlem hata ile bittiğinde
   void _handleError(String operation, Object error) {
     String errorMessage;
 
-    if (error is FirebaseAuthException) {
+    if (error is firebase_auth.FirebaseAuthException) {
       // Hata mesajını direkt olarak kullanmak daha güvenilir
       errorMessage = error.message ?? 'Bir hata oluştu: ${error.code}';
-      logError('$operation hatası: ${error.code}', error);
+      handleError(operation, error);
     } else {
       errorMessage =
           '$operation sırasında bir hata oluştu: ${error.toString()}';
-      logError('Beklenmeyen $operation hatası', error);
+      handleError('Beklenmeyen $operation', error);
     }
 
     emit(
@@ -154,20 +149,48 @@ class AuthCubit extends Cubit<AuthState> {
       _startLoading();
       logInfo('Giriş yapılıyor: $email');
 
-      final userModel = await _userRepository.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      // En fazla 3 kez yeniden deneme stratejisi ile giriş yap
+      int retryCount = 0;
+      UserModel? userModel;
 
-      if (userModel != null) {
-        // Kullanıcı bilgileri, user stream tarafından otomatik güncellenecek
-        logSuccess('Giriş başarılı: ${userModel.email}');
+      while (retryCount < 3 && userModel == null) {
+        try {
+          userModel = await _userRepository.signInWithEmailAndPassword(
+            email: email,
+            password: password,
+          );
 
-        // E-posta doğrulama durumunu kontrol et
-        if (!userModel.isEmailVerified) {
-          startEmailVerificationCheck();
+          // Başarılı giriş
+          if (userModel != null) {
+            logInfo('Giriş başarılı: ${userModel.email}');
+
+            // E-posta doğrulama durumunu kontrol et
+            if (!userModel.isEmailVerified) {
+              startEmailVerificationCheck();
+            }
+
+            return; // Başarılı ise fonksiyondan çık
+          }
+        } catch (e) {
+          if (e.toString().contains('unavailable') && retryCount < 2) {
+            // Servis geçici olarak kullanılamıyor, yeniden dene
+            logInfo(
+                'Firebase servisine bağlantı hatası, yeniden deneme ${retryCount + 1}/3');
+            retryCount++;
+
+            // Exponential backoff: her denemede artan bekleme süresi
+            final backoffDelay = (retryCount * 2) * 1000; // ms cinsinden
+            await Future.delayed(Duration(milliseconds: backoffDelay));
+            continue;
+          } else {
+            // Maksimum deneme sayısına ulaşıldı veya başka bir hata
+            rethrow;
+          }
         }
-      } else {
+      }
+
+      // Tüm yeniden denemeler başarısız oldu
+      if (userModel == null) {
         emit(state.copyWith(
           status: AuthStatus.unauthenticated,
           isLoading: false,
@@ -194,19 +217,48 @@ class AuthCubit extends Cubit<AuthState> {
       _startLoading();
       logInfo('Kayıt olunuyor: $email');
 
-      final userModel = await _userRepository.signUpWithEmailAndPassword(
-        email: email,
-        password: password,
-        displayName: displayName,
-      );
+      // En fazla 3 kez yeniden deneme stratejisi ile kayıt ol
+      int retryCount = 0;
+      UserModel? userModel;
 
-      if (userModel != null) {
-        logSuccess('Kayıt olma başarılı: $email');
-        // Kullanıcı bilgileri, user stream tarafından otomatik güncellenecek
-      } else {
+      while (retryCount < 3 && userModel == null) {
+        try {
+          userModel = await _userRepository.signUpWithEmailAndPassword(
+            email: email,
+            password: password,
+            displayName: displayName,
+          );
+
+          // Başarılı kayıt
+          if (userModel != null) {
+            logInfo('Kullanıcı başarıyla kayıt oldu: $email');
+            logSuccess('Kayıt', 'Kayıt olma başarılı: $email');
+            return; // Başarılı ise fonksiyondan çık
+          }
+        } catch (e) {
+          if (e.toString().contains('unavailable') && retryCount < 2) {
+            // Servis geçici olarak kullanılamıyor, yeniden dene
+            logInfo(
+                'Firebase servisine bağlantı hatası, yeniden deneme ${retryCount + 1}/3');
+            retryCount++;
+
+            // Exponential backoff: her denemede artan bekleme süresi
+            final backoffDelay = (retryCount * 2) * 1000; // ms cinsinden
+            await Future.delayed(Duration(milliseconds: backoffDelay));
+            continue;
+          } else {
+            // Maksimum deneme sayısına ulaşıldı veya başka bir hata
+            rethrow;
+          }
+        }
+      }
+
+      // Tüm yeniden denemeler başarısız oldu
+      if (userModel == null) {
         emit(state.copyWith(
           isLoading: false,
-          errorMessage: 'Kayıt sırasında bir sorun oluştu',
+          errorMessage:
+              'Kayıt sırasında bir sorun oluştu. Lütfen daha sonra tekrar deneyin.',
         ));
       }
     } catch (e) {
@@ -236,7 +288,7 @@ class AuthCubit extends Cubit<AuthState> {
       await _userRepository.signOut();
       // User stream, state'i otomatik güncelleyecek
 
-      logSuccess('Oturum kapatma başarılı');
+      logSuccess('Oturum kapatma', 'Oturum kapatma başarılı');
     } catch (e) {
       _handleError('Oturum kapatma', e);
     }
@@ -250,76 +302,36 @@ class AuthCubit extends Cubit<AuthState> {
 
       await _authService.sendPasswordResetEmail(email);
 
+      logSuccess('Parola sıfırlama', 'Parola sıfırlama e-postası gönderildi');
       emit(state.copyWith(isLoading: false));
-      logSuccess('Parola sıfırlama e-postası gönderildi: $email');
     } catch (e) {
-      _handleError('Parola sıfırlama', e);
-    }
-  }
-
-  /// E-posta doğrulama e-postası gönderir
-  Future<void> sendEmailVerification() async {
-    try {
-      _startLoading();
-      logInfo('E-posta doğrulama e-postası gönderiliyor');
-
-      await _authService.sendEmailVerification();
-
-      emit(state.copyWith(isLoading: false));
-      logSuccess('E-posta doğrulama e-postası gönderildi');
-    } catch (e) {
-      _handleError('E-posta doğrulama e-postası gönderme', e);
+      _handleError('Parola sıfırlama e-postası gönderme', e);
     }
   }
 
   /// E-posta doğrulama kontrolünü başlatır
   void startEmailVerificationCheck() {
-    logInfo('E-posta doğrulama kontrolü başlatılıyor');
-    stopEmailVerificationCheck(); // Önceki zamanlayıcıyı temizle
-
-    // 5 saniyede bir kontrol et
+    _emailVerificationTimer?.cancel();
     _emailVerificationTimer = Timer.periodic(
       const Duration(seconds: 5),
-      (_) => checkEmailVerificationStatus(),
+      (timer) async {
+        try {
+          final user = _authService.currentUser;
+          if (user != null && user.emailVerified) {
+            timer.cancel();
+            logSuccess('E-posta doğrulama', 'E-posta doğrulandı');
+          }
+        } catch (e) {
+          handleError('E-posta doğrulama kontrolü', e);
+        }
+      },
     );
   }
 
   /// E-posta doğrulama kontrolünü durdurur
   void stopEmailVerificationCheck() {
-    if (_emailVerificationTimer != null) {
-      logInfo('E-posta doğrulama kontrolü durduruluyor');
-      _emailVerificationTimer?.cancel();
-      _emailVerificationTimer = null;
-    }
-  }
-
-  /// E-posta doğrulama durumunu kontrol eder ve günceller
-  Future<void> checkEmailVerificationStatus() async {
-    try {
-      if (state.user != null && !state.user!.isEmailVerified) {
-        logInfo('E-posta doğrulama durumu kontrol ediliyor');
-        emit(state.copyWith(isLoading: true));
-
-        final updatedUser =
-            await _userRepository.refreshEmailVerificationStatus();
-
-        if (updatedUser != null) {
-          emit(state.copyWith(user: updatedUser, isLoading: false));
-
-          if (updatedUser.isEmailVerified) {
-            logSuccess('E-posta doğrulama durumu güncellendi');
-            stopEmailVerificationCheck(); // Doğrulandıysa kontrol etmeyi durdur
-          }
-        } else {
-          emit(state.copyWith(isLoading: false));
-        }
-      } else {
-        emit(state.copyWith(isLoading: false));
-      }
-    } catch (e) {
-      emit(state.copyWith(isLoading: false));
-      logError('E-posta doğrulama durumu güncelleme hatası', e);
-    }
+    _emailVerificationTimer?.cancel();
+    _emailVerificationTimer = null;
   }
 
   /// E-posta doğrulama durumu için doğrudan güncelleme
@@ -341,7 +353,7 @@ class AuthCubit extends Cubit<AuthState> {
   }
 
   /// Firebase hata kodlarını kullanıcı dostu mesaja dönüştürür
-  String getErrorMessage(FirebaseAuthException exception) {
+  String getErrorMessage(firebase_auth.FirebaseAuthException exception) {
     return exception.message ?? 'Bir hata oluştu: ${exception.code}';
   }
 
@@ -354,7 +366,7 @@ class AuthCubit extends Cubit<AuthState> {
       await _userRepository.deleteAccount();
       // User stream, state'i otomatik güncelleyecek
 
-      logSuccess('Hesap silme başarılı');
+      logSuccess('Hesap silme', 'Hesap silme başarılı');
     } catch (e) {
       _handleError('Hesap silme', e);
     }
@@ -384,7 +396,7 @@ class AuthCubit extends Cubit<AuthState> {
   Future<void> updateAnalysisCredits(int creditsToAdd) async {
     try {
       if (state.user == null) {
-        logWarning('Kredi güncellemesi yapılamıyor: Kullanıcı oturum açmamış');
+        logInfo('Kredi güncellemesi yapılamıyor: Kullanıcı oturum açmamış');
         return;
       }
 
@@ -416,7 +428,7 @@ class AuthCubit extends Cubit<AuthState> {
   /// Yeterli kredi yoksa false döner
   bool checkCredits() {
     if (state.user == null) {
-      logWarning('Kredi kontrolü yapılamıyor: Kullanıcı oturum açmamış');
+      logInfo('Kredi kontrolü yapılamıyor: Kullanıcı oturum açmamış');
       return false;
     }
 
@@ -429,7 +441,7 @@ class AuthCubit extends Cubit<AuthState> {
     final hasCredits = state.user!.analysisCredits > 0;
 
     if (!hasCredits) {
-      logWarning('Yetersiz analiz kredisi: ${state.user!.analysisCredits}');
+      logInfo('Yetersiz analiz kredisi: ${state.user!.analysisCredits}');
     }
 
     return hasCredits;
@@ -451,7 +463,7 @@ class AuthCubit extends Cubit<AuthState> {
         logSuccess('Profil güncelleme başarılı');
       } else {
         emit(state.copyWith(isLoading: false));
-        logWarning('Profil güncellenemedi: Kullanıcı bilgisi alınamadı');
+        logInfo('Profil güncellenemedi: Kullanıcı bilgisi alınamadı');
       }
     } catch (e) {
       _handleError('Profil güncelleme', e);
@@ -467,8 +479,8 @@ class AuthCubit extends Cubit<AuthState> {
 
   @override
   Future<void> close() {
-    stopEmailVerificationCheck();
     _userSubscription?.cancel();
+    _emailVerificationTimer?.cancel();
     return super.close();
   }
 }

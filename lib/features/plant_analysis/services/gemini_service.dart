@@ -1,14 +1,19 @@
 import 'dart:typed_data';
 
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:tatarai/core/base/base_service.dart';
 import 'package:tatarai/core/constants/app_constants.dart';
-import 'package:tatarai/core/utils/logger.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:dio/dio.dart';
 
-/// Gemini 2.0 Flash AI modelini kullanarak görsel analiz ve önerileri yöneten servis
-class GeminiService {
-  late final GenerativeModel _model;
+/// Gemini AI servisi
+/// Bitki analizi ve öneriler için Gemini AI API'sini kullanır
+class GeminiService extends BaseService {
+  GenerativeModel? _model;
+  bool _isInitialized = false;
+  final Dio _dio = Dio();
 
-  /// Gemini servisini başlatır ve modeli yapılandırır
+  /// Servis oluşturulurken Gemini modelini başlatır
   GeminiService() {
     _initializeModel();
   }
@@ -16,31 +21,55 @@ class GeminiService {
   /// Gemini modelini yapılandırır
   void _initializeModel() {
     try {
-      final apiKey = AppConstants.geminiApiKey;
+      // Önce AppConstants'dan API anahtarını al
+      String apiKey = AppConstants.geminiApiKey;
+
+      // Eğer AppConstants'daki anahtar boşsa, doğrudan .env'den almayı dene
       if (apiKey.isEmpty) {
-        throw Exception(
-            'Gemini API anahtarı bulunamadı. Lütfen .env dosyasını kontrol edin.');
+        apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
       }
 
-      _model = GenerativeModel(
-        model: 'gemini-2.0-flash',
-        apiKey: apiKey,
-      );
-      AppLogger.i('Gemini modeli başarıyla başlatıldı');
+      if (apiKey.isEmpty) {
+        logWarning(
+            'Gemini API anahtarı bulunamadı. Varsayılan yanıtlar kullanılacak.');
+        _isInitialized = false;
+        return;
+      }
+
+      // API anahtarını doğrula
+      if (apiKey.length < 10) {
+        logWarning(
+            'Geçersiz Gemini API anahtarı. Varsayılan yanıtlar kullanılacak.');
+        _isInitialized = false;
+        return;
+      }
+
+      // Modeli başlatmadan önce API anahtarını kontrol et
+      try {
+        _model = GenerativeModel(
+          model: 'gemini-2.0-flash',
+          apiKey: apiKey,
+        );
+        _isInitialized = true;
+        logSuccess('Gemini modeli başlatıldı');
+      } catch (modelError) {
+        logError('Gemini modeli başlatılamadı', modelError.toString());
+        _isInitialized = false;
+      }
     } catch (e) {
-      AppLogger.e('Gemini modeli başlatılamadı', e);
-      rethrow;
+      logError('Gemini modeli başlatılamadı', e.toString());
+      _isInitialized = false;
     }
   }
 
-  /// Bitki görselini analiz eder ve detaylı bilgi verir
+  /// Görsel analizi yapar
   ///
   /// [imageBytes] analiz edilecek görselin bayt dizisi
-  /// [prompt] analiz talimatları (opsiyonel, varsayılan talimatlara sahiptir)
-  /// [location] Konum bilgisi, "Şehir/İlçe" formatında (opsiyonel)
-  /// [province] İl bilgisi
-  /// [district] İlçe bilgisi
-  /// [neighborhood] Mahalle bilgisi
+  /// [prompt] analiz talimatları (opsiyonel)
+  /// [location] Konum bilgisi (opsiyonel)
+  /// [province] İl bilgisi (opsiyonel)
+  /// [district] İlçe bilgisi (opsiyonel)
+  /// [neighborhood] Mahalle bilgisi (opsiyonel)
   /// [fieldName] Tarla adı (opsiyonel)
   Future<String> analyzeImage(
     Uint8List imageBytes, {
@@ -51,6 +80,18 @@ class GeminiService {
     String? neighborhood,
     String? fieldName,
   }) async {
+    // Model başlatılmadıysa varsayılan yanıt döndür
+    if (!_isInitialized || _model == null) {
+      logWarning('Gemini modeli başlatılmadı. Varsayılan yanıt döndürülüyor.');
+      return _getDefaultImageAnalysisResponse(
+        location: location,
+        province: province,
+        district: district,
+        neighborhood: neighborhood,
+        fieldName: fieldName,
+      );
+    }
+
     try {
       // Konum bilgilerini hazırla
       String locationInfo = "";
@@ -145,26 +186,34 @@ Eğer konum bilgisi verilmişse, BOLGESEL_BILGILER bölümünde o bölge için �
       );
 
       // Genişletilmiş ayarlarla içerik oluştur
-      final response = await _model.generateContent(
+      final response = await _model!.generateContent(
         content,
         generationConfig: generationConfig,
       );
 
       if (response.text == null || response.text!.isEmpty) {
+        logWarning('Analiz sonucu alınamadı');
         return 'Analiz sonucu alınamadı. Lütfen farklı bir görsel ile tekrar deneyin.';
       }
 
+      logSuccess('Görsel analiz başarılı');
       return response.text!;
     } catch (e) {
-      AppLogger.e('Gemini görsel analiz hatası', e);
+      logError('Gemini görsel analiz hatası', e.toString());
       return 'Görsel analiz sırasında bir hata oluştu: ${e.toString()}';
     }
   }
 
-  /// Belirli bir bitki hastalığı için detaylı tedavi ve bakım önerileri sunar
+  /// Hastalık önerileri alır
   ///
   /// [diseaseName] hastalık adı
   Future<String> getDiseaseRecommendations(String diseaseName) async {
+    // Model başlatılmadıysa varsayılan yanıt döndür
+    if (!_isInitialized || _model == null) {
+      logWarning('Gemini modeli başlatılmadı. Varsayılan yanıt döndürülüyor.');
+      return 'Bu bir test yanıtıdır. Gerçek Gemini API yanıtı için API anahtarınızı kontrol edin.';
+    }
+
     try {
       final content = [
         Content.text(
@@ -182,26 +231,34 @@ Eğer konum bilgisi verilmişse, BOLGESEL_BILGILER bölümünde o bölge için �
         maxOutputTokens: 2048,
       );
 
-      final response = await _model.generateContent(
+      final response = await _model!.generateContent(
         content,
         generationConfig: generationConfig,
       );
 
       if (response.text == null || response.text!.isEmpty) {
+        logWarning('Hastalık önerisi alınamadı');
         return 'Öneri alınamadı. Lütfen tekrar deneyin.';
       }
 
+      logSuccess('Hastalık önerisi başarıyla alındı');
       return response.text!;
     } catch (e) {
-      AppLogger.e('Gemini öneri hatası', e);
+      logError('Gemini öneri hatası', e.toString());
       return 'Öneri alınırken bir hata oluştu: ${e.toString()}';
     }
   }
 
-  /// Bitki yetiştirme ve bakım tavsiyeleri sunar
+  /// Bitki bakım tavsiyeleri alır
   ///
   /// [plantName] bitki adı
   Future<String> getPlantCareAdvice(String plantName) async {
+    // Model başlatılmadıysa varsayılan yanıt döndür
+    if (!_isInitialized || _model == null) {
+      logWarning('Gemini modeli başlatılmadı. Varsayılan yanıt döndürülüyor.');
+      return 'Bu bir test yanıtıdır. Gerçek Gemini API yanıtı için API anahtarınızı kontrol edin.';
+    }
+
     try {
       final content = [
         Content.text(
@@ -219,19 +276,160 @@ Eğer konum bilgisi verilmişse, BOLGESEL_BILGILER bölümünde o bölge için �
         maxOutputTokens: 2048,
       );
 
-      final response = await _model.generateContent(
+      final response = await _model!.generateContent(
         content,
         generationConfig: generationConfig,
       );
 
       if (response.text == null || response.text!.isEmpty) {
+        logWarning('Bakım tavsiyesi alınamadı');
         return 'Bakım tavsiyeleri alınamadı. Lütfen tekrar deneyin.';
       }
 
+      logSuccess('Bakım tavsiyesi başarıyla alındı');
       return response.text!;
     } catch (e) {
-      AppLogger.e('Gemini bakım tavsiyesi hatası', e);
+      logError('Gemini bakım tavsiyesi hatası', e.toString());
       return 'Bakım tavsiyeleri alınırken bir hata oluştu: ${e.toString()}';
     }
+  }
+
+  /// API anahtarı
+  String? get _apiKey => dotenv.env['GEMINI_API_KEY'];
+
+  /// API endpoint
+  static const String _apiUrl =
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
+
+  /// Gemini API'ye istek gönderir
+  Future<String> generateContent(String prompt) async {
+    try {
+      // API anahtarı kontrolü
+      if (_apiKey == null || _apiKey!.isEmpty) {
+        logWarning(
+            'Gemini API anahtarı bulunamadı. Varsayılan yanıt döndürülüyor.');
+        return _getDefaultResponse(prompt);
+      }
+
+      final response = await _dio.post(
+        '$_apiUrl?key=$_apiKey',
+        data: {
+          'contents': [
+            {
+              'parts': [
+                {
+                  'text': prompt,
+                }
+              ]
+            }
+          ],
+          'generationConfig': {
+            'temperature': 0.7,
+            'topK': 40,
+            'topP': 0.95,
+            'maxOutputTokens': 1024,
+          },
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+        final candidates = data['candidates'] as List;
+        if (candidates.isNotEmpty) {
+          final content = candidates[0]['content'];
+          final parts = content['parts'] as List;
+          if (parts.isNotEmpty) {
+            return parts[0]['text'] as String;
+          }
+        }
+        return 'Yanıt alınamadı.';
+      } else {
+        logError('Gemini API hatası: ${response.statusCode}', response.data);
+        return 'API hatası: ${response.statusCode}';
+      }
+    } catch (e) {
+      logError('Gemini API isteği sırasında hata', e.toString());
+      return 'Bir hata oluştu: $e';
+    }
+  }
+
+  /// API anahtarı olmadığında veya hata durumunda varsayılan yanıt döndürür
+  String _getDefaultResponse(String prompt) {
+    // Basit bir yanıt oluştur
+    if (prompt.toLowerCase().contains('bitki') ||
+        prompt.toLowerCase().contains('hastalık') ||
+        prompt.toLowerCase().contains('analiz')) {
+      return 'Bu bir test yanıtıdır. Gerçek Gemini API yanıtı için API anahtarınızı kontrol edin.';
+    }
+    return 'API anahtarı bulunamadı. Lütfen .env dosyanızı kontrol edin.';
+  }
+
+  /// Görsel analiz için varsayılan yanıt döndürür
+  String _getDefaultImageAnalysisResponse({
+    String? location,
+    String? province,
+    String? district,
+    String? neighborhood,
+    String? fieldName,
+  }) {
+    // Konum bilgilerini hazırla
+    String locationInfo = "";
+    String detailedLocation = "";
+
+    // İl, ilçe ve mahalle bilgilerinden detaylı konum oluştur
+    if (province != null && district != null) {
+      detailedLocation = "$province/$district";
+
+      if (neighborhood != null && neighborhood.isNotEmpty) {
+        detailedLocation += "/$neighborhood";
+      }
+    }
+
+    // Eğer detaylı konum bilgisi oluşturulabilirse, onu kullan
+    // Yoksa, varsa location parametresini kullan
+    final String locationToUse = detailedLocation.isNotEmpty
+        ? detailedLocation
+        : (location != null && location.isNotEmpty)
+            ? location
+            : "";
+
+    // Tarla bilgisini ekle
+    String fieldInfo = "";
+    if (fieldName != null && fieldName.isNotEmpty) {
+      fieldInfo = " ($fieldName tarla)";
+    }
+
+    // Konum bilgisini ekle
+    if (locationToUse.isNotEmpty) {
+      locationInfo =
+          "\n\nBu bitki $locationToUse$fieldInfo bölgesinde yetiştirilmektedir.";
+    }
+
+    // Varsayılan yanıt oluştur
+    return '''BITKI_ADI: Test Bitkisi (Testus plantus)
+SAGLIK_DURUMU: Sağlıklı
+TANIM: Bu bir test yanıtıdır. Gerçek Gemini API yanıtı için API anahtarınızı kontrol edin.
+
+HASTALIKLAR:
+- Test Hastalığı: Bu bir test hastalığıdır.
+
+MUDAHALE_YONTEMLERI:
+- Test İlaçlama: Bu bir test ilaçlamadır.
+
+TARIMSAL_ONERILER:
+- Test Sulama: Bu bir test sulamadır.
+- Test Gübreleme: Bu bir test gübrelemedir.
+
+BOLGESEL_BILGILER:
+- Test Bölge Bilgisi: Bu bir test bölge bilgisidir.$locationInfo
+
+GELISIM_ASAMASI: Test Aşaması
+GELISIM_SKORU: 75
+GELISIM_YORUMU: Bu bir test gelişim yorumudur.
+
+SULAMA: Test sulama bilgisi
+ISIK: Test ışık bilgisi
+TOPRAK: Test toprak bilgisi
+IKLIM: Test iklim bilgisi''';
   }
 }
