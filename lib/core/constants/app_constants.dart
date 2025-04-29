@@ -18,9 +18,16 @@ class AppConstants {
 
   // Firebase collection isimleri
   static const String usersCollection = 'users';
-  static const String analysisCollection = 'analyses';
   static const String paymentsCollection = 'payments';
   static const String settingsCollection = 'settings';
+
+  /// Analizler koleksiyonu (ESKİ - flat yapı)
+  /// [Geçiş sonrası kaldırılacak]
+  static const String analysisCollection = 'analyses';
+
+  /// Kullanıcının analizler alt koleksiyonu
+  /// Yeni hiyerarşik yapı: users/{userId}/analyses/{analysisId}
+  static const String userAnalysesCollection = 'analyses';
 
   // Önbellek süreleri (saniye cinsinden)
   static const int cacheDuration = 86400; // 24 saat
