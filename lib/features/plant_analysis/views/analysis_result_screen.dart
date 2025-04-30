@@ -909,56 +909,86 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // FontSizeControl ekledik
-          Align(
-            alignment: Alignment.centerRight,
-            child: FontSizeControl(
-              fontSizeLevel: _fontSizeLevel,
-              onFontSizeChanged: (newLevel) {
-                setState(() {
-                  _fontSizeLevel = newLevel;
-                });
-              },
-              labelText: 'Yazı Boyutu',
-            ),
-          ),
-          SizedBox(height: context.dimensions.spaceS),
-          ...suggestions.map((suggestion) {
-            return Padding(
-              padding:
-                  EdgeInsets.symmetric(vertical: context.dimensions.spaceXS),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    margin: EdgeInsets.only(top: context.dimensions.spaceXXS),
-                    padding: EdgeInsets.all(context.dimensions.spaceXXS + 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.12),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      CupertinoIcons.checkmark_circle_fill,
-                      color: AppColors.primary,
-                      size: context.dimensions.iconSizeXS - 2,
-                    ),
-                  ),
-                  SizedBox(width: context.dimensions.spaceS),
-                  Expanded(
-                    child: Text(
-                      suggestion,
-                      style: AppTextTheme.bodyText2.copyWith(
-                        height: 1.4,
-                        // Yazı boyutunu fontSizeLevel'e göre ayarla
-                        fontSize:
-                            context.dimensions.fontSizeM + (_fontSizeLevel * 2),
-                      ),
-                    ),
-                  ),
-                ],
+          // Başlık ve FontSizeControl yan yana
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              FontSizeControl(
+                fontSizeLevel: _fontSizeLevel,
+                onFontSizeChanged: (newLevel) {
+                  setState(() {
+                    _fontSizeLevel = newLevel;
+                  });
+                },
+                labelText: 'Yazı',
               ),
-            );
-          }).toList(),
+            ],
+          ),
+          SizedBox(height: context.dimensions.spaceM),
+          // Çizgi ekle
+          Divider(color: AppColors.primary.withOpacity(0.2), height: 1),
+          SizedBox(height: context.dimensions.spaceM),
+          ...suggestions
+              .map((suggestion) => Container(
+                    margin: EdgeInsets.only(bottom: context.dimensions.spaceM),
+                    padding: EdgeInsets.all(context.dimensions.paddingM),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.07),
+                      borderRadius:
+                          BorderRadius.circular(context.dimensions.radiusM),
+                      border: Border.all(
+                        color: AppColors.primary.withOpacity(0.15),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withOpacity(0.05),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          margin: EdgeInsets.only(top: 2),
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.2),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.primary.withOpacity(0.1),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            CupertinoIcons.leaf_arrow_circlepath,
+                            color: AppColors.primary,
+                            size: 20,
+                          ),
+                        ),
+                        SizedBox(width: context.dimensions.spaceM),
+                        Expanded(
+                          child: Text(
+                            suggestion,
+                            style: AppTextTheme.bodyText1.copyWith(
+                              height: 1.5,
+                              fontSize: context.dimensions.fontSizeM +
+                                  (_fontSizeLevel * 2),
+                              fontWeight: FontWeight.w500,
+                              color: Colors.black,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ))
+              .toList(),
         ],
       ),
     );
