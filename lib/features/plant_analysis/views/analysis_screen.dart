@@ -237,7 +237,14 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                       Navigator.pop(context);
 
                       // İl seçildiğinde ilçeleri yükle
-                      _loadDistricts(province);
+                      _loadDistricts(province).then((_) {
+                        // İlçeler yüklendikten sonra ilçe seçim diyaloğunu otomatik göster
+                        if (_districts.isNotEmpty) {
+                          Future.delayed(const Duration(milliseconds: 300), () {
+                            _showDistrictSelector();
+                          });
+                        }
+                      });
                     },
                     child: Text(province.name),
                   ))
@@ -289,7 +296,15 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                       Navigator.pop(context);
 
                       // İlçe seçildiğinde mahalleleri yükle
-                      _loadNeighborhoods(_selectedProvince!, district);
+                      _loadNeighborhoods(_selectedProvince!, district)
+                          .then((_) {
+                        // Mahalleler yüklendikten sonra mahalle seçim diyaloğunu otomatik göster
+                        if (_neighborhoods.isNotEmpty) {
+                          Future.delayed(const Duration(milliseconds: 300), () {
+                            _showNeighborhoodSelector();
+                          });
+                        }
+                      });
                     },
                     child: Text(district.name),
                   ))
@@ -340,6 +355,18 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                         _updateLocationText();
                       });
                       Navigator.pop(context);
+
+                      // Tüm konum seçimleri tamamlandığında, isteğe bağlı olarak tarla adı seçimine yönlendirebiliriz
+                      // veya direkt olarak analiz sürecine odaklanmasını sağlayabiliriz
+                      if (_selectedImage != null) {
+                        // Eğer görsel zaten seçilmiş ise, kullanıcının analiz butonuna odaklanmasına yardımcı ol
+                        HapticFeedback.mediumImpact();
+                      } else {
+                        // Görsel seçilmemişse, kullanıcıyı görsel seçmeye yönlendir
+                        Future.delayed(const Duration(milliseconds: 300), () {
+                          _showPhotoOptions();
+                        });
+                      }
                     },
                     child: Text(neighborhood.name),
                   ))

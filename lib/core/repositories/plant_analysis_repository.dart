@@ -1355,4 +1355,40 @@ class PlantAnalysisRepository extends BaseRepository {
 
     return fullDescription;
   }
+
+  /// Kullanıcının analizlerini gerçek zamanlı olarak dinle
+  Stream<List<PlantAnalysisResult>> streamUserAnalyses() {
+    final userId = _getCurrentUserId();
+    if (userId == null) {
+      // Kullanıcı giriş yapmamışsa boş liste döndür
+      return Stream.value([]);
+    }
+
+    return _firestore
+        .collection(AppConstants.usersCollection)
+        .doc(userId)
+        .collection(AppConstants.userAnalysesCollection)
+        .orderBy('timestamp', descending: true)
+        .limit(10) // Son 10 analizi al
+        .snapshots()
+        .map((snapshot) {
+      final results = <PlantAnalysisResult>[];
+      for (final doc in snapshot.docs) {
+        try {
+          final data = doc.data();
+          // ID yoksa ekle
+          if (!data.containsKey('id') ||
+              data['id'] == null ||
+              data['id'].toString().isEmpty) {
+            data['id'] = doc.id;
+          }
+          results.add(_convertDocToAnalysisResult(data, doc.id));
+        } catch (e) {
+          logError('Analiz sonucu dönüştürme hatası', e.toString());
+        }
+      }
+      logInfo('Stream analizler güncellendi', 'Sayı: ${results.length}');
+      return results;
+    });
+  }
 }

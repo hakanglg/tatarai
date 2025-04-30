@@ -7,6 +7,7 @@ import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
 import 'package:tatarai/features/auth/cubits/auth_state.dart';
 import 'package:tatarai/features/home/cubits/home_cubit.dart';
+import 'package:tatarai/features/home/cubits/home_state.dart';
 import 'package:tatarai/features/navbar/navigation_manager.dart';
 import 'package:tatarai/features/plant_analysis/cubits/plant_analysis_cubit.dart';
 import 'package:tatarai/features/plant_analysis/models/plant_analysis_result.dart';
@@ -42,10 +43,11 @@ class _HomeTabContentState extends State<HomeTabContent>
       duration: const Duration(milliseconds: 800),
     )..forward();
 
-    // Geçmiş analizleri yükle
+    // HomeCubit'i yenile - Stream subscription otomatik başlayacak
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<PlantAnalysisCubit>().loadPastAnalyses();
       context.read<HomeCubit>().refresh();
+      // Not: PlantAnalysisCubit.loadPastAnalyses() çağrısına gerek yok
+      // Artık analizler HomeCubit üzerinden stream ile dinleniyor
     });
   }
 
@@ -360,10 +362,10 @@ class _HomeTabContentState extends State<HomeTabContent>
   }
 
   Widget _buildRecentAnalysesSection(BuildContext context) {
-    return BlocBuilder<PlantAnalysisCubit, PlantAnalysisState>(
+    return BlocBuilder<HomeCubit, HomeState>(
       builder: (context, state) {
         // Yükleniyor durumu
-        if (state.isLoading) {
+        if (state.isLoading == true) {
           return SliverToBoxAdapter(
             child: Center(
               child: Padding(
@@ -375,7 +377,7 @@ class _HomeTabContentState extends State<HomeTabContent>
         }
 
         // Analiz listesi boş
-        if (state.analysisList.isEmpty) {
+        if (state.recentAnalyses.isEmpty) {
           return SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.all(context.dimensions.paddingM),
@@ -457,7 +459,7 @@ class _HomeTabContentState extends State<HomeTabContent>
                   ],
                 ),
                 SizedBox(height: context.dimensions.spaceS),
-                ...state.analysisList.take(3).map((analysis) => Padding(
+                ...state.recentAnalyses.take(3).map((analysis) => Padding(
                       padding:
                           EdgeInsets.only(bottom: context.dimensions.spaceS),
                       child: AnalysisCard(
