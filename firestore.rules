@@ -1,8 +1,44 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Kimlik doğrulama kontrolü
+    function isAuth() {
+      return request.auth != null;
+    }
+    
+    // Kullanıcının kendi verisine erişim kontrolü
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Kullanıcı profilleri - Sadece kendi verisine erişim
+    match /users/{userId} {
+      // Kullanıcı, kendi verilerini okuyabilir ve yazabilir
+      allow read, write: if isOwner(userId);
+      
+      // Admin kullanıcılar tüm kullanıcı verilerine erişebilir (opsiyonel)
+      // allow read: if isAdmin();
+    }
+    
+    // Analizler - Sadece kendi analizlerine erişim
+    match /users/{userId}/analyses/{analysisId} {
+      // Kullanıcı, kendi analizlerini okuyabilir ve yazabilir
+      allow read, write: if isOwner(userId);
+    }
+    
+    // Alternatif koleksiyon yapısı - Belirli analiz ID'sine göre erişim
+    match /analyses/{analysisId} {
+      // Analizin sahibi olan kullanıcı erişebilir
+      allow read, write: if isAuth() && resource.data.userId == request.auth.uid;
+      
+      // Yeni analiz oluşturulurken geçerli kullanıcı ID'si ile oluşturulmalı
+      allow create: if isAuth() && request.resource.data.userId == request.auth.uid;
+    }
+    
+    // Geliştirme amaçlı geçici kurallar
+    // NOT: Canlı ortama geçmeden önce kaldırılmalı!
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if isAuth();
     }
   }
 } 

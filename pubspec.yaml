@@ -96,6 +96,7 @@ dev_dependencies:
   flutter_launcher_icons: ^0.13.1
   mockito: ^5.4.5
 
+# flutter pub run flutter_launcher_icons
 # App icons konfigürasyonu
 flutter_launcher_icons:
   android: "launcher_icon"
