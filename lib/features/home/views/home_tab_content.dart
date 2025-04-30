@@ -17,6 +17,7 @@ import 'package:tatarai/core/theme/dimensions.dart';
 import 'package:sprung/sprung.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:io';
+import 'package:tatarai/features/plant_analysis/views/widgets/analysis_card.dart';
 
 /// Ana ekran tab içeriği - Modern tasarım, hızlı erişim seçenekleri ve bitki analiz geçmişi
 class HomeTabContent extends StatefulWidget {
@@ -67,12 +68,13 @@ class _HomeTabContentState extends State<HomeTabContent>
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      backgroundColor: CupertinoColors.systemBackground,
+      backgroundColor: CupertinoColors.systemGroupedBackground,
       navigationBar: CupertinoNavigationBar(
         middle: Text(
           AppConstants.appName,
           style: AppTextTheme.headline6.copyWith(
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.5,
           ),
         ),
         backgroundColor: CupertinoColors.systemBackground.withOpacity(0.9),
@@ -100,10 +102,34 @@ class _HomeTabContentState extends State<HomeTabContent>
   }
 
   Widget _buildHeader(BuildContext context) {
-    return Padding(
+    return Container(
+      margin: EdgeInsets.only(
+        left: context.dimensions.paddingM,
+        right: context.dimensions.paddingM,
+        top: context.dimensions.paddingS,
+        bottom: context.dimensions.paddingXS,
+      ),
       padding: EdgeInsets.symmetric(
         horizontal: context.dimensions.paddingM,
-        vertical: context.dimensions.paddingS,
+        vertical: context.dimensions.paddingM,
+      ),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.primary.withOpacity(0.9),
+            AppColors.primary.withOpacity(0.7),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(context.dimensions.radiusL),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.2),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: BlocBuilder<AuthCubit, AuthState>(
         builder: (context, state) {
@@ -120,29 +146,37 @@ class _HomeTabContentState extends State<HomeTabContent>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(height: context.dimensions.spaceXS),
                 Text(
                   'Merhaba,',
                   style: AppTextTheme.bodyText1.copyWith(
-                    color: AppColors.textSecondary,
+                    color: CupertinoColors.white.withOpacity(0.9),
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                SizedBox(height: 3),
+                SizedBox(height: 4),
                 Text(
                   userName,
                   style: AppTextTheme.headline3.copyWith(
-                    color: AppColors.primary,
+                    color: CupertinoColors.white,
                     fontWeight: FontWeight.bold,
+                    letterSpacing: -0.5,
+                    shadows: [
+                      Shadow(
+                        color: CupertinoColors.black.withOpacity(0.1),
+                        offset: const Offset(0, 1),
+                        blurRadius: 2,
+                      ),
+                    ],
                   ),
                 ),
-                SizedBox(height: context.dimensions.spaceXS),
+                SizedBox(height: context.dimensions.spaceS),
                 Text(
                   'Bitkilerinin sağlığını kontrol etmeye hazır mısın?',
                   style: AppTextTheme.bodyText2.copyWith(
-                    color: AppColors.textSecondary,
+                    color: CupertinoColors.white.withOpacity(0.9),
+                    fontWeight: FontWeight.w400,
                   ),
                 ),
-                SizedBox(height: context.dimensions.spaceM),
               ],
             ),
           );
@@ -153,10 +187,27 @@ class _HomeTabContentState extends State<HomeTabContent>
 
   Widget _buildQuickActions(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: context.dimensions.paddingM),
+      padding: EdgeInsets.symmetric(
+        horizontal: context.dimensions.paddingM,
+        vertical: context.dimensions.paddingS,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Padding(
+            padding: EdgeInsets.only(
+              left: context.dimensions.paddingXS,
+              bottom: context.dimensions.paddingXS,
+            ),
+            child: Text(
+              'Hızlı İşlemler',
+              style: AppTextTheme.headline6.copyWith(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w600,
+                letterSpacing: -0.5,
+              ),
+            ),
+          ),
           AnimatedBuilder(
             animation: _animationController,
             builder: (context, child) {
@@ -214,7 +265,7 @@ class _HomeTabContentState extends State<HomeTabContent>
               },
             ),
           ),
-          SizedBox(height: context.dimensions.spaceM),
+          SizedBox(height: context.dimensions.spaceXS),
         ],
       ),
     );
@@ -235,30 +286,34 @@ class _HomeTabContentState extends State<HomeTabContent>
         decoration: BoxDecoration(
           color: CupertinoColors.systemBackground,
           borderRadius: BorderRadius.circular(context.dimensions.radiusM),
-          border: Border.all(
-            color: CupertinoColors.systemGrey5,
-            width: 1.5,
-          ),
           boxShadow: [
             BoxShadow(
-              color: CupertinoColors.systemGrey6,
-              blurRadius: 5,
+              color: CupertinoColors.systemGrey5.withOpacity(0.8),
+              blurRadius: 8,
               offset: const Offset(0, 2),
+              spreadRadius: 0,
             ),
           ],
         ),
         child: Row(
           children: [
             Container(
-              width: 46,
-              height: 46,
+              width: 52,
+              height: 52,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(context.dimensions.radiusS),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withOpacity(0.15),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: Icon(
                 iconData,
-                size: 22,
+                size: 24,
                 color: color,
               ),
             ),
@@ -270,11 +325,12 @@ class _HomeTabContentState extends State<HomeTabContent>
                   Text(
                     title,
                     style: AppTextTheme.bodyText1.copyWith(
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.bold,
                       color: color,
+                      letterSpacing: -0.3,
                     ),
                   ),
-                  SizedBox(height: 3),
+                  SizedBox(height: 4),
                   Text(
                     subtitle,
                     style: AppTextTheme.bodyText2.copyWith(
@@ -284,10 +340,18 @@ class _HomeTabContentState extends State<HomeTabContent>
                 ],
               ),
             ),
-            Icon(
-              CupertinoIcons.chevron_right,
-              color: CupertinoColors.systemGrey,
-              size: 16,
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(
+                CupertinoIcons.chevron_right,
+                color: color,
+                size: 14,
+              ),
             ),
           ],
         ),
@@ -321,12 +385,14 @@ class _HomeTabContentState extends State<HomeTabContent>
                   Padding(
                     padding: EdgeInsets.only(
                       left: context.dimensions.paddingXS,
-                      bottom: context.dimensions.paddingXS,
+                      bottom: context.dimensions.paddingS,
                     ),
                     child: Text(
                       'Son Analizler',
                       style: AppTextTheme.headline6.copyWith(
                         color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -0.5,
                       ),
                     ),
                   ),
@@ -342,6 +408,7 @@ class _HomeTabContentState extends State<HomeTabContent>
           child: Padding(
             padding: EdgeInsets.symmetric(
               horizontal: context.dimensions.paddingM,
+              vertical: context.dimensions.paddingXS,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -353,15 +420,30 @@ class _HomeTabContentState extends State<HomeTabContent>
                       'Son Analizler',
                       style: AppTextTheme.headline6.copyWith(
                         color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -0.5,
                       ),
                     ),
                     CupertinoButton(
                       padding: EdgeInsets.zero,
-                      child: Text(
-                        'Tümünü Gör',
-                        style: AppTextTheme.button.copyWith(
-                          color: AppColors.primary,
-                          fontSize: context.dimensions.fontSizeS,
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: context.dimensions.paddingS,
+                          vertical: context.dimensions.spaceXXS,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(
+                            context.dimensions.radiusS,
+                          ),
+                        ),
+                        child: Text(
+                          'Tümünü Gör',
+                          style: AppTextTheme.button.copyWith(
+                            color: AppColors.primary,
+                            fontSize: context.dimensions.fontSizeS,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                       onPressed: () {
@@ -374,11 +456,14 @@ class _HomeTabContentState extends State<HomeTabContent>
                     ),
                   ],
                 ),
-                SizedBox(height: context.dimensions.spaceXS),
+                SizedBox(height: context.dimensions.spaceS),
                 ...state.analysisList.take(3).map((analysis) => Padding(
                       padding:
                           EdgeInsets.only(bottom: context.dimensions.spaceS),
-                      child: _buildAnalysisCard(context, analysis),
+                      child: AnalysisCard(
+                        analysis: analysis,
+                        cardSize: AnalysisCardSize.compact,
+                      ),
                     )),
               ],
             ),
@@ -406,64 +491,65 @@ class _HomeTabContentState extends State<HomeTabContent>
         );
       },
       child: Container(
-        padding: EdgeInsets.all(context.dimensions.paddingM),
+        padding: EdgeInsets.all(context.dimensions.paddingL),
         decoration: BoxDecoration(
           color: CupertinoColors.systemBackground,
           borderRadius: BorderRadius.circular(context.dimensions.radiusM),
-          border: Border.all(
-            color: CupertinoColors.systemGrey5,
-            width: 1.5,
-          ),
           boxShadow: [
             BoxShadow(
-              color: CupertinoColors.systemGrey6,
-              blurRadius: 5,
+              color: CupertinoColors.systemGrey5.withOpacity(0.8),
+              blurRadius: 8,
               offset: const Offset(0, 2),
+              spreadRadius: 0,
             ),
           ],
         ),
         child: Column(
           children: [
             Container(
-              width: 60,
-              height: 60,
+              width: 70,
+              height: 70,
               decoration: BoxDecoration(
-                color: CupertinoColors.systemGrey5,
-                borderRadius: BorderRadius.circular(context.dimensions.radiusM),
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(35),
               ),
               child: Icon(
                 CupertinoIcons.leaf_arrow_circlepath,
-                size: 28,
-                color: CupertinoColors.systemGrey,
+                size: 32,
+                color: AppColors.primary,
               ),
             ),
             SizedBox(height: context.dimensions.spaceM),
             Text(
               'Henüz analiz yok',
               style: AppTextTheme.headline6.copyWith(
-                fontSize: context.dimensions.fontSizeM,
+                fontSize: context.dimensions.fontSizeL,
+                fontWeight: FontWeight.w600,
+                letterSpacing: -0.5,
               ),
             ),
-            SizedBox(height: context.dimensions.spaceXS),
+            SizedBox(height: context.dimensions.spaceS),
             Text(
               'İlk bitki analizini yapmak için Yeni Analiz kartına dokunabilirsin',
               textAlign: TextAlign.center,
               style: AppTextTheme.bodyText2.copyWith(
                 color: AppColors.textSecondary,
+                height: 1.4,
               ),
             ),
-            SizedBox(height: context.dimensions.spaceM),
+            SizedBox(height: context.dimensions.spaceL),
             SizedBox(
               width: double.infinity,
               child: CupertinoButton(
                 padding: EdgeInsets.symmetric(vertical: 12),
                 color: AppColors.primary,
-                borderRadius: BorderRadius.circular(context.dimensions.radiusS),
+                borderRadius: BorderRadius.circular(context.dimensions.radiusM),
                 onPressed: _navigateToAnalysis,
                 child: Text(
                   'Analiz Yap',
                   style: AppTextTheme.button.copyWith(
                     fontWeight: FontWeight.w600,
+                    letterSpacing: -0.3,
                   ),
                 ),
               ),
@@ -472,218 +558,5 @@ class _HomeTabContentState extends State<HomeTabContent>
         ),
       ),
     );
-  }
-
-  /// Analiz kartı widget'ı
-  Widget _buildAnalysisCard(
-    BuildContext context,
-    PlantAnalysisResult analysis,
-  ) {
-    // Tarih için temel bir değer kullan, API'den gelmediği için
-    final formattedDate = 'Yeni Analiz';
-
-    return GestureDetector(
-      onTap: () {
-        Navigator.of(context).push(
-          CupertinoPageRoute(
-            builder: (context) => AnalysisResultScreen(
-              analysisId: analysis.id,
-            ),
-          ),
-        );
-      },
-      child: Container(
-        padding: EdgeInsets.all(context.dimensions.paddingM),
-        decoration: BoxDecoration(
-          color: CupertinoColors.systemBackground,
-          borderRadius: BorderRadius.circular(context.dimensions.radiusM),
-          border: Border.all(
-            color: CupertinoColors.systemGrey5,
-            width: 1.5,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: CupertinoColors.systemGrey6,
-              blurRadius: 5,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            // Analiz fotoğrafı
-            if (analysis.imageUrl.isNotEmpty)
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  borderRadius:
-                      BorderRadius.circular(context.dimensions.radiusS),
-                  border: Border.all(
-                    color: CupertinoColors.systemGrey5,
-                    width: 1,
-                  ),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: _buildAnalysisImage(analysis.imageUrl),
-              )
-            else
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: analysis.diseases.isEmpty
-                      ? AppColors.primary.withOpacity(0.1)
-                      : CupertinoColors.systemRed.withOpacity(0.1),
-                  borderRadius:
-                      BorderRadius.circular(context.dimensions.radiusS),
-                ),
-                child: Icon(
-                  analysis.diseases.isEmpty
-                      ? CupertinoIcons.leaf_arrow_circlepath
-                      : CupertinoIcons.exclamationmark_circle,
-                  size: 24,
-                  color: analysis.diseases.isEmpty
-                      ? AppColors.primary
-                      : CupertinoColors.systemRed,
-                ),
-              ),
-            SizedBox(width: context.dimensions.spaceM),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          analysis.plantName ?? 'Bilinmeyen Bitki',
-                          style: AppTextTheme.bodyText1.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      Text(
-                        formattedDate,
-                        style: AppTextTheme.caption,
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 3),
-                  if (analysis.diseases.isNotEmpty)
-                    Text(
-                      analysis.diseases.first.name,
-                      style: AppTextTheme.bodyText2.copyWith(
-                        color: CupertinoColors.systemRed,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    )
-                  else
-                    Text(
-                      'Sağlıklı',
-                      style: AppTextTheme.bodyText2.copyWith(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            Icon(
-              CupertinoIcons.chevron_right,
-              color: CupertinoColors.systemGrey,
-              size: 16,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Analiz fotoğrafı için image widget'ı
-  Widget _buildAnalysisImage(String imageUrl) {
-    // Base64 ile kodlanmış bir görüntü ise
-    if (imageUrl.startsWith('data:image')) {
-      try {
-        // Base64 veriyi ayır
-        final dataUri = Uri.parse(imageUrl);
-        final mimeType = dataUri.pathSegments.first.split(':').last;
-        final data = dataUri.data!.contentAsBytes();
-        // Decode ederek kullan
-        return Image.memory(
-          data,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            AppLogger.e('Base64 görüntü hatası: $error', error, stackTrace);
-            return const Icon(
-              CupertinoIcons.photo,
-              size: 24,
-              color: CupertinoColors.systemGrey,
-            );
-          },
-        );
-      } catch (e) {
-        AppLogger.e('Base64 görüntü hatası', e);
-        return const Icon(
-          CupertinoIcons.photo,
-          size: 24,
-          color: CupertinoColors.systemGrey,
-        );
-      }
-    }
-    // Dosya yolu ise
-    else if (imageUrl.startsWith('file://')) {
-      try {
-        // file:// önekini kaldır
-        final filePath = imageUrl.replaceFirst('file://', '');
-        // Dosyadan yükle
-        return Image.file(
-          File(filePath),
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            AppLogger.e('Dosya görüntü hatası: $error', error, stackTrace);
-            return const Icon(
-              CupertinoIcons.photo,
-              size: 24,
-              color: CupertinoColors.systemGrey,
-            );
-          },
-        );
-      } catch (e) {
-        AppLogger.e('Dosya görüntü hatası', e);
-        return const Icon(
-          CupertinoIcons.photo,
-          size: 24,
-          color: CupertinoColors.systemGrey,
-        );
-      }
-    }
-    // Normal URL ise ağdan yükle
-    else {
-      return Image.network(
-        imageUrl,
-        fit: BoxFit.cover,
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) {
-            return child;
-          }
-          return const Center(
-            child: CupertinoActivityIndicator(
-              radius: 10,
-            ),
-          );
-        },
-        errorBuilder: (context, error, stackTrace) {
-          AppLogger.e('Network görüntü hatası: $error', error, stackTrace);
-          return const Icon(
-            CupertinoIcons.photo,
-            size: 24,
-            color: CupertinoColors.systemGrey,
-          );
-        },
-      );
-    }
   }
 }

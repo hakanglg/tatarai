@@ -9,6 +9,7 @@ import 'package:tatarai/features/plant_analysis/cubits/plant_analysis_cubit.dart
 import 'package:tatarai/features/plant_analysis/models/plant_analysis_result.dart';
 import 'package:tatarai/features/plant_analysis/cubits/plant_analysis_state.dart';
 import 'package:tatarai/features/plant_analysis/views/analysis_result_screen.dart';
+import 'package:tatarai/features/plant_analysis/views/widgets/analysis_card.dart';
 
 /// Tüm analizleri gösteren ekran
 class AllAnalysesScreen extends StatefulWidget {
@@ -113,10 +114,17 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen> {
                 padding: EdgeInsets.only(top: context.dimensions.paddingM),
                 itemCount: state.analysisList.length,
                 itemBuilder: (context, index) {
-                  return AnalysisListItem(
-                    analysis: state.analysisList[index],
-                    onTap: () => _showAnalysisDetails(
-                        context, state.analysisList[index]),
+                  return Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: context.dimensions.paddingM,
+                      vertical: context.dimensions.paddingXS,
+                    ),
+                    child: AnalysisCard(
+                      analysis: state.analysisList[index],
+                      cardSize: AnalysisCardSize.large,
+                      onTap: () => _showAnalysisDetails(
+                          context, state.analysisList[index]),
+                    ),
                   );
                 },
               );
@@ -290,109 +298,4 @@ class ErrorInfo {
     required this.description,
     this.additionalInfo,
   });
-}
-
-class AnalysisListItem extends StatelessWidget {
-  final PlantAnalysisResult analysis;
-  final VoidCallback onTap;
-
-  const AnalysisListItem({
-    super.key,
-    required this.analysis,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: context.dimensions.paddingM,
-        vertical: context.dimensions.paddingXS,
-      ),
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: EdgeInsets.all(context.dimensions.paddingM),
-          decoration: BoxDecoration(
-            color: CupertinoColors.systemBackground,
-            borderRadius: BorderRadius.circular(context.dimensions.radiusS),
-            boxShadow: [
-              BoxShadow(
-                color: CupertinoColors.systemGrey.withOpacity(0.1),
-                blurRadius: context.dimensions.radiusXS,
-                offset: Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(context.dimensions.radiusS),
-                child: Image.network(
-                  analysis.imageUrl,
-                  width: context.dimensions.buttonHeight * 1.5,
-                  height: context.dimensions.buttonHeight * 1.5,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      width: context.dimensions.buttonHeight * 1.5,
-                      height: context.dimensions.buttonHeight * 1.5,
-                      color: CupertinoColors.systemGrey5,
-                      child: Icon(
-                        CupertinoIcons.photo,
-                        color: CupertinoColors.systemGrey,
-                      ),
-                    );
-                  },
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Container(
-                      width: context.dimensions.buttonHeight * 1.5,
-                      height: context.dimensions.buttonHeight * 1.5,
-                      color: CupertinoColors.systemGrey6,
-                      child: Center(
-                        child: CupertinoActivityIndicator(),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              SizedBox(width: context.dimensions.spaceM),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      analysis.fieldName != null &&
-                              analysis.fieldName!.isNotEmpty
-                          ? analysis.fieldName!
-                          : analysis.plantName,
-                      style: TextStyle(
-                        fontSize: context.dimensions.fontSizeM,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: context.dimensions.spaceXXS),
-                    Text(
-                      analysis.plantName,
-                      style: TextStyle(
-                        fontSize: context.dimensions.fontSizeS,
-                        color: CupertinoColors.systemGrey,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                CupertinoIcons.chevron_right,
-                color: CupertinoColors.systemGrey,
-                size: context.dimensions.iconSizeS,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
