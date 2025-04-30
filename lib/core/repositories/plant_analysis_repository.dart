@@ -96,32 +96,112 @@ class PlantAnalysisRepository extends BaseRepository {
   }) async {
     await _ensureInitialized();
 
-    final result = await apiCall<PlantAnalysisResult>(
-      operationName: 'Bitki Analizi',
-      apiCall: () async {
-        // Önce kullanıcı girişi kontrolü yap
-        final userId = _getCurrentUserId();
-        if (userId == null) {
-          throw Exception('Kullanıcı oturum açmamış. Lütfen önce giriş yapın.');
-        }
+    // 1. Temel loglamayı yap
+    logInfo('Bitki analizi başlatılıyor',
+        'Dosya: ${imageFile.path}, Boyut: ${await imageFile.length()} bayt');
 
-        // Önce görüntüyü storage'a yükle
-        final imageUrl = await _uploadImage(imageFile);
+    try {
+      // 2. Kullanıcı kontrolü
+      final userId = _getCurrentUserId();
+      if (userId == null) {
+        logError('Kullanıcı oturum açmamış');
+        return PlantAnalysisResult(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          plantName: 'Analiz Edilemedi',
+          probability: 0.0,
+          isHealthy: false,
+          diseases: [],
+          description: 'Kullanıcı oturum açmamış.',
+          suggestions: ['Lütfen önce giriş yapın.'],
+          imageUrl: '',
+          similarImages: [],
+        );
+      }
+      logInfo('Kullanıcı kimliği doğrulandı', 'UserID: $userId');
 
-        // Varsayılan konum bilgisi
-        final String locationInfo = location ?? "Tekirdağ/Tatarlı";
+      // 3. Görüntüyü yükle - doğrudan _storage kullanarak
+      logInfo('Görüntü yükleniyor', 'Dosya: ${imageFile.path}');
 
-        // Varsayılan boş sonuç
-        PlantAnalysisResult result = _createEmptyAnalysisResult(
-          imageUrl: imageUrl,
-          location: locationInfo,
-          fieldName: fieldName,
+      String imageUrl = '';
+      try {
+        final userId = _getCurrentUserId() ?? 'anonymous';
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final fileName = '$timestamp.jpg';
+        final folderPath = 'analyses/$userId';
+        final filePath = '$folderPath/$fileName';
+        final ref = _storage.ref().child(filePath);
+
+        // Görüntüyü sıkıştır
+        final Uint8List imageBytes = await _compressImageIfNeeded(imageFile);
+
+        // Yükleme işlemini başlat
+        final uploadTask = ref.putData(
+          imageBytes,
+          SettableMetadata(
+            contentType: 'image/jpeg',
+            customMetadata: {
+              'userId': userId,
+              'originalSize': (await imageFile.length()).toString(),
+              'compressedSize': imageBytes.length.toString(),
+              'uploadDate': DateTime.now().toIso8601String(),
+            },
+          ),
         );
 
-        if (useGemini) {
+        // Yükleme tamamlanana kadar bekle ve sonucu al
+        final taskSnapshot = await uploadTask;
+        imageUrl = await taskSnapshot.ref.getDownloadURL();
+        AppLogger.i('Görüntü yüklendi', 'URL: $imageUrl, Yol: $filePath');
+      } catch (uploadError) {
+        logError('Görüntü yükleme hatası', uploadError.toString());
+        return PlantAnalysisResult(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          plantName: 'Analiz Edilemedi',
+          probability: 0.0,
+          isHealthy: false,
+          diseases: [],
+          description: 'Görüntü yüklenirken bir hata oluştu.',
+          suggestions: [
+            'Lütfen başka bir fotoğraf ile tekrar deneyin.',
+            'Hata: ${uploadError.toString()}'
+          ],
+          imageUrl: '',
+          similarImages: [],
+        );
+      }
+
+      if (imageUrl.isEmpty) {
+        logError('Görüntü yüklenemedi');
+        return PlantAnalysisResult(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          plantName: 'Analiz Edilemedi',
+          probability: 0.0,
+          isHealthy: false,
+          diseases: [],
+          description: 'Görüntü yüklenemedi.',
+          suggestions: ['Lütfen başka bir fotoğraf ile tekrar deneyin.'],
+          imageUrl: '',
+          similarImages: [],
+        );
+      }
+      logSuccess('Görüntü yüklendi', 'URL: $imageUrl');
+
+      // 4. Varsayılan değerleri hazırla
+      final String locationInfo = location ?? "Tekirdağ/Tatarlı";
+      PlantAnalysisResult result = _createEmptyAnalysisResult(
+        imageUrl: imageUrl,
+        location: locationInfo,
+        fieldName: fieldName,
+      );
+
+      if (useGemini) {
+        try {
+          // 5. Görüntüyü analiz et
+          logInfo('Görüntü analizi başlatılıyor', 'Gemini API kullanılıyor');
+          final imageBytes = await imageFile.readAsBytes();
+
           try {
-            // Gemini AI ile analiz
-            final imageBytes = await imageFile.readAsBytes();
+            // Direk PlantAnalysisService üzerinden çağrı yap
             final response = await _plantAnalysisService.analyzePlant(
               imageBytes,
               userId,
@@ -135,39 +215,181 @@ class PlantAnalysisRepository extends BaseRepository {
 
             if (!response.success) {
               if (response.needsPremium) {
-                throw Exception('Premium gerekli: ${response.message}');
+                logWarning('Premium gerekli', response.message);
+                return PlantAnalysisResult(
+                  id: DateTime.now().millisecondsSinceEpoch.toString(),
+                  plantName: 'Premium Gerekli',
+                  probability: 0.0,
+                  isHealthy: false,
+                  diseases: [],
+                  description: 'Bu özellik premium üyelik gerektirir.',
+                  suggestions: ['Lütfen üyelik planınızı yükseltin.'],
+                  imageUrl: imageUrl,
+                  similarImages: [],
+                );
               } else {
-                throw Exception(response.message);
+                logError('Gemini yanıtı başarısız', response.message);
+                logInfo('Alternatif analiz denenecek');
+
+                // İlk yöntem başarısız oldu, yedek yöntemi dene
+                return await _runBackupAnalysis(
+                    imageFile, imageUrl, locationInfo, fieldName);
               }
             }
 
-            // Gemini yanıtını PlantAnalysisResult'a dönüştür
-            result = _parseGeminiResponse(
-              response.result ?? '',
-              imageUrl,
-              locationInfo,
-              fieldName,
-            );
-          } catch (e) {
-            logError('Gemini analizi hatası', e.toString());
-            throw Exception('Gemini analizi tamamlanamadı: ${e.toString()}');
+            // 6. Yanıtı kontrol et
+            final responseText = response.result ?? '';
+            if (responseText.isEmpty) {
+              logError('Gemini yanıtı boş');
+              logInfo('Alternatif analiz denenecek');
+
+              // İlk yöntem başarısız oldu, yedek yöntemi dene
+              return await _runBackupAnalysis(
+                  imageFile, imageUrl, locationInfo, fieldName);
+            }
+            logSuccess('Gemini yanıtı alındı',
+                'Yanıt uzunluğu: ${responseText.length} karakter');
+
+            // 7. Yanıtı işle
+            try {
+              result = _parseGeminiResponse(
+                responseText,
+                imageUrl,
+                locationInfo,
+                fieldName,
+              );
+              logSuccess('Gemini yanıtı işlendi', 'Bitki: ${result.plantName}');
+            } catch (parseError) {
+              logError('Gemini yanıtı işleme hatası', parseError.toString());
+              // Parse hatası durumunda yedek yöntem yerine ham yanıtı kullan
+              return PlantAnalysisResult(
+                id: DateTime.now().millisecondsSinceEpoch.toString(),
+                plantName: 'İşleme Hatası',
+                probability: 0.0,
+                isHealthy: true,
+                diseases: [],
+                description:
+                    'Analiz sonucu işlenirken bir hata oluştu, ancak ham yanıt aşağıdadır:',
+                suggestions: [
+                  responseText.length > 1000
+                      ? responseText.substring(0, 1000) + "..."
+                      : responseText
+                ],
+                imageUrl: imageUrl,
+                similarImages: [],
+                geminiAnalysis: responseText,
+              );
+            }
+          } catch (serviceError) {
+            logError('Servis hatası', serviceError.toString());
+            logInfo('Alternatif analiz denenecek');
+
+            // Service çağrısı başarısız oldu, yedek yöntemi dene
+            return await _runBackupAnalysis(
+                imageFile, imageUrl, locationInfo, fieldName);
           }
+        } catch (analysisError) {
+          logError('Gemini analizi hatası', analysisError.toString());
+          // Analiz hatası durumunda da yedek yöntemi dene
+          return await _runBackupAnalysis(
+              imageFile, imageUrl, locationInfo, fieldName);
         }
+      }
 
-        // Sonucu kaydet
+      // 8. Analiz sonucunu kaydet
+      try {
+        logInfo('Analiz sonucunu kaydediyor');
         await saveAnalysisResult(result: result);
+        logSuccess('Analiz sonucu kaydedildi', 'ID: ${result.id}');
+      } catch (saveError) {
+        logError('Analiz sonucu kaydetme hatası', saveError.toString());
+        // Kayıt hatası olsa bile analiz sonucunu dön
+      }
 
-        // Kaydedilen belgenin ID'sini set et
-        return result.copyWith(id: result.id);
-      },
-    );
+      // 9. Sonucu döndür
+      return result;
+    } catch (error) {
+      logError('Analiz sırasında hata oluştu', 'Hata: ${error.toString()}');
 
-    return result ??
-        _createEmptyAnalysisResult(
-          imageUrl: '',
-          location: location ?? 'Tekirdağ/Tatarlı',
-          fieldName: fieldName,
-        );
+      // Hatanın içeriğinden bölüm gösteren bir yapıyla logu zenginleştir
+      String errorDetails = '';
+      try {
+        errorDetails = error.toString().substring(
+            0, error.toString().length > 500 ? 500 : error.toString().length);
+      } catch (_) {
+        errorDetails = error.toString();
+      }
+      logError('Hata detayları', errorDetails);
+
+      // Hata ile bir sonuç oluştur - bu aşamada hatayı üst katmana gönderme
+      return PlantAnalysisResult(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        plantName: 'Analiz Edilemedi',
+        probability: 0.0,
+        isHealthy: false,
+        diseases: [],
+        description: 'Analiz sırasında bir hata oluştu: ${error.toString()}',
+        suggestions: [
+          'Lütfen başka bir fotoğraf ile tekrar deneyin.',
+          'Hata: ${errorDetails}'
+        ],
+        imageUrl: '',
+        similarImages: [],
+      );
+    }
+  }
+
+  /// Yedek analiz yöntemi - AI servisi çalışmadığında default yanıt dondürür
+  Future<PlantAnalysisResult> _runBackupAnalysis(File imageFile,
+      String imageUrl, String location, String? fieldName) async {
+    logInfo('Yedek analiz yöntemi çalıştırılıyor');
+
+    try {
+      // Basit bir bitkisel analiz sonucu oluştur
+      return PlantAnalysisResult(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        plantName: 'Tahmin Edilemiyor',
+        probability: 0.5,
+        isHealthy: true,
+        diseases: [],
+        description:
+            'API servisi şu anda kullanılamıyor. Görüntünüzü analiz edemedik. '
+            'Ancak genel bitki bakım önerilerimiz şunlardır:',
+        suggestions: [
+          'Düzenli sulama yapın. Toprağın 2-3 cm derinliğindeki kısmı kuruduğunda sulayın.',
+          'Yeteri kadar güneş ışığı alan bir yerde tutun.',
+          'Bitkinin ihtiyacına göre ayda bir kez organik gübre kullanın.',
+          'Sararmış veya kurumuş yaprakları düzenli olarak temizleyin.',
+          'Havalandırma yapın ve bitkinizi nemli ortamlarda tutun.',
+          'Zararlı böcekler için düzenli kontrol edin.',
+        ],
+        imageUrl: imageUrl,
+        similarImages: [],
+        watering: 'Haftada 2-3 kez, toprak kuruduğunda.',
+        sunlight: 'Orta derecede güneş ışığı.',
+        soil: 'İyi drene olan, besin açısından zengin toprak.',
+        climate: 'Ilıman iklimler için uygundur.',
+        location: location,
+        fieldName: fieldName,
+        growthStage: 'Belirlenemedi',
+        growthScore: 50,
+      );
+    } catch (backupError) {
+      logError('Yedek analiz yöntemi hatası', backupError.toString());
+
+      // Tamamen basit bir sonuç döndür
+      return PlantAnalysisResult(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        plantName: 'Analiz Servisi Hatası',
+        probability: 0.0,
+        isHealthy: false,
+        diseases: [],
+        description: 'Görsel analiz servisi şu anda kullanılamıyor.',
+        suggestions: ['Lütfen daha sonra tekrar deneyin.'],
+        imageUrl: imageUrl,
+        similarImages: [],
+      );
+    }
   }
 
   /// Boş bir analiz sonucu oluşturur
@@ -751,8 +973,30 @@ class PlantAnalysisRepository extends BaseRepository {
     String? fieldName,
   ) {
     try {
+      // Debug için yanıtın ilk kısmını logla
+      final previewLength =
+          geminiResponse.length > 100 ? 100 : geminiResponse.length;
+      final preview = geminiResponse.substring(0, previewLength);
+      logInfo('Gemini yanıtı parse ediliyor', 'Önizleme: $preview...');
+
+      // Gemini yanıtı boş kontrolü
+      if (geminiResponse.trim().isEmpty) {
+        logError('Gemini yanıtı boş geldi');
+        throw Exception('Gemini yanıtı boş');
+      }
+
       // Gemini yanıtını parse işlemini gerçekleştir
       final parsedData = _parseGeminiText(geminiResponse);
+
+      // Parsed data kontrolü
+      if (parsedData.isEmpty) {
+        logError('Gemini yanıtı parse edilemedi');
+        throw Exception('Gemini yanıtından veri çıkarılamadı');
+      }
+
+      // Parse edilen verilerin bir kısmını logla
+      logInfo('Parse edilen veriler',
+          'Bitki adı: ${parsedData['plantName']}, Sağlıklı: ${parsedData['isHealthy']}');
 
       // Tüm önerileri birleştir
       List<String> allSuggestions = _combineAllSuggestions(
@@ -788,6 +1032,25 @@ class PlantAnalysisRepository extends BaseRepository {
       );
     } catch (e) {
       logError('Gemini yanıtını işleme hatası', e.toString());
+
+      // Hata bilgisini daha detaylı al
+      String errorDetails = '';
+      try {
+        // Yanıtın ilk 200 karakteri
+        if (geminiResponse.isNotEmpty) {
+          final previewLength =
+              geminiResponse.length > 200 ? 200 : geminiResponse.length;
+          errorDetails =
+              'İlk ${previewLength} karakter: ${geminiResponse.substring(0, previewLength)}';
+        } else {
+          errorDetails = 'Yanıt boş';
+        }
+      } catch (logError) {
+        errorDetails = 'Yanıt detayları alınamadı: $logError';
+      }
+
+      logError('Gemini yanıtı detayları', errorDetails);
+
       // Hata durumunda basit bir sonuç oluştur
       return PlantAnalysisResult(
         id: DateTime.now().millisecondsSinceEpoch.toString(),

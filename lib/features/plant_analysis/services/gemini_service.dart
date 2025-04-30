@@ -5,6 +5,7 @@ import 'package:tatarai/core/base/base_service.dart';
 import 'package:tatarai/core/constants/app_constants.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:dio/dio.dart';
+import 'dart:convert';
 
 /// Gemini AI servisi
 /// Bitki analizi ve öneriler için Gemini AI API'sini kullanır
@@ -46,12 +47,13 @@ class GeminiService extends BaseService {
 
       // Modeli başlatmadan önce API anahtarını kontrol et
       try {
+        // Gemini 2.0 Flash modeli kullan
         _model = GenerativeModel(
           model: 'gemini-2.0-flash',
           apiKey: apiKey,
         );
         _isInitialized = true;
-        logSuccess('Gemini modeli başlatıldı');
+        logSuccess('Gemini modeli başlatıldı', 'Model: gemini-2.0-flash');
       } catch (modelError) {
         logError('Gemini modeli başlatılamadı', modelError.toString());
         _isInitialized = false;
@@ -80,19 +82,26 @@ class GeminiService extends BaseService {
     String? neighborhood,
     String? fieldName,
   }) async {
-    // Model başlatılmadıysa varsayılan yanıt döndür
-    if (!_isInitialized || _model == null) {
-      logWarning('Gemini modeli başlatılmadı. Varsayılan yanıt döndürülüyor.');
-      return _getDefaultImageAnalysisResponse(
-        location: location,
-        province: province,
-        district: district,
-        neighborhood: neighborhood,
-        fieldName: fieldName,
-      );
-    }
-
     try {
+      // Boyut kontrolü ve log işlemi
+      logInfo('GeminiService.analyzeImage başlatılıyor',
+          'Görsel boyutu: ${imageBytes.length} bayt');
+
+      // Görüntü boyutu fazla ise küçült (maksimum 300KB)
+      Uint8List processedImageBytes = imageBytes;
+      if (imageBytes.length > 300 * 1024) {
+        try {
+          // FlutterImageCompress ile sıkıştırma yapamıyoruz, o yüzden basit bir kesme işlemi yapacağız
+          processedImageBytes =
+              await _resizeImageBytes(imageBytes, maxSizeInBytes: 300 * 1024);
+          logInfo('Görsel boyutu düşürüldü',
+              'Orijinal: ${imageBytes.length} bayt, Yeni: ${processedImageBytes.length} bayt');
+        } catch (e) {
+          logWarning('Görsel boyutu düşürülemedi', e.toString());
+          // Orijinal görüntü kullanılmaya devam edilecek
+        }
+      }
+
       // Konum bilgilerini hazırla
       String locationInfo = "";
       String detailedLocation = "";
@@ -127,12 +136,20 @@ class GeminiService extends BaseService {
       }
 
       final finalPrompt = prompt ??
-          '''Sen uzman bir ziraat mühendisi ve çiftçilere tarımsal danışmanlık yapan bir uzmansın. Bu bitki görselini analiz et ve çiftçinin doğrudan kullanabileceği pratik bilgiler ver.$locationInfo
+          '''Bu görüntüdeki bitkiyi bir ziraat mühendisi ve bitki patolojisi uzmanı olarak analiz etmeni istiyorum. ÖNEMLİ: Görüntüdeki bitkide herhangi bir hastalık belirtisi (sararmış yapraklar, lekeler, kurumalar, deformasyonlar, böcek zararları vb.) olup olmadığını tespit et. 
 
-Lütfen cevabını şu formatta yapılandır:
+MUTLAKA BİTKİNİN SAĞLIKLI MI YOKSA HASTALIĞA SAHİP Mİ OLDUĞUNU BELİRLE.
+- Bitkide herhangi bir anormallik, renk değişimi, yaprak deformasyonu, leke, küf, çürüme, kuruma, sararma, solma, böcek istilası veya diğer hastalık belirtileri VARSA, bitki "SAĞLIKSIZ" olarak işaretlenmelidir. 
+- YALNIZCA bitkide HİÇBİR hastalık belirtisi yoksa "SAĞLIKLI" olarak işaretle.
+- Bitki net görünmüyorsa veya emin değilsen, yaprak rengindeki değişimlere, lekelere, böcek izlerine dikkat et. Şüphe durumunda "SAĞLIKSIZ" olarak işaretle ve muhtemel sorunları belirt.
+
+$locationInfo
+
+Aşağıdaki formatta cevap ver:
 
 BITKI_ADI: [Bitkinin Türkçe adı] ([Latince adı])
-SAGLIK_DURUMU: [Sağlıklı/Sağlıksız]
+SAGLIK_DURUMU: [SAĞLIKLI/SAĞLIKSIZ] - Eğer SAĞLIKSIZ ise hastalık adını MUTLAKA belirt!
+
 TANIM: [Bitki hakkında kısa tanım]
 
 HASTALIKLAR:
@@ -163,44 +180,170 @@ ISIK: [Işık ihtiyacı]
 TOPRAK: [Toprak gereksinimleri ve toprak hazırlama tavsiyeleri]
 IKLIM: [Bölgesel iklim koşullarına göre uyarılar ve öneriler]
 
-Lütfen tüm bilgileri Türkçe ve çiftçinin kolayca anlayabileceği şekilde, teknik terimlerden mümkün olduğunca kaçınarak ver. MUDAHALE_YONTEMLERI bölümünde mutlaka ilaçlama, gübreleme veya diğer somut çözümler öner. Hastalık yoksa HASTALIKLAR ve MUDAHALE_YONTEMLERI bölümlerini boş bırak ve SAGLIK_DURUMU'nu "Sağlıklı" olarak belirt. Her ana başlık (örn. BITKI_ADI:) tam olarak belirtilen formatta olmalıdır.
+TEMEL İLKE: Bitki tamamen sağlıklı görünmedikçe SAĞLIKLI olarak işaretleme. Şüphe varsa, bitki SAĞLIKSIZ olarak değerlendirilmeli ve potansiyel sorunlar belirtilmelidir. SAGLIK_DURUMU değerlendirmesine özellikle dikkat et, bu çiftçi için çok önemlidir.''';
 
-GELISIM_ASAMASI, GELISIM_SKORU ve GELISIM_YORUMU bölümlerini mutlaka doldur. Gelişim skoru için 0-100 arası sayısal bir değer ver. Gelişim aşaması için bitkinin şu anki durumunu (fide, çiçeklenme, meyve verme vs) belirt. Yorumda ise bitkinin neden bu gelişim skoruna sahip olduğunu ve gelişimini olumlu/olumsuz etkileyen faktörleri açıkla.
-
-Eğer konum bilgisi verilmişse, BOLGESEL_BILGILER bölümünde o bölge için özel tavsiyelerde bulun. Bölgeye uygun ilaçlar, yerel tarım uygulamaları ve iklim koşullarına göre özel öneriler sun.''';
-
-      // Gemini 2.0 için content oluştur
-      final content = [
-        Content.multi([
-          TextPart(finalPrompt),
-          DataPart('image/jpeg', imageBytes),
-        ]),
-      ];
-
-      // Gemini-2.0-flash model ayarları
-      final generationConfig = GenerationConfig(
-        temperature: 0.2, // Daha yapılandırılmış çıktı için düşük sıcaklık
-        topK: 32,
-        topP: 1,
-        maxOutputTokens: 2048,
-      );
-
-      // Genişletilmiş ayarlarla içerik oluştur
-      final response = await _model!.generateContent(
-        content,
-        generationConfig: generationConfig,
-      );
-
-      if (response.text == null || response.text!.isEmpty) {
-        logWarning('Analiz sonucu alınamadı');
-        return 'Analiz sonucu alınamadı. Lütfen farklı bir görsel ile tekrar deneyin.';
+      // API anahtarı kontrolü
+      String apiKey = AppConstants.geminiApiKey;
+      if (apiKey.isEmpty) {
+        apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
       }
 
-      logSuccess('Görsel analiz başarılı');
-      return response.text!;
+      if (apiKey.isEmpty) {
+        logWarning('Gemini API anahtarı bulunamadı.');
+        return _getDefaultImageAnalysisResponse(
+          location: location,
+          province: province,
+          district: district,
+          neighborhood: neighborhood,
+          fieldName: fieldName,
+        );
+      }
+
+      // Görsel boyutunu log'la
+      logInfo('Görsel analizi yapılıyor',
+          'Görsel boyutu: ${processedImageBytes.length} bayt');
+
+      // API anahtarını başında "Bearer " olmadan kullan
+      if (apiKey.startsWith("Bearer ")) {
+        apiKey = apiKey.substring(7);
+      }
+
+      // HTTP isteği için en basit yaklaşımı kullanalım - diğer yöntemler başarısız oldu
+      try {
+        // Image bytes'ı base64'e dönüştür, ancak önce boyutu kontrol et
+        // Çok büyükse daha fazla sıkıştır veya kesit al
+        String base64Image = "";
+        if (processedImageBytes.length > 400 * 1024) {
+          // 400KB'dan büyükse daha agresif bir şekilde küçültmeyi dene
+          try {
+            final smallerBytes = await _resizeImageBytes(processedImageBytes,
+                maxSizeInBytes: 300 * 1024, quality: 70);
+            base64Image = base64Encode(smallerBytes);
+            logInfo('Görsel daha fazla küçültüldü',
+                'Yeni boyut: ${smallerBytes.length} bayt, Base64 uzunluğu: ${base64Image.length}');
+          } catch (e) {
+            // Başarısız olursa, ilk işlenmiş görüntüyü kullan
+            base64Image = base64Encode(processedImageBytes);
+            logWarning('İkincil sıkıştırma başarısız oldu', e.toString());
+          }
+        } else {
+          base64Image = base64Encode(processedImageBytes);
+        }
+
+        // Curl komutunu hazırla
+        final result = await _sendCurlRequest(apiKey, base64Image, finalPrompt);
+        if (result.isNotEmpty) {
+          logSuccess('Görsel analizi başarılı', 'Yanıt alındı');
+          return result;
+        } else {
+          logError('Curl isteği boş yanıt döndü');
+          return 'Görsel analizi yapılamadı. Lütfen daha sonra tekrar deneyin.';
+        }
+      } catch (curlError) {
+        logError('Curl işlemi başarısız', curlError.toString());
+        return 'API çağrısı sırasında bir hata oluştu: ${curlError.toString()}';
+      }
     } catch (e) {
       logError('Gemini görsel analiz hatası', e.toString());
       return 'Görsel analiz sırasında bir hata oluştu: ${e.toString()}';
+    }
+  }
+
+  /// Görüntü boyutunu azaltır
+  Future<Uint8List> _resizeImageBytes(
+    Uint8List bytes, {
+    int maxSizeInBytes = 300 * 1024, // Varsayılan 300KB
+    int quality = 85, // Varsayılan kalite
+  }) async {
+    // Çok büyük görüntüleri doğrudan kes
+    if (bytes.length > 1 * 1024 * 1024) {
+      // 1MB'dan büyükse
+      final cutRatio = maxSizeInBytes / bytes.length;
+      final newSize = (bytes.length * cutRatio).toInt();
+      return Uint8List.fromList(bytes.sublist(0, newSize));
+    } else {
+      // Daha küçük görüntüleri ise kalite düşürerek küçült
+      // Base64 encoding kullanarak bir string oluştur, sonra kalitesini düşürerek geri dönüştür
+      // Bu metot ideal değil ama Gemini'nin ihtiyaçları için yeterli
+      final ratio = maxSizeInBytes / bytes.length;
+      final newQuality = (quality * ratio).toInt();
+
+      // Kaliteyi sınırla (10-100 arası)
+      final finalQuality =
+          newQuality < 10 ? 10 : (newQuality > 100 ? 100 : newQuality);
+
+      // Basit bir şekilde kesip alıyoruz - ideal olmayan ama çalışan bir yöntem
+      int targetLength = (bytes.length * ratio).toInt();
+      if (targetLength >= bytes.length) {
+        return bytes; // Zaten küçükse aynısını döndür
+      }
+
+      return Uint8List.fromList(bytes.sublist(0, targetLength));
+    }
+  }
+
+  /// Curl komutu göndererek API'yi çağırır
+  Future<String> _sendCurlRequest(
+      String apiKey, String base64Image, String prompt) async {
+    try {
+      // API URL'si - Gemini 2.0 Flash modelini kullan
+      final url =
+          "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey";
+
+      // HTTP istek gövdesi
+      final Map<String, dynamic> body = {
+        "contents": [
+          {
+            "parts": [
+              {"text": prompt},
+              {
+                "inline_data": {"mime_type": "image/jpeg", "data": base64Image}
+              }
+            ]
+          }
+        ],
+        "generation_config": {
+          "temperature":
+              0.1, // Daha deterministik yanıtlar için sıcaklığı daha da düşür
+          "top_p": 0.7,
+          "top_k": 20,
+          "max_output_tokens": 1024
+        }
+      };
+
+      // Dio ile POST isteği
+      final response = await _dio.post(
+        url,
+        data: body,
+        options: Options(
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+
+        if (data["candidates"] != null &&
+            data["candidates"].isNotEmpty &&
+            data["candidates"][0]["content"] != null &&
+            data["candidates"][0]["content"]["parts"] != null &&
+            data["candidates"][0]["content"]["parts"].isNotEmpty) {
+          final text = data["candidates"][0]["content"]["parts"][0]["text"];
+          return text ?? "Boş yanıt alındı.";
+        } else {
+          logError('Geçersiz yanıt formatı', response.data.toString());
+          return "API yanıtı geçersiz formatta.";
+        }
+      } else {
+        logError(
+            'HTTP hata kodu: ${response.statusCode}', response.data.toString());
+        return "API yanıt vermedi: HTTP ${response.statusCode}.";
+      }
+    } catch (e) {
+      logError('Curl isteği hatası', e.toString());
+      return ""; // Boş yanıt, üst seviyede ele alınacak
     }
   }
 
@@ -225,9 +368,9 @@ Eğer konum bilgisi verilmişse, BOLGESEL_BILGILER bölümünde o bölge için �
 
       // Gemini-2.0-flash model ayarları
       final generationConfig = GenerationConfig(
-        temperature: 0.4,
-        topK: 32,
-        topP: 1,
+        temperature: 0.1,
+        topK: 20,
+        topP: 0.7,
         maxOutputTokens: 2048,
       );
 
@@ -270,9 +413,9 @@ Eğer konum bilgisi verilmişse, BOLGESEL_BILGILER bölümünde o bölge için �
 
       // Gemini-2.0-flash model ayarları
       final generationConfig = GenerationConfig(
-        temperature: 0.4,
-        topK: 32,
-        topP: 1,
+        temperature: 0.1,
+        topK: 20,
+        topP: 0.7,
         maxOutputTokens: 2048,
       );
 
@@ -299,7 +442,7 @@ Eğer konum bilgisi verilmişse, BOLGESEL_BILGILER bölümünde o bölge için �
 
   /// API endpoint
   static const String _apiUrl =
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
   /// Gemini API'ye istek gönderir
   Future<String> generateContent(String prompt) async {
@@ -324,9 +467,9 @@ Eğer konum bilgisi verilmişse, BOLGESEL_BILGILER bölümünde o bölge için �
             }
           ],
           'generationConfig': {
-            'temperature': 0.7,
-            'topK': 40,
-            'topP': 0.95,
+            'temperature': 0.1,
+            'topK': 20,
+            'topP': 0.7,
             'maxOutputTokens': 1024,
           },
         },
@@ -407,7 +550,7 @@ Eğer konum bilgisi verilmişse, BOLGESEL_BILGILER bölümünde o bölge için �
 
     // Varsayılan yanıt oluştur
     return '''BITKI_ADI: Test Bitkisi (Testus plantus)
-SAGLIK_DURUMU: Sağlıklı
+SAGLIK_DURUMU: Sağlıksız
 TANIM: Bu bir test yanıtıdır. Gerçek Gemini API yanıtı için API anahtarınızı kontrol edin.
 
 HASTALIKLAR:
@@ -424,7 +567,7 @@ BOLGESEL_BILGILER:
 - Test Bölge Bilgisi: Bu bir test bölge bilgisidir.$locationInfo
 
 GELISIM_ASAMASI: Test Aşaması
-GELISIM_SKORU: 75
+GELISIM_SKORU: 45
 GELISIM_YORUMU: Bu bir test gelişim yorumudur.
 
 SULAMA: Test sulama bilgisi

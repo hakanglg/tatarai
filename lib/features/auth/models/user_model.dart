@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:equatable/equatable.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:tatarai/core/constants/app_constants.dart';
 import 'package:tatarai/features/auth/models/user_role.dart';
 
 /// Kullanıcı modeli - Firebase kimlik doğrulama verilerini ve Firestore kullanıcı verilerini birleştirir
@@ -41,7 +42,8 @@ class UserModel extends Equatable {
       createdAt: user.metadata.creationTime ?? DateTime.now(),
       lastLoginAt: user.metadata.lastSignInTime ?? DateTime.now(),
       role: UserRole.free, // Varsayılan rol
-      analysisCredits: 3, // Yeni kullanıcılar için ücretsiz krediler
+      analysisCredits: AppConstants
+          .FREE_ANALYSIS_CREDITS, // Yeni kullanıcılar için ücretsiz krediler
       favoriteAnalysisIds: const [],
     );
   }

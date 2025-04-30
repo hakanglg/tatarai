@@ -12,6 +12,9 @@ class PlantAnalysisState extends BaseState {
   /// Mevcut analiz durumu
   final AnalysisStatus status;
 
+  /// Premium özellik mi gerekiyor
+  final bool needsPremium;
+
   /// Constructor
   const PlantAnalysisState({
     this.analysisList = const [],
@@ -19,6 +22,7 @@ class PlantAnalysisState extends BaseState {
     this.status = AnalysisStatus.initial,
     super.isLoading = false,
     super.errorMessage,
+    this.needsPremium = false,
   });
 
   /// Başlangıç durumu
@@ -38,11 +42,13 @@ class PlantAnalysisState extends BaseState {
   }
 
   /// Hata durumu
-  factory PlantAnalysisState.error(String message) {
+  factory PlantAnalysisState.error(String message,
+      {bool needsPremium = false}) {
     return PlantAnalysisState(
       status: AnalysisStatus.error,
       errorMessage: message,
       isLoading: false,
+      needsPremium: needsPremium,
     );
   }
 
@@ -67,6 +73,7 @@ class PlantAnalysisState extends BaseState {
     AnalysisStatus? status,
     bool? isLoading,
     String? errorMessage,
+    bool? needsPremium,
   }) {
     return PlantAnalysisState(
       analysisList: analysisList ?? this.analysisList,
@@ -75,6 +82,7 @@ class PlantAnalysisState extends BaseState {
       status: status ?? this.status,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage ?? this.errorMessage,
+      needsPremium: needsPremium ?? this.needsPremium,
     );
   }
 
@@ -84,6 +92,7 @@ class PlantAnalysisState extends BaseState {
         analysisList,
         selectedAnalysisResult,
         status,
+        needsPremium,
       ];
 }
 

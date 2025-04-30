@@ -48,6 +48,9 @@ class PlantAnalysisService extends BaseService {
     String? fieldName,
   }) async {
     try {
+      logInfo('PlantAnalysisService.analyzePlant başlatılıyor',
+          'Görsel boyutu: ${imageBytes.length} bayt, UserId: $userId');
+
       final user = _authService.currentUser;
       if (user == null) {
         logError('Kullanıcı oturum açmamış');
@@ -84,48 +87,80 @@ class PlantAnalysisService extends BaseService {
         );
       }
 
-      logInfo('Bitki analizi başlatılıyor...');
+      logInfo('Bitki analizi başlatılıyor...',
+          'Konum: ${location ?? "belirtilmemiş"}, İl: ${province ?? "belirtilmemiş"}, İlçe: ${district ?? "belirtilmemiş"}');
 
       // Eğer konum bilgisi verilmemişse varsayılan konumu kullan
       final String locationInfo = location ?? 'Tekirdağ/Tatarlı';
 
-      // Kredi var veya premium kullanıcı - analizi yap
-      final result = await _geminiService.analyzeImage(
-        imageBytes,
-        prompt: prompt,
-        location: locationInfo, // Konum bilgisini Gemini'ye ilet
-        province: province, // İl bilgisi
-        district: district, // İlçe bilgisi
-        neighborhood: neighborhood, // Mahalle bilgisi
-        fieldName: fieldName, // Tarla adı
-      );
+      try {
+        // Kredi var veya premium kullanıcı - analizi yap
+        logInfo('GeminiService.analyzeImage çağrılıyor',
+            'Görsel boyutu: ${imageBytes.length} bayt');
 
-      // Premium değilse, krediyi azalt
-      if (!isPremium) {
-        await _firestore
-            .collection(AppConstants.usersCollection)
-            .doc(userId)
-            .update({'analysisCredits': FieldValue.increment(-1)});
+        final result = await _geminiService.analyzeImage(
+          imageBytes,
+          prompt: prompt,
+          location: locationInfo, // Konum bilgisini Gemini'ye ilet
+          province: province, // İl bilgisi
+          district: district, // İlçe bilgisi
+          neighborhood: neighborhood, // Mahalle bilgisi
+          fieldName: fieldName, // Tarla adı
+        );
 
-        // Kalan kredi sayısını log'la
-        final int remainingCredits = userCredits - 1;
-        logInfo(
-            'Kullanıcı kredisi düşürüldü', 'Kalan kredi: $remainingCredits');
+        // Bu noktada başarılı bir cevap alındı
+        logSuccess('GeminiService işlemi başarılı',
+            'Yanıt uzunluğu: ${result.length} karakter');
+
+        // Premium değilse, krediyi azalt
+        if (!isPremium) {
+          await _firestore
+              .collection(AppConstants.usersCollection)
+              .doc(userId)
+              .update({'analysisCredits': FieldValue.increment(-1)});
+
+          // Kalan kredi sayısını log'la
+          final int remainingCredits = userCredits - 1;
+          logInfo(
+              'Kullanıcı kredisi düşürüldü', 'Kalan kredi: $remainingCredits');
+        }
+
+        logSuccess('Bitki analizi başarıyla tamamlandı', 'userId: $userId');
+        return AnalysisResponse(
+          success: true,
+          message: 'Analiz başarıyla tamamlandı.',
+          result: result,
+          location: locationInfo, // Konum bilgisini yanıta ekle
+          fieldName: fieldName, // Tarla adını yanıta ekle
+        );
+      } catch (geminiError) {
+        logError('GeminiService hatası', 'Hata: ${geminiError.toString()}');
+
+        // Gemini API hatası daha spesifik olarak raporla
+        String errorMessage =
+            'Analiz sırasında bir hata oluştu: ${geminiError.toString()}';
+        if (geminiError.toString().contains('API anahtarı')) {
+          errorMessage =
+              'API anahtarı hatası: Lütfen daha sonra tekrar deneyin veya destek ile iletişime geçin.';
+        } else if (geminiError.toString().contains('Network')) {
+          errorMessage =
+              'Ağ hatası: İnternet bağlantınızı kontrol edin ve tekrar deneyin.';
+        } else if (geminiError.toString().contains('403')) {
+          errorMessage =
+              'Yetkilendirme hatası: Gemini API erişimi sağlanamadı.';
+        }
+
+        return AnalysisResponse(
+          success: false,
+          message: errorMessage,
+        );
       }
-
-      logSuccess('Bitki analizi başarıyla tamamlandı', 'userId: $userId');
-      return AnalysisResponse(
-        success: true,
-        message: 'Analiz başarıyla tamamlandı.',
-        result: result,
-        location: locationInfo, // Konum bilgisini yanıta ekle
-        fieldName: fieldName, // Tarla adını yanıta ekle
-      );
     } catch (e) {
-      logError('Bitki analizi sırasında hata oluştu', e.toString());
+      logError('Bitki analizi genel hatası', e.toString());
       return AnalysisResponse(
         success: false,
-        message: 'Analiz sırasında bir hata oluştu: ${e.toString()}',
+        message:
+            'Analiz sırasında bir hata oluştu: ${e.toString().substring(0, e.toString().length > 100 ? 100 : e.toString().length)}...',
       );
     }
   }

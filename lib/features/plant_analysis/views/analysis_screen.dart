@@ -17,6 +17,7 @@ import 'package:tatarai/features/plant_analysis/models/location_models.dart';
 import 'package:tatarai/features/plant_analysis/cubits/plant_analysis_state.dart';
 import 'package:tatarai/features/plant_analysis/services/location_service.dart';
 import 'package:tatarai/features/plant_analysis/views/analysis_result_screen.dart';
+import 'package:tatarai/features/payment/views/premium_screen.dart';
 
 /// Bitki analizi ekranı
 /// Fotoğraf çekme, yükleme ve yapay zeka analizini başlatma
@@ -638,18 +639,94 @@ class _AnalysisScreenState extends State<AnalysisScreen>
   }
 
   // Hata mesajı gösterme
-  void _showErrorDialog(String message) {
-    showCupertinoDialog(
-      context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: const Text('Hata'),
-        content: Text(message),
-        actions: <Widget>[
-          CupertinoDialogAction(
-            child: const Text('Tamam'),
-            onPressed: () => Navigator.of(context).pop(),
+  void _showErrorDialog(String message, {bool needsPremium = false}) {
+    if (needsPremium) {
+      // Premium satın alma yönlendirmesi ile göster
+      showCupertinoDialog(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: const Text('Premium Gerekiyor'),
+          content: Column(
+            children: [
+              const SizedBox(height: 8),
+              Text(message),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      CupertinoIcons.lightbulb_fill,
+                      color: AppColors.warning,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Premium üyelikle sınırsız bitki analizi yapabilirsiniz!',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: CupertinoColors.black,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
+          actions: <Widget>[
+            CupertinoDialogAction(
+              child: const Text('Vazgeç'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            CupertinoDialogAction(
+              isDefaultAction: true,
+              child: const Text(
+                'Premium Satın Al',
+                style: TextStyle(
+                  color: AppColors.success,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              onPressed: () {
+                Navigator.of(context).pop();
+                // Premium satın alma sayfasına yönlendir
+                _navigateToPremiumScreen();
+              },
+            ),
+          ],
+        ),
+      );
+    } else {
+      // Normal hata mesajı göster
+      showCupertinoDialog(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: const Text('Hata'),
+          content: Text(message),
+          actions: <Widget>[
+            CupertinoDialogAction(
+              child: const Text('Tamam'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  // Premium satın alma sayfasına yönlendir
+  void _navigateToPremiumScreen() {
+    // Premium sayfasına yönlendirme
+    AppLogger.i('Premium satın alma sayfasına yönlendiriliyor');
+    Navigator.of(context).push(
+      CupertinoPageRoute(
+        builder: (context) => const PremiumScreen(),
       ),
     );
   }
@@ -828,7 +905,8 @@ class _AnalysisScreenState extends State<AnalysisScreen>
               }
             } else if (state.errorMessage != null) {
               // Hata durumunda kullanıcıya bilgi ver
-              _showErrorDialog(state.errorMessage!);
+              _showErrorDialog(state.errorMessage!,
+                  needsPremium: state.needsPremium);
             }
           },
           builder: (context, state) {
