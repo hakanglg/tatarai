@@ -13,6 +13,7 @@ import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/core/widgets/app_button.dart';
 import 'package:tatarai/features/plant_analysis/cubits/plant_analysis_cubit.dart';
 import 'package:tatarai/features/plant_analysis/models/plant_analysis_result.dart';
+import 'package:tatarai/features/plant_analysis/views/widgets/font_size_control.dart';
 
 /// Analiz sonuçları ekranı
 /// Yapay zeka tarafından yapılan bitki analiz sonuçlarını gösterir
@@ -34,6 +35,9 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
   bool _isLoading = true;
   String? _errorMessage;
   bool _initialLoadComplete = false;
+
+  // Yazı boyutu seviyesi için state değişkeni
+  int _fontSizeLevel = 0;
 
   // Animasyon kontrolcüsü
   late AnimationController _animationController;
@@ -904,39 +908,58 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: suggestions.map((suggestion) {
-          return Padding(
-            padding: EdgeInsets.symmetric(vertical: context.dimensions.spaceXS),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  margin: EdgeInsets.only(top: context.dimensions.spaceXXS),
-                  padding: EdgeInsets.all(context.dimensions.spaceXXS + 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.12),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    CupertinoIcons.checkmark_circle_fill,
-                    color: AppColors.primary,
-                    size: context.dimensions.iconSizeXS - 2,
-                  ),
-                ),
-                SizedBox(width: context.dimensions.spaceS),
-                Expanded(
-                  child: Text(
-                    suggestion,
-                    style: AppTextTheme.bodyText2.copyWith(
-                      height: 1.4,
-                      fontSize: context.dimensions.fontSizeM,
+        children: [
+          // FontSizeControl ekledik
+          Align(
+            alignment: Alignment.centerRight,
+            child: FontSizeControl(
+              fontSizeLevel: _fontSizeLevel,
+              onFontSizeChanged: (newLevel) {
+                setState(() {
+                  _fontSizeLevel = newLevel;
+                });
+              },
+              labelText: 'Yazı Boyutu',
+            ),
+          ),
+          SizedBox(height: context.dimensions.spaceS),
+          ...suggestions.map((suggestion) {
+            return Padding(
+              padding:
+                  EdgeInsets.symmetric(vertical: context.dimensions.spaceXS),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    margin: EdgeInsets.only(top: context.dimensions.spaceXXS),
+                    padding: EdgeInsets.all(context.dimensions.spaceXXS + 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      CupertinoIcons.checkmark_circle_fill,
+                      color: AppColors.primary,
+                      size: context.dimensions.iconSizeXS - 2,
                     ),
                   ),
-                ),
-              ],
-            ),
-          );
-        }).toList(),
+                  SizedBox(width: context.dimensions.spaceS),
+                  Expanded(
+                    child: Text(
+                      suggestion,
+                      style: AppTextTheme.bodyText2.copyWith(
+                        height: 1.4,
+                        // Yazı boyutunu fontSizeLevel'e göre ayarla
+                        fontSize:
+                            context.dimensions.fontSizeM + (_fontSizeLevel * 2),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ],
       ),
     );
   }
