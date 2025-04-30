@@ -49,20 +49,15 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        CupertinoIcons.hourglass,
-                        size: context.dimensions.iconSizeXL,
-                      ),
-                      SizedBox(height: context.dimensions.spaceM),
-                      Text('Analizler yükleniyor...'),
+                      CircularProgressIndicator.adaptive(),
                       SizedBox(height: context.dimensions.spaceXS),
-                      Text('Lütfen bekleyin...'),
-                      SizedBox(height: context.dimensions.spaceL),
-                      Padding(
-                        padding: EdgeInsets.symmetric(
-                            horizontal: context.dimensions.paddingL),
-                        child: CupertinoActivityIndicator(),
+                      Text(
+                        'Analizler yükleniyor...',
+                        style: AppTextTheme.bodyMedium
+                            .copyWith(color: AppTextTheme.bodySmall.color),
                       ),
+                      SizedBox(height: context.dimensions.spaceXS),
+                      Text('Lütfen bekleyin...', style: AppTextTheme.bodySmall),
                     ],
                   ),
                 );

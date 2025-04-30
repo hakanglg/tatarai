@@ -1,11 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:tatarai/core/base/base_state_widget.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
 import 'package:tatarai/core/utils/logger.dart';
+import 'package:tatarai/core/utils/loading_view.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
 import 'package:tatarai/features/auth/cubits/auth_state.dart';
 import 'package:tatarai/features/navbar/navigation_manager.dart';
@@ -193,75 +195,77 @@ class _SplashScreenState extends BaseState<SplashScreen>
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
 
-    return CupertinoPageScaffold(
-      backgroundColor: AppColors.background,
-      child: SafeArea(
-        child: Center(
-          child: AnimatedBuilder(
-            animation: _animation,
-            builder: (context, child) {
-              return Transform.scale(
-                scale: _animation.value,
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth: screenSize.width * 0.8,
-                    minWidth:
-                        10.0, // Minimum genişlik ekleyerek sonsuz genişlik hatasını önle
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      // Logo
-                      SizedBox(
-                        width: 120,
-                        height: 120,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.2),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Center(
-                            child: Icon(
-                              CupertinoIcons.leaf_arrow_circlepath,
-                              color: AppColors.primary,
-                              size: 70,
+    return Scaffold(
+      body: CupertinoPageScaffold(
+        backgroundColor: AppColors.background,
+        child: SafeArea(
+          child: Center(
+            child: AnimatedBuilder(
+              animation: _animation,
+              builder: (context, child) {
+                return Transform.scale(
+                  scale: _animation.value,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: screenSize.width * 0.8,
+                      minWidth:
+                          10.0, // Minimum genişlik ekleyerek sonsuz genişlik hatasını önle
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // Logo
+                        SizedBox(
+                          width: 120,
+                          height: 120,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Center(
+                              child: Icon(
+                                CupertinoIcons.leaf_arrow_circlepath,
+                                color: AppColors.primary,
+                                size: 70,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 24),
-                      // Uygulama adı
-                      const Text(
-                        'TatarAI',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontFamily: 'sfpro',
-                          fontSize: 36,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primary,
+                        const SizedBox(height: 24),
+                        // Uygulama adı
+                        const Text(
+                          'TatarAI',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: 'sfpro',
+                            fontSize: 36,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Yapay Zeka ile Tarım Asistanı',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontFamily: 'sfpro',
-                          fontSize: 16,
-                          color: CupertinoColors.systemGrey,
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Yapay Zeka ile Tarım Asistanı',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: 'sfpro',
+                            fontSize: 16,
+                            color: CupertinoColors.systemGrey,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 48),
+                        const SizedBox(height: 48),
 
-                      // Sadece yükleniyor göstergesi
-                      const CupertinoActivityIndicator(),
-                    ],
+                        // Sadece yükleniyor göstergesi
+                        const CupertinoActivityIndicator(),
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
         ),
       ),

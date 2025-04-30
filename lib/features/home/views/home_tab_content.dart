@@ -15,6 +15,8 @@ import 'package:tatarai/features/plant_analysis/views/analysis_result_screen.dar
 import 'package:tatarai/features/plant_analysis/views/all_analyses_screen.dart';
 import 'package:tatarai/core/theme/dimensions.dart';
 import 'package:sprung/sprung.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:io';
 
 /// Ana ekran tab içeriği - Modern tasarım, hızlı erişim seçenekleri ve bitki analiz geçmişi
 class HomeTabContent extends StatefulWidget {
@@ -509,25 +511,43 @@ class _HomeTabContentState extends State<HomeTabContent>
         ),
         child: Row(
           children: [
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: analysis.diseases.isEmpty
-                    ? AppColors.primary.withOpacity(0.1)
-                    : CupertinoColors.systemRed.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(context.dimensions.radiusS),
+            // Analiz fotoğrafı
+            if (analysis.imageUrl.isNotEmpty)
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  borderRadius:
+                      BorderRadius.circular(context.dimensions.radiusS),
+                  border: Border.all(
+                    color: CupertinoColors.systemGrey5,
+                    width: 1,
+                  ),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: _buildAnalysisImage(analysis.imageUrl),
+              )
+            else
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: analysis.diseases.isEmpty
+                      ? AppColors.primary.withOpacity(0.1)
+                      : CupertinoColors.systemRed.withOpacity(0.1),
+                  borderRadius:
+                      BorderRadius.circular(context.dimensions.radiusS),
+                ),
+                child: Icon(
+                  analysis.diseases.isEmpty
+                      ? CupertinoIcons.leaf_arrow_circlepath
+                      : CupertinoIcons.exclamationmark_circle,
+                  size: 24,
+                  color: analysis.diseases.isEmpty
+                      ? AppColors.primary
+                      : CupertinoColors.systemRed,
+                ),
               ),
-              child: Icon(
-                analysis.diseases.isEmpty
-                    ? CupertinoIcons.leaf_arrow_circlepath
-                    : CupertinoIcons.exclamationmark_circle,
-                size: 24,
-                color: analysis.diseases.isEmpty
-                    ? AppColors.primary
-                    : CupertinoColors.systemRed,
-              ),
-            ),
             SizedBox(width: context.dimensions.spaceM),
             Expanded(
               child: Column(
@@ -580,5 +600,90 @@ class _HomeTabContentState extends State<HomeTabContent>
         ),
       ),
     );
+  }
+
+  // Analiz fotoğrafı için image widget'ı
+  Widget _buildAnalysisImage(String imageUrl) {
+    // Base64 ile kodlanmış bir görüntü ise
+    if (imageUrl.startsWith('data:image')) {
+      try {
+        // Base64 veriyi ayır
+        final dataUri = Uri.parse(imageUrl);
+        final mimeType = dataUri.pathSegments.first.split(':').last;
+        final data = dataUri.data!.contentAsBytes();
+        // Decode ederek kullan
+        return Image.memory(
+          data,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            AppLogger.e('Base64 görüntü hatası: $error', error, stackTrace);
+            return const Icon(
+              CupertinoIcons.photo,
+              size: 24,
+              color: CupertinoColors.systemGrey,
+            );
+          },
+        );
+      } catch (e) {
+        AppLogger.e('Base64 görüntü hatası', e);
+        return const Icon(
+          CupertinoIcons.photo,
+          size: 24,
+          color: CupertinoColors.systemGrey,
+        );
+      }
+    }
+    // Dosya yolu ise
+    else if (imageUrl.startsWith('file://')) {
+      try {
+        // file:// önekini kaldır
+        final filePath = imageUrl.replaceFirst('file://', '');
+        // Dosyadan yükle
+        return Image.file(
+          File(filePath),
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            AppLogger.e('Dosya görüntü hatası: $error', error, stackTrace);
+            return const Icon(
+              CupertinoIcons.photo,
+              size: 24,
+              color: CupertinoColors.systemGrey,
+            );
+          },
+        );
+      } catch (e) {
+        AppLogger.e('Dosya görüntü hatası', e);
+        return const Icon(
+          CupertinoIcons.photo,
+          size: 24,
+          color: CupertinoColors.systemGrey,
+        );
+      }
+    }
+    // Normal URL ise ağdan yükle
+    else {
+      return Image.network(
+        imageUrl,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) {
+            return child;
+          }
+          return const Center(
+            child: CupertinoActivityIndicator(
+              radius: 10,
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          AppLogger.e('Network görüntü hatası: $error', error, stackTrace);
+          return const Icon(
+            CupertinoIcons.photo,
+            size: 24,
+            color: CupertinoColors.systemGrey,
+          );
+        },
+      );
+    }
   }
 }
