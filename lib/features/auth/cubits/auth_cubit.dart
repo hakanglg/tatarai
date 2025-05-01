@@ -348,9 +348,9 @@ class AuthCubit extends BaseCubit<AuthState> {
       _startLoading();
       logInfo('Giriş yapılıyor: $email');
 
-      // Timeout ekle - 30 saniye sonra işlem tamamlanmazsa hata dön
+      // Timeout ekle - 60 saniye sonra işlem tamamlanmazsa hata dön
       Timer? timeoutTimer;
-      timeoutTimer = Timer(const Duration(seconds: 30), () {
+      timeoutTimer = Timer(const Duration(seconds: 60), () {
         if (state.isLoading) {
           handleError(
               'Giriş timeout',
@@ -372,6 +372,14 @@ class AuthCubit extends BaseCubit<AuthState> {
 
       while (retryCount < 3 && userModel == null) {
         try {
+          // İşlem mesajını güncelle
+          emit(state.copyWith(
+            pendingOperationMessage: retryCount > 0
+                ? 'Giriş yapılıyor (${retryCount + 1}/3)...'
+                : 'Giriş yapılıyor...',
+            isLoading: true,
+          ));
+
           logInfo('Giriş denemesi ${retryCount + 1}/3');
 
           userModel = await _userRepository.signInWithEmailAndPassword(
@@ -399,91 +407,67 @@ class AuthCubit extends BaseCubit<AuthState> {
               startEmailVerificationCheck();
             }
 
-            // Bekleyen giriş işaretini temizle
+            // Başarılı giriş sonrası işlemler...
             _hasPendingSignIn = false;
-
-            return; // Başarılı ise fonksiyondan çık
+            return;
           }
         } catch (e) {
           lastException = e is Exception ? e : Exception(e.toString());
-          handleError('Giriş denemesi başarısız', e);
+          logWarning('Giriş denemesi ${retryCount + 1} başarısız: $e');
 
-          if (_isNetworkError(e) && retryCount < 2) {
-            // Servis geçici olarak kullanılamıyor, yeniden dene
-            logInfo(
-                'Firebase servisine bağlantı hatası, yeniden deneme ${retryCount + 1}/3');
+          // Ağ hatası veya zaman aşımı hatası ise yeniden deneme
+          if (_isNetworkError(e)) {
             retryCount++;
 
-            // Exponential backoff: her denemede artan bekleme süresi
-            final backoffDelay = (retryCount * 2) * 1000; // ms cinsinden
-            logInfo('$backoffDelay ms bekliyor...');
-            await Future.delayed(Duration(milliseconds: backoffDelay));
-            continue;
+            if (retryCount < 3) {
+              // Üstel geri çekilme stratejisi (exponential backoff)
+              final backoffMs = 1000 * (1 << (retryCount - 1)); // 1s, 2s, 4s
+              logInfo(
+                  'Ağ hatası nedeniyle ${backoffMs}ms sonra tekrar deneniyor');
+
+              // Bekleyen işlem mesajını güncelle
+              emit(state.copyWith(
+                pendingOperationMessage:
+                    'Bağlantı hatası nedeniyle ${backoffMs ~/ 1000} saniye sonra tekrar denenecek...',
+                isLoading: true,
+              ));
+
+              await Future.delayed(Duration(milliseconds: backoffMs));
+            }
           } else {
-            // Maksimum deneme sayısına ulaşıldı veya başka bir hata
-            timeoutTimer.cancel(); // Timeout'u iptal et
-            handleError('Giriş başarısız', e);
-
-            // Ağ hatası ise bekleyen giriş işaretle
-            if (_isNetworkError(e)) {
-              _hasPendingSignIn = true;
-            }
-
-            // Hata mesajını UI'da göster
-            String errorMessage;
-            if (_isNetworkError(e)) {
-              errorMessage =
-                  'Bağlantı sorunu nedeniyle giriş yapılamadı. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.';
-            } else if (e.toString().contains('user-not-found') ||
-                e.toString().contains('wrong-password')) {
-              errorMessage =
-                  'E-posta veya şifre hatalı. Lütfen bilgilerinizi kontrol edip tekrar deneyin.';
-            } else {
-              errorMessage = e.toString();
-            }
-
-            emit(state.copyWith(
-              status: AuthStatus.unauthenticated,
-              isLoading: false,
-              errorMessage: errorMessage,
-              // Hata durumunda tekrar deneme butonu göstermek için
-              showRetryButton: _isNetworkError(e),
-            ));
+            // Ağ hatası değilse (kimlik bilgileri hatası vb.), tekrar denemeyi durdur
+            timeoutTimer.cancel();
+            _handleError('Giriş', e);
             return;
           }
         }
       }
 
-      // Tüm yeniden denemeler başarısız oldu
+      // Tüm denemeler tamamlandı ama hala başarısız
       if (userModel == null) {
-        timeoutTimer.cancel(); // Timeout'u iptal et
-        handleError('Giriş başarısız',
-            lastException ?? Exception('Tüm denemeler başarısız oldu'));
+        timeoutTimer.cancel();
+        final errorMessage =
+            lastException?.toString() ?? 'Bilinmeyen bir hata oluştu';
 
-        // Ağ hatası ise bekleyen giriş işaretle
         if (lastException != null && _isNetworkError(lastException)) {
-          _hasPendingSignIn = true;
-        }
-
-        String errorMessage;
-        if (lastException != null && _isNetworkError(lastException)) {
-          errorMessage =
-              'Bağlantı sorunu nedeniyle giriş yapılamadı. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.';
+          _handleError(
+              'Giriş',
+              Exception(
+                  'İnternet bağlantısı sorunu nedeniyle giriş yapılamadı. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.'));
         } else {
-          errorMessage = lastException?.toString() ??
-              'Giriş yapılamadı, lütfen bilgilerinizi kontrol edin.';
+          _handleError(
+              'Giriş',
+              lastException ??
+                  Exception('Giriş yapılamadı, lütfen tekrar deneyin.'));
         }
-
-        emit(state.copyWith(
-          status: AuthStatus.unauthenticated,
-          isLoading: false,
-          errorMessage: errorMessage,
-          showRetryButton:
-              lastException != null && _isNetworkError(lastException),
-        ));
       }
-    } catch (e) {
-      _handleError('Giriş yapma', e);
+    } catch (e, stack) {
+      handleError('Giriş işlemi', e, stack);
+      emit(state.copyWith(
+        status: AuthStatus.unauthenticated,
+        isLoading: false,
+        errorMessage: 'Giriş işlemi sırasında bir hata oluştu: ${e.toString()}',
+      ));
     }
   }
 

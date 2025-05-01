@@ -4,8 +4,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 
 /// Firebase servislerini merkezi olarak yöneten sınıf
 /// Singleton pattern kullanılarak oluşturulmuştur
@@ -247,18 +249,29 @@ class FirebaseManager {
   /// Firestore çevrimdışı kalıcılığını etkinleştirir
   Future<void> enablePersistence() async {
     try {
-      await FirebaseFirestore.instance.enablePersistence(
-        const PersistenceSettings(
-          synchronizeTabs: true,
-        ),
-      );
-      AppLogger.i('Firestore çevrimdışı kalıcılık etkinleştirildi');
+      // enablePersistence() sadece Web platformu için geçerli
+      // Mobil platformlar için Settings.persistenceEnabled kullanılmalı
+      if (kIsWeb) {
+        await FirebaseFirestore.instance.enablePersistence(
+          const PersistenceSettings(
+            synchronizeTabs: true,
+          ),
+        );
+        AppLogger.i('Firestore çevrimdışı kalıcılık etkinleştirildi (web)');
+      } else {
+        // Mobil platformlar için Settings kullanarak kalıcılık etkinleştir
+        FirebaseFirestore.instance.settings = const Settings(
+          persistenceEnabled: true,
+          cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+        );
+        AppLogger.i('Firestore çevrimdışı kalıcılık etkinleştirildi (mobil)');
+      }
     } catch (e) {
       if (e.toString().contains('already enabled')) {
         AppLogger.i('Firestore çevrimdışı kalıcılık zaten etkin');
       } else {
         AppLogger.w('Çevrimdışı kalıcılık etkinleştirilemedi: $e');
-        rethrow;
+        // Hata olsa bile devam et
       }
     }
   }
@@ -376,80 +389,36 @@ class FirebaseManager {
   /// Firebase bağlantısını test eder
   Future<void> _testFirebaseConnection() async {
     try {
-      // Önce network bağlantısı olup olmadığını kontrol et
+      AppLogger.i('Firebase bağlantısı test ediliyor...');
+
+      // Daha uzun bir timeout süresi (10 saniye yerine 20 saniye)
+      const timeout = Duration(seconds: 20);
+
       try {
-        var connectivityResult = await Connectivity().checkConnectivity();
-        bool hasConnection = false;
-
-        // Uyumluluk için kontrol ediyoruz
-        hasConnection = connectivityResult
-            .any((result) => result != ConnectivityResult.none);
-
-        if (!hasConnection) {
-          AppLogger.w(
-              'Network bağlantısı yok, Firestore offline modda çalışacak');
-          _isFirestoreConnected = false;
-          return;
-        }
-        AppLogger.i(
-            'Network bağlantısı mevcut, Firestore bağlantı testi yapılıyor...');
-        AppLogger.i('Firestore Database ID: tatarai');
-      } catch (e) {
-        AppLogger.w('Connectivity kontrolü hatası, işleme devam ediliyor', e);
-        // Connectivity hatası olsa bile devam et
-      }
-
-      // Önce Firebase Auth bağlantısını test et
-      try {
-        await Future.delayed(const Duration(milliseconds: 500));
-        _auth.tenantId;
-        AppLogger.i('Firebase Auth bağlantı testi başarılı');
-      } catch (e) {
-        AppLogger.w('Firebase Auth bağlantı testi başarısız', e);
-        // Auth bağlantısı başarısız olsa bile, Firestore'u kontrol edelim
-      }
-
-      // Sonra Firestore bağlantısını test et - timeout ile
-      try {
-        AppLogger.i('Firestore bağlantısı test ediliyor...');
-        AppLogger.i(
-            'Firestore yapılandırması: ${_firestore?.settings.toString() ?? "null"}');
-        AppLogger.i('Firestore host: ${_firestore?.settings.host ?? "null"}');
-
+        // Basit bir Firestore sorgusu yaparak bağlantıyı test et
         await _timeoutFuture(
           _firestore!
-              .collection('test')
-              .limit(1)
+              .collection('system')
+              .doc('status')
               .get(const GetOptions(source: Source.server)),
-          const Duration(seconds: 10),
-          'Firestore connection timeout',
+          timeout,
+          'Firestore bağlantı testi zaman aşımına uğradı',
         );
 
-        // Bağlantı başarılı
         _isFirestoreConnected = true;
-        _retryCount = 0;
-        AppLogger.i('Firebase bağlantı testi başarılı');
+        AppLogger.i('Firestore bağlantı testi başarılı');
       } catch (e) {
-        _isFirestoreConnected = false;
-        AppLogger.e('Firestore bağlantı testi başarısız', e);
+        AppLogger.w('Firestore bağlantı testi başarısız: $e');
 
-        // Daha fazla hata ayıklama bilgisi
-        AppLogger.e('Firestore bağlantı hatası detayları:', {
-          'hata_tipi': e.runtimeType.toString(),
-          'firestore_null': _firestore == null,
-          'database_id': 'tatarai',
-          'hata_mesajı': e.toString(),
-        });
-
-        // Network hatası olup olmadığını kontrol et
-        if (e is SocketException ||
-            e is TimeoutException ||
-            e.toString().contains('network') ||
-            e.toString().contains('unavailable')) {
-          AppLogger.w('Network kaynaklı bağlantı hatası tespit edildi');
-        }
-
-        rethrow;
+        // Analytics için hata kaydı
+        FirebaseCrashlytics.instance.recordError(e, StackTrace.current,
+            reason: 'Firestore bağlantı testi hatası',
+            information: [
+              'database_id',
+              'tatarai',
+              'hata_mesajı',
+              e.toString(),
+            ]);
       }
     } catch (e, stackTrace) {
       _isFirestoreConnected = false;
@@ -464,9 +433,13 @@ class FirebaseManager {
     Duration timeout,
     String timeoutMessage,
   ) {
+    // Daha uzun bir timeout süresi sağla
     return future.timeout(
       timeout,
-      onTimeout: () => throw TimeoutException(timeoutMessage),
+      onTimeout: () {
+        AppLogger.w('İşlem zaman aşımına uğradı: $timeoutMessage');
+        throw TimeoutException(timeoutMessage);
+      },
     );
   }
 

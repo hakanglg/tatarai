@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -62,6 +63,21 @@ Future<void> main() async {
           options: DefaultFirebaseOptions.currentPlatform,
         );
         AppLogger.i('Firebase Core başarıyla başlatıldı');
+
+        // Crashlytics'i başlat
+        await FirebaseCrashlytics.instance
+            .setCrashlyticsCollectionEnabled(!kDebugMode);
+
+        // Yakalanmayan Flutter hatalarını Crashlytics'e yönlendir
+        FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterError;
+
+        // Async hataları için Firebase Crashlytics entegrasyonu
+        PlatformDispatcher.instance.onError = (error, stack) {
+          FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+          return true;
+        };
+
+        AppLogger.i('Crashlytics başarıyla yapılandırıldı');
 
         // Firebase testlerini çalıştır
         try {
@@ -154,6 +170,15 @@ Future<void> main() async {
     runApp(TatarAI(firebaseInitialized: firebaseInitialized));
   }, (error, stack) {
     AppLogger.e('Yakalanmamış hata', error, stack);
+
+    // Crashlytics'e yakalanmamış hataları bildir
+    try {
+      FirebaseCrashlytics.instance.recordError(error, stack,
+          reason: 'Yakalanmamış uygulama hatası', fatal: true);
+    } catch (e) {
+      // Firebase başlatılamamış olabilir, sessizce geç
+      AppLogger.e('Crashlytics\'e hata bildirilemedi', e);
+    }
   });
 }
 

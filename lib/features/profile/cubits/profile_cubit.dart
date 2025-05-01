@@ -65,6 +65,7 @@ class ProfileCubit extends Cubit<ProfileState> {
   final UserRepository _userRepository;
   final AuthCubit? _authCubit;
   StreamSubscription<UserModel?>? _userSubscription;
+  StreamSubscription<User?>? _authStateSubscription;
 
   ProfileCubit({
     required UserRepository userRepository,
@@ -82,6 +83,9 @@ class ProfileCubit extends Cubit<ProfileState> {
 
       // Kullanıcıyı dinleme
       _listenUserChanges();
+
+      // Auth durumunu dinle
+      _listenAuthState();
     } catch (e) {
       AppLogger.e('ProfileCubit başlatma hatası', e);
     }
@@ -235,13 +239,71 @@ class ProfileCubit extends Cubit<ProfileState> {
     emit(state.copyWith(isImageUploading: isUploading));
   }
 
+  /// Firebase Auth durumunu dinler
+  void _listenAuthState() {
+    try {
+      _authStateSubscription?.cancel();
+      _authStateSubscription =
+          FirebaseAuth.instance.authStateChanges().listen((user) {
+        if (user != null && user.emailVerified) {
+          // Eğer email doğrulanmışsa Firestore'daki kullanıcı verisini güncelle
+          _updateEmailVerificationInFirestore(user.uid);
+        }
+      });
+      AppLogger.i('Auth state dinleyicisi başlatıldı');
+    } catch (e) {
+      AppLogger.e('Auth state dinleyicisi başlatma hatası', e);
+    }
+  }
+
+  /// Firestore'daki kullanıcı verisini güncelleyerek e-posta doğrulama durumunu senkronize eder
+  Future<void> _updateEmailVerificationInFirestore(String userId) async {
+    try {
+      // Önce Firestore'dan güncel kullanıcı verisini al
+      final userModel = await _userRepository.fetchFreshUserData(userId);
+
+      // Kullanıcı modeli varsa ve e-posta doğrulanmamış olarak kaydedilmişse
+      if (userModel != null && !userModel.isEmailVerified) {
+        // Modeli güncelle
+        final updatedModel = userModel.copyWith(isEmailVerified: true);
+
+        // Firestore'a kaydet
+        await _userRepository.updateUserData(updatedModel);
+
+        // State'i güncelle
+        emit(state.copyWith(user: updatedModel));
+
+        AppLogger.i(
+            'E-posta doğrulama durumu Firestore\'da güncellendi: $userId');
+      }
+    } catch (e) {
+      AppLogger.e('Firestore e-posta doğrulama güncelleme hatası', e);
+    }
+  }
+
   /// Email doğrulama durumunu günceller
-  Future<void> refreshEmailVerificationStatus() async {
+  Future<bool> refreshEmailVerificationStatus() async {
     try {
       emit(state.copyWith(isLoading: true, errorMessage: null));
 
+      // Firebase Auth kullanıcısını yenile
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      if (firebaseUser != null) {
+        // Kullanıcıyı yeniden yükle (serverdan güncelle)
+        await firebaseUser.reload();
+
+        // Yenilenmiş kullanıcıyı al
+        final freshUser = FirebaseAuth.instance.currentUser;
+
+        if (freshUser != null && freshUser.emailVerified) {
+          // Eğer e-posta doğrulanmışsa Firestore'daki veriyi güncelle
+          await _updateEmailVerificationInFirestore(freshUser.uid);
+        }
+      }
+
+      // Güncel kullanıcı verisini Firestore'dan al
       final updatedUser =
-          await _userRepository.refreshEmailVerificationStatus();
+          await _userRepository.fetchFreshUserData(state.user?.id ?? '');
 
       if (updatedUser != null) {
         emit(state.copyWith(
@@ -249,17 +311,22 @@ class ProfileCubit extends Cubit<ProfileState> {
           isLoading: false,
         ));
         AppLogger.i(
-            'Profil: Email doğrulama durumu güncellendi: ${updatedUser.isEmailVerified}');
+            'E-posta doğrulama durumu güncellendi: ${updatedUser.isEmailVerified}');
       } else {
         emit(state.copyWith(isLoading: false));
-        AppLogger.w('Profil: Email doğrulama durumu güncellenemedi');
+        AppLogger.w(
+            'E-posta doğrulama durumu güncellenemedi: Kullanıcı bulunamadı');
       }
+
+      return updatedUser?.isEmailVerified ?? false;
     } catch (e) {
-      AppLogger.e('Profil: Email doğrulama durumu güncelleme hatası', e);
+      AppLogger.e('E-posta doğrulama kontrolü hatası', e);
       emit(state.copyWith(
         isLoading: false,
-        errorMessage: 'Email doğrulama durumu güncellenirken bir hata oluştu',
+        errorMessage:
+            'E-posta doğrulama durumu kontrol edilirken bir hata oluştu',
       ));
+      return false;
     }
   }
 
@@ -366,6 +433,7 @@ class ProfileCubit extends Cubit<ProfileState> {
   @override
   Future<void> close() {
     _userSubscription?.cancel();
+    _authStateSubscription?.cancel();
     return super.close();
   }
 }

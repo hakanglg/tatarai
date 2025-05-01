@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:logger/logger.dart';
@@ -311,83 +312,55 @@ class AuthService extends BaseService {
     return _withRetry(() async {
       try {
         _logger.i('E-posta ile giriş başlatılıyor: $email');
+        Stopwatch stopwatch = Stopwatch()..start();
+
+        // Önce token yenileme işlemini kaldıralım - bu işlem çok zaman alabilir
+        // ve giriş sırasında gerekli değil, giriş sonrası arka planda yapılabilir
+        // await _renewFirebaseToken();
 
         // Firebase Auth doğrulaması başlatılıyor
         _logger.d('Firebase Auth doğrulaması yapılıyor...');
 
-        // Önce token yenileme işlemini gerçekleştir
-        await _renewFirebaseToken();
-
-        final userCredential = await _firebaseAuth.signInWithEmailAndPassword(
-          email: email,
-          password: password,
-        );
+        // Timeout ekleyerek giriş işlemini sınırlayalım
+        final userCredential = await _firebaseAuth
+            .signInWithEmailAndPassword(
+              email: email,
+              password: password,
+            )
+            .timeout(
+              const Duration(seconds: 15),
+              onTimeout: () =>
+                  throw TimeoutException('Giriş işlemi zaman aşımına uğradı'),
+            );
 
         final user = userCredential.user!;
         _logger
             .i('Firebase Auth doğrulaması başarılı, kullanıcı ID: ${user.uid}');
 
-        // Firestore'dan kullanıcı bilgilerini al
-        _logger.d('Firestore\'dan kullanıcı verisi alınıyor...');
-        UserModel userModel;
+        // Temel kullanıcı modeli oluştur - Firestore verisi olmadan hızlıca dönüş yapmak için
+        final basicUserModel = UserModel.fromFirebaseUser(user);
 
-        try {
-          userModel = await getUserFromFirestore(user.uid);
-          _logger.i('Firestore\'dan kullanıcı verisi alındı');
-        } catch (firestoreError) {
-          _logger.w('Firestore\'dan kullanıcı alınamadı: $firestoreError');
-          _logger.i('Temel kullanıcı modeli oluşturuluyor...');
+        // Firestore'dan kullanıcı bilgilerini arka planda getir
+        _logger.d('Firestore\'dan kullanıcı verisi arka planda alınacak...');
 
-          // Eğer Firestore'dan veri alınamazsa, temel bir kullanıcı modeli oluştur
-          userModel = UserModel.fromFirebaseUser(user);
+        // Token yenileme işlemini arka planda gerçekleştir
+        unawaited(_renewFirebaseTokenInBackground());
 
-          // Firestore'a temel modeli kaydetmeyi dene
-          try {
-            await saveUserToFirestore(userModel);
-            _logger.i('Temel kullanıcı modeli Firestore\'a kaydedildi');
-          } catch (saveError) {
-            _logger
-                .e('Kullanıcı modeli Firestore\'a kaydedilemedi: $saveError');
+        // Giriş zamanını güncelle - arka planda
+        unawaited(_updateLoginTimestamp(basicUserModel));
 
-            // Kayıt hatası durumunda bekleyen işlemlere ekle
-            _addPendingOperation(
-              _PendingOperation(
-                type: 'SAVE_USER',
-                execute: () => saveUserToFirestore(userModel),
-                timestamp: DateTime.now(),
-              ),
-            );
-          }
-        }
+        stopwatch.stop();
+        _logger.i(
+            'Giriş işlemi tamamlandı: ${user.uid}, süre: ${stopwatch.elapsedMilliseconds}ms');
 
-        // Giriş zamanını güncelle
-        final updatedModel = userModel.copyWith(
-          lastLoginAt: DateTime.now(),
-        );
-
-        // Firestore'a güncelleme yap
-        try {
-          _logger.d('Kullanıcı giriş tarihi güncelleniyor...');
-          await saveUserToFirestore(updatedModel);
-          _logger.i('Kullanıcı giriş tarihi güncellendi');
-        } catch (updateError) {
-          _logger.w('Giriş tarihi güncellenemedi: $updateError');
-
-          // Güncelleme hatası durumunda bekleyen işlemlere ekle
-          _addPendingOperation(
-            _PendingOperation(
-              type: 'UPDATE_USER',
-              execute: () => saveUserToFirestore(updatedModel),
-              timestamp: DateTime.now(),
-            ),
-          );
-        }
-
-        _logger.i('Giriş işlemi tamamlandı: ${user.uid}');
-        return updatedModel;
+        return basicUserModel;
       } on firebase_auth.FirebaseAuthException catch (e) {
         _logger.w('Giriş hatası: ${e.code}, Mesaj: ${e.message}');
         throw _handleAuthException(e);
+      } on TimeoutException catch (e) {
+        _logger.e('Giriş zaman aşımı: $e');
+        throw Exception(
+            'Giriş işlemi zaman aşımına uğradı. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.');
       } catch (e) {
         _logger.e('Beklenmeyen giriş hatası: $e');
         throw Exception(
@@ -396,17 +369,39 @@ class AuthService extends BaseService {
     }, 'Kullanıcı girişi');
   }
 
-  /// Firebase token'ını yeniler
-  Future<void> _renewFirebaseToken() async {
+  /// Token yenileme işlemini arka planda gerçekleştirir
+  Future<void> _renewFirebaseTokenInBackground() async {
     try {
-      final currentUser = _firebaseAuth.currentUser;
-      if (currentUser != null) {
-        await currentUser.getIdToken(true);
-        _logger.i('Firebase token yenilendi, userId: ${currentUser.uid}');
-      }
+      await _renewFirebaseToken();
+      _logger.i('Firebase token arka planda yenilendi');
     } catch (e) {
-      _logger.w('Token yenilenirken hata oluştu: $e');
-      // Hata olsa bile devam et
+      _logger.w('Arka planda token yenileme hatası: $e');
+      // Hata olsa bile sessizce devam et
+    }
+  }
+
+  /// Giriş zamanını arka planda günceller
+  Future<void> _updateLoginTimestamp(UserModel userModel) async {
+    try {
+      // Firestore'a güncelleme yap
+      final updatedModel = userModel.copyWith(
+        lastLoginAt: DateTime.now(),
+      );
+
+      await saveUserToFirestore(updatedModel);
+      _logger.i('Kullanıcı giriş tarihi arka planda güncellendi');
+    } catch (e) {
+      _logger.w('Giriş tarihi güncellenemedi: $e');
+
+      // Güncelleme hatası durumunda bekleyen işlemlere ekle
+      _addPendingOperation(
+        _PendingOperation(
+          type: 'UPDATE_LOGIN_TIMESTAMP',
+          execute: () => saveUserToFirestore(
+              userModel.copyWith(lastLoginAt: DateTime.now())),
+          timestamp: DateTime.now(),
+        ),
+      );
     }
   }
 
@@ -462,25 +457,55 @@ class AuthService extends BaseService {
   Future<bool> checkEmailVerification() async {
     try {
       final user = _firebaseAuth.currentUser;
-      await user?.reload(); // Kullanıcı bilgilerini yenile
 
-      if (user != null && user.emailVerified) {
-        _logger.i('E-posta doğrulandı: ${user.email}');
+      if (user == null) {
+        _logger.w('E-posta doğrulama kontrolü: Kullanıcı oturum açmamış');
+        return false;
+      }
+
+      // Önce kullanıcıyı sunucudan yenile
+      try {
+        await user.reload();
+        _logger.i('Kullanıcı bilgileri sunucudan yenilendi');
+      } catch (e) {
+        _logger.w('Kullanıcı bilgileri yenilenirken hata: $e');
+        // Hata olsa bile devam et, mevcut durumu kullan
+      }
+
+      // Yenilenen kullanıcıyı al
+      final freshUser = _firebaseAuth.currentUser;
+      if (freshUser == null) {
+        _logger.w('Kullanıcı bilgileri yenilendikten sonra null');
+        return false;
+      }
+
+      if (freshUser.emailVerified) {
+        _logger.i('E-posta doğrulandı: ${freshUser.email}');
 
         // Firestore'daki kullanıcı bilgilerini güncelle
         try {
-          final userModel = await getUserFromFirestore(user.uid);
-          final updatedModel = userModel.copyWith(isEmailVerified: true);
-          await saveUserToFirestore(updatedModel);
+          final userModel = await getUserFromFirestore(freshUser.uid);
+
+          // Eğer Firestore'daki veri güncel değilse güncelle
+          if (!userModel.isEmailVerified) {
+            final updatedModel = userModel.copyWith(isEmailVerified: true);
+            await saveUserToFirestore(updatedModel);
+            _logger.i(
+                'Kullanıcı e-posta doğrulama durumu Firestore\'da güncellendi');
+          } else {
+            _logger.i('Kullanıcı e-posta doğrulama durumu zaten güncel');
+          }
         } catch (e) {
           _logger.w('Kullanıcı e-posta doğrulama durumu güncellenemedi: $e');
 
           // Ağ bağlantısı hatasıysa bekleyen işlemlere ekle
           if (_isNetworkRelatedError(e)) {
-            final currentUser = _firebaseAuth.currentUser;
-            if (currentUser != null) {
-              try {
-                final userModel = await getUserFromFirestore(user.uid);
+            try {
+              // Önce kullanıcı verisini almayı dene
+              final userModel = await getUserFromFirestore(freshUser.uid);
+
+              // Veri varsa ve güncellenmesi gerekiyorsa bekleyen işlemlere ekle
+              if (!userModel.isEmailVerified) {
                 final updatedModel = userModel.copyWith(isEmailVerified: true);
 
                 _addPendingOperation(
@@ -490,9 +515,11 @@ class AuthService extends BaseService {
                     timestamp: DateTime.now(),
                   ),
                 );
-              } catch (innerError) {
-                _logger.e('Bekleyen işlem oluşturma hatası: $innerError');
+                _logger.i(
+                    'E-posta doğrulama durumu güncelleme işlemi kuyruğa eklendi');
               }
+            } catch (innerError) {
+              _logger.e('Bekleyen işlem oluşturma hatası: $innerError');
             }
           }
         }
@@ -503,7 +530,7 @@ class AuthService extends BaseService {
         return false;
       }
     } catch (e) {
-      _logger.e('E-posta doğrulama hatası: $e');
+      _logger.e('E-posta doğrulama kontrolü hatası: $e');
       return false;
     }
   }
@@ -812,6 +839,20 @@ class AuthService extends BaseService {
   void dispose() {
     _connectivitySubscription?.cancel();
     _pendingOperationsTimer?.cancel();
+  }
+
+  /// Firebase token'ını yeniler
+  Future<void> _renewFirebaseToken() async {
+    try {
+      final currentUser = _firebaseAuth.currentUser;
+      if (currentUser != null) {
+        await currentUser.getIdToken(true);
+        _logger.i('Firebase token yenilendi, userId: ${currentUser.uid}');
+      }
+    } catch (e) {
+      _logger.w('Token yenilenirken hata oluştu: $e');
+      // Hata olsa bile devam et
+    }
   }
 }
 

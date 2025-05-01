@@ -21,6 +21,9 @@ import 'package:tatarai/features/payment/views/premium_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:tatarai/features/profile/cubits/profile_cubit.dart';
 import 'package:sprung/sprung.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:app_settings/app_settings.dart';
 
 /// Kullanıcı profil bilgilerini gösteren ve düzenleyen ekran
 /// Apple Human Interface Guidelines'a uygun modern tasarım
@@ -1119,6 +1122,52 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   void _showVerificationDialog(BuildContext context) {
+    // Doğrulama e-postası gönderildiğini göster
+    _showVerificationEmailSentDialog(context);
+  }
+
+  void _checkEmailVerification(BuildContext context) {
+    final profileCubit = context.read<ProfileCubit>();
+
+    // Yükleniyor dialog göster
+    showCupertinoDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const CupertinoAlertDialog(
+        title: Center(
+          child: CupertinoActivityIndicator(),
+        ),
+        content: Padding(
+          padding: EdgeInsets.symmetric(vertical: 12.0),
+          child: Text(
+            'E-posta doğrulama durumu kontrol ediliyor...',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ),
+    );
+
+    // E-posta doğrulama durumunu kontrol et
+    profileCubit.refreshEmailVerificationStatus().then((isVerified) {
+      // Dialog'u kapat
+      Navigator.of(context).pop();
+
+      if (isVerified) {
+        // Doğrulandıysa başarı mesajı göster
+        _showSuccessDialog(context);
+      } else {
+        // Doğrulanmadıysa bilgi mesajı göster
+        _showNotVerifiedDialog(context);
+      }
+    }).catchError((error) {
+      // Dialog'u kapat ve hata mesajı göster
+      Navigator.of(context).pop();
+      _showErrorDialog(context, error.toString());
+    });
+  }
+
+  // Doğrulama başarılı mesajı
+  void _showSuccessDialog(BuildContext context) {
     showCupertinoDialog(
       context: context,
       builder: (context) => CupertinoAlertDialog(
@@ -1126,72 +1175,165 @@ class _ProfileScreenState extends State<ProfileScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              CupertinoIcons.mail,
+              CupertinoIcons.checkmark_circle_fill,
+              color: CupertinoColors.systemGreen,
+              size: 20,
+            ),
+            SizedBox(width: 8),
+            Text('E-posta Doğrulandı'),
+          ],
+        ),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 8.0),
+          child: Text(
+            'E-posta adresiniz başarıyla doğrulandı. Artık tüm özellikleri kullanabilirsiniz.',
+            style: TextStyle(fontSize: 14),
+            textAlign: TextAlign.center,
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            child: Text('Tamam'),
+            onPressed: () {
+              Navigator.of(context).pop();
+              // State'i yenile
+              context.read<ProfileCubit>().refreshUserData();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Doğrulama başarısız mesajı
+  void _showNotVerifiedDialog(BuildContext context) {
+    showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              CupertinoIcons.exclamationmark_circle_fill,
+              color: CupertinoColors.systemYellow,
+              size: 20,
+            ),
+            SizedBox(width: 8),
+            Text('Doğrulanmadı'),
+          ],
+        ),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 8.0),
+          child: Text(
+            'E-posta adresiniz henüz doğrulanmadı. Lütfen e-postanızdaki doğrulama bağlantısına tıklayın.',
+            style: TextStyle(fontSize: 14),
+            textAlign: TextAlign.center,
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            child: Text('Tamam'),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            child: Text('Yeniden Gönder'),
+            onPressed: () {
+              Navigator.of(context).pop();
+              // Yeni doğrulama e-postası gönder
+              context.read<ProfileCubit>().sendEmailVerification();
+              _showVerificationEmailSentDialog(context);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Doğrulama e-postası gönderildi mesajı
+  void _showVerificationEmailSentDialog(BuildContext context) {
+    showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              CupertinoIcons.mail_solid,
               color: CupertinoColors.activeBlue,
               size: 20,
             ),
             SizedBox(width: 8),
-            Text('Doğrulama E-postası'),
+            Text('E-posta Gönderildi'),
           ],
         ),
-        content: Column(
-          children: [
-            SizedBox(height: 8),
-            Text(
-              'E-posta adresinize bir doğrulama bağlantısı gönderdik.',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w400,
+        content: Padding(
+          padding: const EdgeInsets.only(top: 8.0),
+          child: Column(
+            children: [
+              Text(
+                'E-posta adresinize doğrulama bağlantısı gönderildi.',
+                style: TextStyle(fontSize: 14),
+                textAlign: TextAlign.center,
               ),
-            ),
-            SizedBox(height: 4),
-            Text(
-              'Lütfen e-postanızı kontrol edin ve bağlantıya tıklayarak hesabınızı doğrulayın.',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w400,
+              SizedBox(height: 8),
+              Text(
+                'Lütfen e-postanızı kontrol edin ve doğrulama bağlantısına tıklayın.',
+                style: TextStyle(fontSize: 14),
+                textAlign: TextAlign.center,
               ),
-            ),
-            SizedBox(height: 16),
-            Container(
-              padding: EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: CupertinoColors.systemGrey6,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    CupertinoIcons.info,
-                    color: CupertinoColors.systemGrey,
-                    size: 14,
-                  ),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Doğrulama durumunuz otomatik olarak kontrol edilecektir.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: CupertinoColors.systemGrey,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
         actions: [
           CupertinoDialogAction(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Tamam'),
+            child: Text('Tamam'),
+            onPressed: () => Navigator.of(context).pop(),
           ),
           CupertinoDialogAction(
+            isDefaultAction: true,
+            child: Text('Durumu Kontrol Et'),
             onPressed: () {
-              Navigator.pop(context);
-              context.read<ProfileCubit>().refreshEmailVerificationStatus();
+              Navigator.of(context).pop();
+              _checkEmailVerification(context);
             },
-            child: const Text('Durumu Kontrol Et'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Hata mesajı
+  void _showErrorDialog(BuildContext context, String errorMessage) {
+    showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              CupertinoIcons.exclamationmark_triangle_fill,
+              color: CupertinoColors.systemRed,
+              size: 20,
+            ),
+            SizedBox(width: 8),
+            Text('Hata'),
+          ],
+        ),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 8.0),
+          child: Text(
+            'E-posta doğrulama durumu kontrol edilirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.',
+            style: TextStyle(fontSize: 14),
+            textAlign: TextAlign.center,
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            child: Text('Tamam'),
+            onPressed: () => Navigator.of(context).pop(),
           ),
         ],
       ),
@@ -1321,32 +1463,57 @@ class _ProfileScreenState extends State<ProfileScreen>
       AppLogger.i(
           'Profil fotoğrafı seçimi başlatılıyor, kaynak: ${source == ImageSource.camera ? 'Kamera' : 'Galeri'}');
 
+      // İzin kontrolü
+      bool hasPermission = await _checkPermission(source);
+      if (!hasPermission) {
+        if (mounted) {
+          _showPermissionDeniedDialog(context, source);
+        }
+        return;
+      }
+
+      // Resim seçme işlemi
       final XFile? image = await _imagePicker.pickImage(
         source: source,
-        maxWidth: 1024, // Daha yüksek çözünürlük sağlayalım
+        maxWidth: 1024,
         maxHeight: 1024,
-        imageQuality: 90, // Kaliteyi artıralım
+        imageQuality: 90,
+        preferredCameraDevice: CameraDevice.front, // Ön kamera tercih edilsin
       );
 
-      if (image != null) {
-        final File imageFile = File(image.path);
+      if (image == null) {
+        AppLogger.i('Görüntü seçimi iptal edildi');
+        return;
+      }
 
-        // Dosya boyutu kontrolü (5MB sınırı)
-        final fileSize = await imageFile.length();
-        AppLogger.i(
-            'Seçilen resim: ${image.path}, boyut: ${(fileSize / 1024).toStringAsFixed(2)} KB');
-
-        // 5MB'dan büyükse kullanıcıya hata mesajı gösterelim
-        if (fileSize > 5 * 1024 * 1024) {
-          if (mounted) {
-            _showSnackBar(context,
-                'Seçilen fotoğraf çok büyük (${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB). Lütfen 5MB\'dan küçük bir fotoğraf seçin.');
-          }
-          return;
+      // Dosya kontrolü
+      final File imageFile = File(image.path);
+      if (!imageFile.existsSync()) {
+        AppLogger.e('Seçilen dosya bulunamadı: ${image.path}');
+        if (mounted) {
+          _showSnackBar(context, 'Seçilen dosya bulunamadı veya erişilemiyor');
         }
+        return;
+      }
 
+      // Dosya boyutu kontrolü (5MB sınırı)
+      final fileSize = await imageFile.length();
+      AppLogger.i(
+          'Seçilen resim: ${image.path}, boyut: ${(fileSize / 1024).toStringAsFixed(2)} KB');
+
+      // 5MB'dan büyükse kullanıcıya hata mesajı gösterelim
+      if (fileSize > 5 * 1024 * 1024) {
+        if (mounted) {
+          _showSnackBar(context,
+              'Seçilen fotoğraf çok büyük (${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB). Lütfen 5MB\'dan küçük bir fotoğraf seçin.');
+        }
+        return;
+      }
+
+      // Yüklemeye geç
+      if (mounted) {
         setState(() {
-          _selectedProfileImage = File(image.path);
+          _selectedProfileImage = imageFile;
           _isUploading = true;
         });
 
@@ -1368,25 +1535,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         } catch (e) {
           AppLogger.e('Profil fotoğrafı yükleme hatası', e.toString());
           if (mounted) {
-            String errorMsg = 'Fotoğraf yüklenirken bir hata oluştu';
-
-            // Hata mesajını kullanıcı dostu hale getirelim
-            if (e.toString().contains('storage/unauthorized')) {
-              errorMsg =
-                  'Yetki hatası: Lütfen tekrar giriş yapın ve tekrar deneyin';
-            } else if (e.toString().contains('storage/quota-exceeded')) {
-              errorMsg =
-                  'Depolama alanı doldu. Lütfen daha sonra tekrar deneyin';
-            } else if (e.toString().contains('storage/retry-limit-exceeded')) {
-              errorMsg =
-                  'Bağlantı hatası: Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin';
-            } else if (e.toString().contains('dosya bulunamadı')) {
-              errorMsg = 'Seçilen dosya artık mevcut değil veya erişilemiyor';
-            } else if (e.toString().contains('dosya boyutu çok büyük')) {
-              errorMsg =
-                  'Dosya boyutu 5MB sınırını aşıyor, lütfen daha küçük bir fotoğraf seçin';
-            }
-
+            String errorMsg = _getErrorMessage(e);
             _showSnackBar(context, errorMsg);
           }
         } finally {
@@ -1399,8 +1548,6 @@ class _ProfileScreenState extends State<ProfileScreen>
             profileCubit.setImageUploading(false);
           }
         }
-      } else {
-        AppLogger.i('Görüntü seçimi iptal edildi');
       }
     } catch (e) {
       setState(() {
@@ -1409,29 +1556,125 @@ class _ProfileScreenState extends State<ProfileScreen>
       context.read<ProfileCubit>().setImageUploading(false);
 
       // Çeşitli hata tiplerini ele alalım
-      String errorMessage = 'Profil fotoğrafı seçme hatası: ${e.toString()}';
-      AppLogger.e(errorMessage, e.toString());
+      AppLogger.e('Profil fotoğrafı seçme hatası', e.toString());
 
       if (mounted) {
-        if (e is PlatformException) {
-          switch (e.code) {
-            case 'photo_access_denied':
-            case 'camera_access_denied':
-              _showSnackBar(context,
-                  'Erişim izni verilmedi. Lütfen uygulama ayarlarından izinleri kontrol edin.');
-              break;
-            case 'camera_not_available':
-              _showSnackBar(context, 'Kamera şu anda kullanılamıyor.');
-              break;
-            default:
-              _showSnackBar(
-                  context, 'Fotoğraf seçilirken bir hata oluştu: ${e.message}');
-          }
-        } else {
-          _showSnackBar(
-              context, 'Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.');
-        }
+        _showSnackBar(context, _getPlatformErrorMessage(e));
       }
+    }
+  }
+
+  // Kaynak türüne göre izin kontrolü yapar
+  Future<bool> _checkPermission(ImageSource source) async {
+    try {
+      if (source == ImageSource.camera) {
+        // Kamera izni kontrolü
+        final status = await Permission.camera.status;
+        if (status.isDenied) {
+          // İzin istenecek
+          final result = await Permission.camera.request();
+          return result.isGranted;
+        }
+        return status.isGranted;
+      } else {
+        // Galeri izni kontrolü
+        final status = await Permission.photos.status;
+        if (status.isDenied) {
+          // İzin istenecek
+          final result = await Permission.photos.request();
+          return result.isGranted;
+        }
+        return status.isGranted;
+      }
+    } catch (e) {
+      AppLogger.e('İzin kontrolü hatası', e.toString());
+      return false;
+    }
+  }
+
+  // İzin reddedildiğinde gösterilecek diyalog
+  void _showPermissionDeniedDialog(BuildContext context, ImageSource source) {
+    showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              CupertinoIcons.exclamationmark_circle,
+              color: CupertinoColors.systemRed,
+              size: 20,
+            ),
+            SizedBox(width: 8),
+            Text('İzin Gerekli'),
+          ],
+        ),
+        content: Text(
+          source == ImageSource.camera
+              ? 'Kamerayı kullanabilmek için uygulama ayarlarından kamera iznini vermeniz gerekiyor.'
+              : 'Fotoğraf galerisine erişebilmek için uygulama ayarlarından galeri iznini vermeniz gerekiyor.',
+          style: TextStyle(fontSize: 14),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            child: Text('İptal'),
+            onPressed: () => Navigator.pop(context),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            child: Text('Ayarlara Git'),
+            onPressed: () {
+              Navigator.pop(context);
+              openAppSettings();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Hata mesajlarını kullanıcı dostu hale getir
+  String _getErrorMessage(dynamic error) {
+    String errorMsg = 'Fotoğraf yüklenirken bir hata oluştu';
+
+    // Hata mesajını kullanıcı dostu hale getirelim
+    if (error.toString().contains('storage/unauthorized')) {
+      errorMsg = 'Yetki hatası: Lütfen tekrar giriş yapın ve tekrar deneyin';
+    } else if (error.toString().contains('storage/quota-exceeded')) {
+      errorMsg = 'Depolama alanı doldu. Lütfen daha sonra tekrar deneyin';
+    } else if (error.toString().contains('storage/retry-limit-exceeded')) {
+      errorMsg =
+          'Bağlantı hatası: Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin';
+    } else if (error.toString().contains('dosya bulunamadı')) {
+      errorMsg = 'Seçilen dosya artık mevcut değil veya erişilemiyor';
+    } else if (error.toString().contains('dosya boyutu')) {
+      errorMsg =
+          'Dosya boyutu 5MB sınırını aşıyor, lütfen daha küçük bir fotoğraf seçin';
+    } else if (error.toString().contains('network')) {
+      errorMsg = 'İnternet bağlantı hatası. Lütfen bağlantınızı kontrol edin';
+    }
+
+    return errorMsg;
+  }
+
+  // Platform hatalarını kullanıcı dostu hale getir
+  String _getPlatformErrorMessage(dynamic error) {
+    if (error is PlatformException) {
+      switch (error.code) {
+        case 'photo_access_denied':
+        case 'camera_access_denied':
+          return 'Erişim izni verilmedi. Lütfen uygulama ayarlarından izinleri kontrol edin.';
+        case 'camera_not_available':
+          return 'Kamera şu anda kullanılamıyor.';
+        case 'camera_in_use':
+          return 'Kamera başka bir uygulama tarafından kullanılıyor.';
+        case 'invalid_image':
+          return 'Seçilen resim geçersiz veya desteklenmeyen bir formatta.';
+        default:
+          return 'Bir hata oluştu: ${error.message}';
+      }
+    } else {
+      return 'Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.';
     }
   }
 
@@ -1466,114 +1709,115 @@ class _ProfileScreenState extends State<ProfileScreen>
             'Dosya boyutu çok büyük, lütfen daha küçük bir fotoğraf seçin (maks. 5MB)');
       }
 
+      // Kullanıcı oturum açık mı kontrol et ve token yenile
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      if (firebaseUser == null) {
+        AppLogger.e('Firebase kullanıcısı null, oturum açık değil');
+        throw Exception(
+            'Oturum süresi dolmuş olabilir, lütfen tekrar giriş yapın');
+      }
+
+      // Token yenileme denemesi
+      try {
+        await firebaseUser.getIdToken(true);
+        AppLogger.i('Firebase token yenilendi');
+      } catch (tokenError) {
+        AppLogger.w('Token yenilenemedi: $tokenError');
+        // Token yenilenemese bile devam et
+      }
+
       // Firebase Storage'a profil fotoğrafını yükle
       final storageRef = FirebaseStorage.instance.ref();
 
-      // Storage kurallarına göre yol belirleme (userId/'profile.jpg' şeklinde)
-      final profileImageRef =
-          storageRef.child('profile_images/$userId/profile.jpg');
+      // Storage kurallarına göre yol belirleme
+      final profileImageRef = storageRef.child(
+          'profile_images/$userId/profile_${DateTime.now().millisecondsSinceEpoch}.jpg');
 
-      AppLogger.i(
-          'Storage referansı oluşturuldu: profile_images/$userId/profile.jpg');
+      AppLogger.i('Storage referansı oluşturuldu: ${profileImageRef.fullPath}');
 
+      // İmajı sıkıştırmayı dene
+      Uint8List? imageData;
       try {
-        // İmajı sıkıştır
         AppLogger.i('Görüntü sıkıştırma başlıyor');
-        final Uint8List? compressedImage =
-            await FlutterImageCompress.compressWithFile(
+        final compressedImage = await FlutterImageCompress.compressWithFile(
           imageFile.absolute.path,
           quality: 85,
           minWidth: 500,
           minHeight: 500,
         );
 
-        if (compressedImage == null) {
+        if (compressedImage != null) {
+          imageData = compressedImage;
+          AppLogger.i('Görüntü sıkıştırıldı: ${imageData.length} bytes');
+        } else {
           AppLogger.w('Sıkıştırma başarısız, orijinal görüntü kullanılacak');
-          // Sıkıştırma başarısız olursa orijinal dosyayı kullan
-          final originalBytes = await imageFile.readAsBytes();
-
-          // Storage'a yükle
-          AppLogger.i(
-              'Orijinal görüntü yükleniyor: ${originalBytes.length} bytes');
-          final uploadTask = profileImageRef.putData(
-            originalBytes,
-            SettableMetadata(contentType: 'image/jpeg'),
-          );
-
-          // İlerleme izleme
-          uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
-            final progress = snapshot.bytesTransferred / snapshot.totalBytes;
-            AppLogger.i(
-                'Yükleme ilerlemesi: ${(progress * 100).toStringAsFixed(2)}%');
-          }, onError: (e) {
-            AppLogger.e('Yükleme takibi sırasında hata', e.toString());
-          });
-
-          // Yükleme tamamlanana kadar bekle
-          final TaskSnapshot taskSnapshot = await uploadTask;
-          final downloadUrl = await taskSnapshot.ref.getDownloadURL();
-
-          AppLogger.i('Profil fotoğrafı başarıyla yüklendi: $downloadUrl');
-          return downloadUrl;
-        } else {
-          // Sıkıştırılmış görüntüyü kullan
-          AppLogger.i(
-              'Sıkıştırılmış görüntü yükleniyor: ${compressedImage.length} bytes');
-
-          // Storage'a yükle
-          final uploadTask = profileImageRef.putData(
-            compressedImage,
-            SettableMetadata(contentType: 'image/jpeg'),
-          );
-
-          // İlerleme izleme
-          uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
-            final progress = snapshot.bytesTransferred / snapshot.totalBytes;
-            AppLogger.i(
-                'Yükleme ilerlemesi: ${(progress * 100).toStringAsFixed(2)}%');
-          }, onError: (e) {
-            AppLogger.e('Yükleme takibi sırasında hata', e.toString());
-          });
-
-          // Yükleme tamamlanana kadar bekle
-          final TaskSnapshot taskSnapshot = await uploadTask;
-          final downloadUrl = await taskSnapshot.ref.getDownloadURL();
-
-          AppLogger.i('Profil fotoğrafı başarıyla yüklendi: $downloadUrl');
-          return downloadUrl;
+          imageData = await imageFile.readAsBytes();
+          AppLogger.i('Orijinal görüntü: ${imageData.length} bytes');
         }
-      } catch (storageError) {
+      } catch (compressError) {
+        AppLogger.w(
+            'Sıkıştırma hatası: $compressError, orijinal görüntü kullanılacak');
+        imageData = await imageFile.readAsBytes();
+      }
+
+      // Yüklemeyi başlat
+      try {
+        // Metadata ile içerik tipini belirle
+        final metadata = SettableMetadata(
+          contentType: 'image/jpeg',
+          customMetadata: {'userId': userId},
+        );
+
+        // Yükleme işlemini başlat
+        final uploadTask = profileImageRef.putData(imageData!, metadata);
+
+        // İlerleme takibi
+        uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
+          final progress = snapshot.bytesTransferred / snapshot.totalBytes;
+          AppLogger.i(
+              'Yükleme ilerlemesi: ${(progress * 100).toStringAsFixed(1)}%');
+        }, onError: (e) {
+          AppLogger.e('Yükleme takibi sırasında hata', e.toString());
+        });
+
+        // Yükleme bitene kadar bekle
+        final snapshot = await uploadTask
+            .whenComplete(() => AppLogger.i('Yükleme tamamlandı'));
+
+        // İndirme URL'sini al
+        final downloadUrl = await snapshot.ref.getDownloadURL();
+        AppLogger.i('Profil fotoğrafı başarıyla yüklendi: $downloadUrl');
+        return downloadUrl;
+      } on FirebaseException catch (storageError) {
         AppLogger.e(
-            'Firebase Storage işlemi sırasında hata', storageError.toString());
+            'Firebase Storage hatası: ${storageError.code}', storageError);
 
-        // Hata tipine göre özel mesajlar
-        if (storageError is FirebaseException) {
-          switch (storageError.code) {
-            case 'storage/unauthorized':
-              throw Exception('Yetki hatası: Storage erişimi reddedildi');
-            case 'storage/canceled':
-              throw Exception('Yükleme iptal edildi');
-            case 'storage/quota-exceeded':
-              throw Exception('Storage kotası aşıldı');
-            case 'storage/invalid-checksum':
-              throw Exception(
-                  'Dosya bozuk veya transfer sırasında veri kaybı oldu');
-            case 'storage/retry-limit-exceeded':
-              throw Exception(
-                  'Yükleme denemesi sınırı aşıldı, lütfen daha sonra tekrar deneyin');
-            case 'storage/object-not-found':
-              throw Exception('Yüklenen dosya bulunamadı');
-            default:
-              throw Exception('Firebase Storage hatası: ${storageError.code}');
-          }
-        } else {
-          throw Exception(
-              'Dosya yükleme işlemi başarısız: ${storageError.toString()}');
+        switch (storageError.code) {
+          case 'storage/unauthorized':
+            throw Exception('Yetki hatası: Dosyayı yükleme izniniz yok');
+          case 'storage/canceled':
+            throw Exception('Yükleme iptal edildi');
+          case 'storage/retry-limit-exceeded':
+            throw Exception(
+                'Bağlantı hatası: İnternet bağlantınızı kontrol edin');
+          case 'storage/invalid-checksum':
+            throw Exception('Dosya bozuk veya transfer sırasında hata oluştu');
+          case 'storage/server-file-wrong-size':
+            throw Exception(
+                'Dosya boyutu hataları, lütfen daha küçük bir dosya deneyin');
+          case 'storage/quota-exceeded':
+            throw Exception('Depolama kotası aşıldı');
+          default:
+            throw Exception('Firebase Storage hatası: ${storageError.code}');
         }
+      } catch (error) {
+        AppLogger.e('Dosya yükleme işlemi başarısız', error.toString());
+        throw Exception(
+            'Dosya yüklenirken beklenmeyen bir hata oluştu: ${error.toString()}');
       }
     } catch (e) {
-      AppLogger.e('Profil fotoğrafı yükleme hatası (detay)', e.toString());
-      throw Exception('⛔ Profil fotoğrafı yükleme hatası: ${e.toString()}');
+      AppLogger.e('Profil fotoğrafı yükleme hatası', e.toString());
+      rethrow; // Asıl hatayı ilet
     }
   }
 

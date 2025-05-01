@@ -10,6 +10,7 @@ import 'package:tatarai/features/auth/models/user_model.dart';
 import 'package:tatarai/features/auth/models/user_role.dart';
 import 'package:tatarai/features/auth/services/auth_service.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 
 /// Kullanıcı repository'si - Firebase Auth ve Firestore işlemlerini birleştirir
 class UserRepository extends BaseRepository with CacheableMixin {
@@ -651,17 +652,37 @@ class UserRepository extends BaseRepository with CacheableMixin {
   }) async {
     await _ensureInitialized();
 
+    // İşlem başlangıcını logla
+    AppLogger.i('Giriş işlemi başlatılıyor: $email');
+    Stopwatch stopwatch = Stopwatch()..start();
+
     return await apiCall<UserModel?>(
       operationName: 'E-posta ile giriş yapma',
       apiCall: () async {
         try {
+          // Daha kısa timeout'la giriş yap
           final userModel = await _authService.signInWithEmailAndPassword(
             email: email,
             password: password,
           );
-          logSuccess('Giriş başarılı', 'Kullanıcı ID: ${userModel.id}');
-          return userModel;
+
+          // Firestore'dan kullanıcı verisini daha hızlı almak için önce auth'dan gelen temel veriyi döndürelim
+          final basicUser = userModel;
+
+          // Yeni bir işlem olarak kullanıcı verisini almayı başlatalım (arka planda)
+          // Bu, kullanıcının hemen giriş yapmasını sağlar ve veriler arka planda yüklenir
+          _loadUserDataInBackground(userModel.id);
+
+          stopwatch.stop();
+          logSuccess('Giriş başarılı',
+              'Kullanıcı ID: ${userModel.id}, Süre: ${stopwatch.elapsedMilliseconds}ms');
+
+          return basicUser;
         } catch (e) {
+          stopwatch.stop();
+          AppLogger.e(
+              'Giriş hatası: $e, Süre: ${stopwatch.elapsedMilliseconds}ms');
+
           // Özel hata mesajları ile yeniden fırlat
           if (_isNetworkOrFirestoreError(e)) {
             AppLogger.e('Giriş sırasında bağlantı hatası: $e');
@@ -671,6 +692,123 @@ class UserRepository extends BaseRepository with CacheableMixin {
                 message:
                     'Giriş yapılırken bağlantı hatası oluştu. Lütfen internet bağlantınızı kontrol edin.');
           }
+          rethrow;
+        }
+      },
+      ignoreConnectionCheck: false,
+      throwError: true,
+    );
+  }
+
+  /// Kullanıcı verisini arka planda yükleme
+  Future<void> _loadUserDataInBackground(String userId) async {
+    try {
+      AppLogger.i('Kullanıcı verileri arka planda yükleniyor: $userId');
+      await fetchFreshUserData(userId);
+    } catch (e) {
+      AppLogger.w('Arka plan kullanıcı verisi yükleme hatası: $e');
+      // Hata olsa bile sessizce devam et, kullanıcı deneyimini etkilemez
+    }
+  }
+
+  /// E-posta doğrulama durumunu Firestore'a kaydeder
+  Future<UserModel?> refreshEmailVerificationStatus() async {
+    await _ensureInitialized();
+
+    return await apiCall<UserModel?>(
+      operationName: 'E-posta doğrulama durumunu güncelleme',
+      apiCall: () async {
+        Stopwatch stopwatch = Stopwatch()..start();
+        AppLogger.i('E-posta doğrulama durumu kontrol ediliyor');
+
+        try {
+          // Firebase Auth'tan kullanıcıyı al
+          final firebaseUser = _authService.currentUser;
+          if (firebaseUser == null) {
+            stopwatch.stop();
+            AppLogger.w('Kullanıcı oturum açmamış');
+            return null;
+          }
+
+          // Firebase Auth'tan kullanıcı bilgilerini yenile
+          try {
+            await firebaseUser.reload();
+            AppLogger.i('Firebase Auth kullanıcı bilgileri yenilendi');
+          } catch (e) {
+            AppLogger.w('Firebase Auth kullanıcı bilgileri yenilenemedi: $e');
+            // Hata olsa bile devam et
+          }
+
+          // Yenilenen kullanıcıyı al
+          final freshFirebaseUser = _authService.currentUser;
+          if (freshFirebaseUser == null) {
+            stopwatch.stop();
+            AppLogger.w(
+                'Yenilenen kullanıcı bilgilerinde kullanıcı bulunamadı');
+            return null;
+          }
+
+          // Firestore'dan mevcut kullanıcı verisini getir - 2 saniye timeout ile
+          UserModel? userModel;
+          try {
+            final docSnapshot = await _firestore
+                .collection(_userCollection)
+                .doc(freshFirebaseUser.uid)
+                .get(const GetOptions(source: Source.server))
+                .timeout(const Duration(seconds: 2));
+
+            if (docSnapshot.exists) {
+              userModel = UserModel.fromFirestore(docSnapshot);
+            }
+          } catch (e) {
+            AppLogger.w(
+                'Firestore\'dan kullanıcı alınamadı, temel model kullanılacak: $e');
+            // Temel kullanıcı modeli oluştur
+            userModel = UserModel.fromFirebaseUser(freshFirebaseUser);
+          }
+
+          if (userModel == null) {
+            userModel = UserModel.fromFirebaseUser(freshFirebaseUser);
+          }
+
+          // Doğrulama durumunu güncelle
+          final isEmailVerified = freshFirebaseUser.emailVerified;
+
+          if (isEmailVerified != userModel.isEmailVerified) {
+            AppLogger.i('E-posta doğrulama durumu değişti: $isEmailVerified');
+
+            // Kullanıcı modelini güncelle
+            final updatedUser =
+                userModel.copyWith(isEmailVerified: isEmailVerified);
+
+            // Firestore'u güncelle
+            try {
+              await _firestore
+                  .collection(_userCollection)
+                  .doc(freshFirebaseUser.uid)
+                  .update({'isEmailVerified': isEmailVerified});
+              AppLogger.i(
+                  'Firestore\'daki e-posta doğrulama durumu güncellendi');
+            } catch (e) {
+              AppLogger.w(
+                  'Firestore\'daki e-posta doğrulama durumu güncellenemedi: $e');
+              // Yine de güncellenmiş kullanıcıyı döndür
+            }
+
+            stopwatch.stop();
+            AppLogger.i(
+                'E-posta doğrulama durumu güncellendi, süre: ${stopwatch.elapsedMilliseconds}ms');
+            return updatedUser;
+          }
+
+          stopwatch.stop();
+          AppLogger.i(
+              'E-posta doğrulama durumu zaten güncel, süre: ${stopwatch.elapsedMilliseconds}ms');
+          return userModel;
+        } catch (e) {
+          stopwatch.stop();
+          AppLogger.e(
+              'E-posta doğrulama durumu güncellenirken hata: $e, Süre: ${stopwatch.elapsedMilliseconds}ms');
           rethrow;
         }
       },
@@ -777,35 +915,6 @@ class UserRepository extends BaseRepository with CacheableMixin {
       },
       ignoreConnectionCheck: false,
       throwError: true,
-    );
-  }
-
-  /// E-posta doğrulama durumunu günceller
-  Future<UserModel?> refreshEmailVerificationStatus() async {
-    await _ensureInitialized();
-
-    return await apiCall<UserModel?>(
-      operationName: 'E-posta doğrulama durumu yenileme',
-      apiCall: () async {
-        final currentUser = _authService.currentUser;
-        if (currentUser == null) {
-          return null;
-        }
-
-        // E-posta doğrulama durumunu kontrol et ve güncelle
-        try {
-          final isVerified = await _authService.checkEmailVerification();
-          if (isVerified) {
-            logSuccess('E-posta doğrulama durumu güncellendi');
-          }
-        } catch (e) {
-          AppLogger.w('E-posta doğrulama durumu kontrol edilemedi: $e');
-          // Hata olsa bile devam et
-        }
-
-        // Güncel kullanıcı modelini döndür
-        return await getCurrentUser();
-      },
     );
   }
 
