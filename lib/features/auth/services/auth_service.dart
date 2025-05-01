@@ -57,6 +57,14 @@ class AuthService extends BaseService {
         _logger.i('Firebase Manager başlatıldı');
       }
 
+      // Firebase Auth için kalıcılık ayarı yapma
+      try {
+        await _firebaseAuth.setPersistence(firebase_auth.Persistence.LOCAL);
+        _logger.i('Firebase Auth kalıcılık LOCAL olarak ayarlandı');
+      } catch (authError) {
+        _logger.w('Firebase Auth kalıcılık ayarlanamadı: $authError');
+      }
+
       // Firebase çevrimdışı kalıcılığı etkinleştir
       await _enableFirestoreOfflinePersistence();
     } catch (e) {
@@ -853,6 +861,36 @@ class AuthService extends BaseService {
       _logger.w('Token yenilenirken hata oluştu: $e');
       // Hata olsa bile devam et
     }
+  }
+
+  /// Google veya diğer sağlayıcılar üzerinden kimlik bilgileriyle giriş yapar
+  Future<firebase_auth.UserCredential> signInWithCredential(
+      firebase_auth.AuthCredential credential,
+      [bool persistSession = true] // Varsayılan olarak kalıcı oturum açma
+      ) async {
+    // Kalıcı oturum açma ayarını kontrol et
+    if (persistSession) {
+      try {
+        // Firebase Auth'a oturumu yerel olarak saklamasını söyle
+        await _firebaseAuth.setPersistence(firebase_auth.Persistence.LOCAL);
+        _logger.i('Kalıcı oturum açma için persistence ayarlandı: LOCAL');
+      } catch (e) {
+        _logger.w('Kalıcı oturum açma ayarlanamadı: $e');
+      }
+    }
+
+    return await _firebaseAuth.signInWithCredential(credential);
+  }
+
+  /// Kayıt ol - yeni kullanıcı oluşturur
+  Future<firebase_auth.UserCredential> createUserWithEmailAndPassword({
+    required String email,
+    required String password,
+  }) async {
+    return await _firebaseAuth.createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
   }
 }
 

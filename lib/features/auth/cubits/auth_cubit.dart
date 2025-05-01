@@ -8,6 +8,9 @@ import 'package:tatarai/features/auth/models/user_model.dart';
 import 'package:tatarai/core/repositories/user_repository.dart';
 import 'package:tatarai/features/auth/services/auth_service.dart';
 import 'package:tatarai/core/utils/logger.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 /// Kimlik doğrulama ve kullanıcı yönetimi için Cubit
 class AuthCubit extends BaseCubit<AuthState> {
@@ -471,9 +474,163 @@ class AuthCubit extends BaseCubit<AuthState> {
     }
   }
 
-  // Alias metodu - eski isimle uyumluluk için
-  Future<void> signIn({required String email, required String password}) async {
-    return signInWithEmailAndPassword(email: email, password: password);
+  /// Google ile giriş yapar
+  Future<void> signInWithGoogle() async {
+    int retryCount = 0;
+    const maxRetries = 3;
+
+    while (retryCount < maxRetries) {
+      try {
+        emit(state.copyWith(isLoading: true, errorMessage: null));
+
+        // GoogleSignIn nesnesini oluşturma
+        final GoogleSignIn googleSignIn = GoogleSignIn(
+          scopes: [
+            'email',
+            'https://www.googleapis.com/auth/userinfo.profile',
+          ],
+          signInOption: SignInOption.standard, // Native platformu kullan
+          hostedDomain: null, // Tüm domain'lere izin ver
+        );
+
+        // Önce mevcut oturumu kapatmayı dene
+        try {
+          await googleSignIn.signOut();
+        } catch (e) {
+          // Sessizce devam et
+          logWarning('Google sign out sırasında hata: $e');
+        }
+
+        // Google ile giriş diyaloğunu göster
+        final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+
+        // Kullanıcı işlemi iptal ettiyse
+        if (googleUser == null) {
+          emit(state.copyWith(isLoading: false));
+          return;
+        }
+
+        logInfo('Google kullanıcısı seçildi: ${googleUser.email}');
+
+        // Google kimlik doğrulama bilgilerini al
+        final GoogleSignInAuthentication googleAuth =
+            await googleUser.authentication;
+
+        logInfo(
+            'Google authentication alındı, accessToken: ${googleAuth.accessToken != null}');
+
+        // Firebase kimlik bilgilerini oluştur
+        final credential = firebase_auth.GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+        );
+
+        // Firebase'e giriş yap
+        logInfo('Firebase\'e Google credential ile giriş yapılıyor...');
+
+        try {
+          // Kalıcı oturum açma (true parametresi)
+          final userCredential = await _timeoutFuture(
+              _authService.signInWithCredential(credential, true),
+              const Duration(seconds: 30),
+              'Google ile giriş zaman aşımına uğradı');
+
+          if (userCredential.user != null) {
+            logSuccess('Google',
+                'Google ile giriş başarılı: ${userCredential.user?.email}');
+
+            // User'ı kaydet
+            try {
+              final basicUser =
+                  UserModel.fromFirebaseUser(userCredential.user!);
+
+              // AuthService üzerinden Firestore'a kaydet
+              await _authService.saveUserToFirestore(basicUser.copyWith(
+                lastLoginAt: DateTime.now(),
+              ));
+
+              logInfo('Google kullanıcısı veritabanına kaydedildi/güncellendi');
+            } catch (dbError) {
+              logWarning(
+                  'Kullanıcı veritabanına kaydedilemedi, ama giriş başarılı: $dbError');
+            }
+
+            // Başarılı giriş
+            emit(state.copyWith(
+              isLoading: false,
+              errorMessage: null,
+            ));
+            return;
+          } else {
+            logError('Google ile giriş başarısız', 'Kullanıcı null');
+            emit(state.copyWith(
+              isLoading: false,
+              errorMessage: 'Google ile giriş yapılamadı.',
+            ));
+            return;
+          }
+        } catch (firebaseError) {
+          // Firebase hatası durumunda, unavailable hatası için yeniden dene
+          if (firebaseError.toString().contains('unavailable') &&
+              retryCount < maxRetries - 1) {
+            retryCount++;
+            final retryDelay = _getExponentialBackoffDelay(retryCount);
+            logWarning('Firebase geçici olarak kullanılamıyor',
+                '$retryDelay saniye sonra tekrar denenecek (${retryCount}/${maxRetries - 1})');
+
+            // Kullanıcıya bilgi ver
+            emit(state.copyWith(
+              isLoading: true,
+              errorMessage: null,
+              pendingOperationMessage:
+                  'Sunucuya bağlanılamadı. $retryDelay saniye içinde tekrar deneniyor...',
+            ));
+
+            await Future.delayed(Duration(seconds: retryDelay));
+            continue;
+          } else {
+            // Diğer hatalar veya son deneme başarısız oldu
+            throw firebaseError;
+          }
+        }
+      } on firebase_auth.FirebaseAuthException catch (e) {
+        logError('Firebase Auth Hatası', '${e.code} - ${e.message}');
+        emit(state.copyWith(
+          isLoading: false,
+          errorMessage: getErrorMessage(e),
+        ));
+        return;
+      } catch (e) {
+        logError('Google Sign In Hatası', e.toString());
+        emit(state.copyWith(
+          isLoading: false,
+          errorMessage: 'Google ile giriş sırasında bir hata oluştu: $e',
+        ));
+        return;
+      }
+    }
+  }
+
+  /// Future'ı belirli bir timeout ile çalıştırır
+  Future<T> _timeoutFuture<T>(
+    Future<T> future,
+    Duration timeout,
+    String timeoutMessage,
+  ) {
+    return future.timeout(
+      timeout,
+      onTimeout: () {
+        throw TimeoutException(timeoutMessage);
+      },
+    );
+  }
+
+  /// Üstel geri çekilme gecikmesi hesaplar (exponential backoff)
+  int _getExponentialBackoffDelay(int retryAttempt) {
+    // Baz gecikme (saniye cinsinden) * 2^(retryAttempt-1)
+    // Örneğin: 2, 4, 8, 16, 32, ... saniye
+    const baseDelay = 2;
+    return baseDelay * (1 << (retryAttempt - 1));
   }
 
   /// E-posta ve şifre ile kayıt oluşturur

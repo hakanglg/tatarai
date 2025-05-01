@@ -69,45 +69,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen> {
               }
 
               if (state.analysisList.isEmpty) {
-                return Center(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                        horizontal: context.dimensions.paddingM),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(context.dimensions.paddingM),
-                          decoration: BoxDecoration(
-                            color: CupertinoColors.systemGrey6,
-                            borderRadius: BorderRadius.circular(
-                                context.dimensions.radiusM),
-                          ),
-                          child: Column(
-                            children: [
-                              Text(
-                                'Henüz hiç analiz yapmadınız',
-                                style: TextStyle(
-                                  fontSize: context.dimensions.fontSizeL,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              SizedBox(height: context.dimensions.spaceXS),
-                              Text(
-                                'Bitki analizi yapmak için ana sayfaya dönün',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: context.dimensions.fontSizeM,
-                                  color: CupertinoColors.systemGrey,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
+                return _buildEmptyState(context);
               }
 
               return ListView.builder(
@@ -195,6 +157,73 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen> {
                   type: AppButtonType.primary,
                 ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Analiz sonucu olmadığında gösterilecek boş durum
+  Widget _buildEmptyState(BuildContext context) {
+    final dim = context.dimensions;
+
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: dim.paddingL),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Boş durum illüstrasyonu
+            Container(
+              width: 180,
+              height: 180,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                CupertinoIcons.leaf_arrow_circlepath,
+                size: 80,
+                color: AppColors.primary.withOpacity(0.7),
+              ),
+            ),
+            SizedBox(height: dim.spaceL),
+
+            // Başlık
+            Text(
+              'Henüz Hiç Analiz Yok',
+              style: TextStyle(
+                fontFamily: 'sfpro',
+                fontSize: dim.fontSizeXL,
+                fontWeight: FontWeight.bold,
+                color: CupertinoColors.label,
+                letterSpacing: -0.5,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: dim.spaceM),
+
+            // Açıklama
+            Text(
+              'Bitki fotoğrafı yükleyerek ilk analizinizi yapabilirsiniz. Analizleriniz burada listelenecek.',
+              style: TextStyle(
+                fontFamily: 'sfpro',
+                fontSize: dim.fontSizeM,
+                color: CupertinoColors.secondaryLabel,
+                height: 1.4,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: dim.spaceXL),
+
+            // Ana sayfaya dön butonu
+            AppButton(
+              text: 'Ana Sayfaya Dön',
+              onPressed: () => Navigator.of(context).pop(),
+              isFullWidth: true,
+              type: AppButtonType.primary,
+              icon: CupertinoIcons.home,
             ),
           ],
         ),

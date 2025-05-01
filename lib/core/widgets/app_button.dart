@@ -28,7 +28,8 @@ class AppButton extends StatefulWidget {
   final bool isLoading;
   final bool isFullWidth;
   final IconData? icon;
-  final double height;
+  final double? height;
+  final double? width;
   final EdgeInsets? padding;
 
   const AppButton({
@@ -37,9 +38,10 @@ class AppButton extends StatefulWidget {
     this.onPressed,
     this.type = AppButtonType.primary,
     this.isLoading = false,
-    this.isFullWidth = true,
+    this.isFullWidth = false,
     this.icon,
     this.height = 48.0,
+    this.width,
     this.padding,
   });
 
@@ -102,48 +104,44 @@ class _AppButtonState extends State<AppButton>
 
   @override
   Widget build(BuildContext context) {
-    final buttonContent = ScaleTransition(
-      scale: _scaleAnimation,
-      child: Container(
-        height: widget.height,
-        padding: widget.padding ?? const EdgeInsets.symmetric(horizontal: 16),
-        decoration: BoxDecoration(
-          color: _getBackgroundColor(),
-          borderRadius: BorderRadius.circular(10),
-          border: widget.type == AppButtonType.secondary
-              ? Border.all(color: AppColors.primary.withOpacity(0.3), width: 1)
-              : null,
-          boxShadow: widget.type != AppButtonType.text
-              ? [
-                  BoxShadow(
-                    color: AppColors.primary.withOpacity(0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
-        ),
-        child: _buildContent(),
+    // Button içeriği
+    final buttonContent = Container(
+      height: widget.height,
+      width: widget.isFullWidth ? double.infinity : widget.width,
+      padding: widget.padding ?? const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: _getBackgroundColor(),
+        borderRadius: BorderRadius.circular(10),
+        border: widget.type == AppButtonType.secondary
+            ? Border.all(color: AppColors.primary.withOpacity(0.3), width: 1)
+            : null,
+        boxShadow: widget.type != AppButtonType.text
+            ? [
+                BoxShadow(
+                  color: AppColors.primary.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : null,
       ),
+      child: _buildContent(),
     );
 
-    final buttonChild = CupertinoButton(
-      padding: EdgeInsets.zero,
-      onPressed: widget.isLoading ? null : widget.onPressed,
-      child: buttonContent,
-    );
-
+    // Buton widget'ı
     return GestureDetector(
       onTapDown: (_) => _handleTapDown(),
       onTapUp: (_) => _handleTapUp(),
       onTapCancel: () => _handleTapUp(),
-      child: widget.isFullWidth
-          ? SizedBox(
-              width: double.infinity,
-              height: widget.height,
-              child: buttonChild,
-            )
-          : SizedBox(height: widget.height, child: buttonChild),
+      child: ScaleTransition(
+        scale: _scaleAnimation,
+        child: CupertinoButton(
+          padding: EdgeInsets.zero,
+          minSize: widget.type == AppButtonType.text ? 0 : null,
+          onPressed: widget.isLoading ? null : widget.onPressed,
+          child: buttonContent,
+        ),
+      ),
     );
   }
 
@@ -209,7 +207,6 @@ Row(
       text: 'Primary',
       onPressed: () {},
       type: AppButtonType.primary,
-      isFullWidth: false,
     ),
     
     const SizedBox(width: 8),
@@ -219,7 +216,6 @@ Row(
       text: 'Secondary',
       onPressed: () {},
       type: AppButtonType.secondary,
-      isFullWidth: false,
     ),
     
     const SizedBox(width: 8),
@@ -229,7 +225,6 @@ Row(
       text: 'Destructive',
       onPressed: () {},
       type: AppButtonType.destructive,
-      isFullWidth: false,
     ),
     
     const SizedBox(width: 8),
@@ -239,7 +234,6 @@ Row(
       text: 'Text',
       onPressed: () {},
       type: AppButtonType.text,
-      isFullWidth: false,
     ),
   ],
 )
