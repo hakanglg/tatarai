@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:tatarai/core/routing/route_names.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
 import 'package:tatarai/core/theme/dimensions.dart';
+import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/core/widgets/app_button.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
 import 'package:tatarai/features/auth/cubits/auth_state.dart';
@@ -26,6 +27,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _acceptTerms = false;
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -39,6 +41,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   /// Kayıt ol butonuna tıklandığında çalışır
   void _signUp() {
     if (_formKey.currentState?.validate() ?? false) {
+      // Klavyeyi kapat
+      FocusScope.of(context).unfocus();
+
       if (!_acceptTerms) {
         _showErrorDialog(
           context,
@@ -51,6 +56,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _showErrorDialog(context, 'Şifreler eşleşmiyor.');
         return;
       }
+
+      setState(() {
+        _isSubmitting = true;
+      });
 
       context.read<AuthCubit>().signUpWithEmailAndPassword(
             email: _emailController.text.trim(),
@@ -67,6 +76,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     return BlocListener<AuthCubit, AuthState>(
       listener: (context, state) {
+        // Form durumunu güncelle
+        if (_isSubmitting && !state.isLoading) {
+          setState(() {
+            _isSubmitting = false;
+          });
+        }
+
+        // Loading durumunu gizle (isLoading durum güncellemesi olduğunda)
+        if (state.isLoading) {
+          // Loading ekranı gösterme
+          AppLogger.i('Kayıt yükleniyor durumu: ${state.isLoading}');
+        }
+
         if (state.isAuthenticated) {
           // Başarılı kayıt - hata mesajını temizle ve ana sayfaya yönlendir
           context.read<AuthCubit>().clearErrorMessage();
@@ -78,6 +100,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
             _showErrorDialog(
               context,
               'Sunucuya bağlanırken bir sorun oluştu. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.',
+            );
+          } else if (state.errorMessage!.contains('timeout') ||
+              state.errorMessage!.contains('zaman aşımı')) {
+            _showErrorDialog(
+              context,
+              'İşlem zaman aşımına uğradı. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.',
+            );
+          } else if (state.errorMessage!.contains('email-already-in-use')) {
+            _showErrorDialog(
+              context,
+              'Bu e-posta adresi zaten kullanılıyor. Farklı bir e-posta adresi deneyin veya giriş yapın.',
             );
           } else {
             _showErrorDialog(context, state.errorMessage!);
@@ -305,12 +338,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       // Kayıt ol butonu
                       AppButton(
                         text: 'Kayıt Ol',
-                        isLoading: state.isLoading,
-                        onPressed: () {
-                          print('Kayıt Ol butonuna basıldı!');
-                          _signUp();
-                        },
-                        height: dim.buttonHeight,
+                        isLoading: state.isLoading || _isSubmitting,
+                        onPressed:
+                            (state.isLoading || _isSubmitting) ? null : _signUp,
+                        icon: CupertinoIcons.person_add,
                       ),
                       SizedBox(height: dim.spaceL),
                       // Giriş ekranına dön
@@ -327,9 +358,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           SizedBox(width: dim.spaceXS),
                           CupertinoButton(
                             padding: EdgeInsets.zero,
-                            onPressed: () {
-                              context.goNamed(RouteNames.login);
-                            },
+                            onPressed: state.isLoading
+                                ? null
+                                : () {
+                                    context.goNamed(RouteNames.login);
+                                  },
                             child: const Text(
                               'Giriş Yap',
                               style: TextStyle(fontFamily: 'sfpro'),

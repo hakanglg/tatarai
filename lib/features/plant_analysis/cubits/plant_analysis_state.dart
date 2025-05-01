@@ -1,6 +1,42 @@
 import 'package:tatarai/core/base/base_state.dart';
 import 'package:tatarai/features/plant_analysis/models/plant_analysis_result.dart';
 
+/// Hata türleri
+enum ErrorType {
+  /// Ağ bağlantısı hatası
+  network,
+
+  /// Sunucu hatası
+  server,
+
+  /// Kimlik doğrulama hatası
+  auth,
+
+  /// Premium hesap gerekiyor
+  premium,
+
+  /// API anahtarı hatası
+  apiKey,
+
+  /// Görüntü işleme hatası
+  image,
+
+  /// API hatası
+  api,
+
+  /// Analiz hatası
+  analysis,
+
+  /// Veritabanı hatası
+  database,
+
+  /// Veri bulunamadı
+  notFound,
+
+  /// Bilinmeyen hata
+  unknown,
+}
+
 /// Bitki analizi durum sınıfı
 class PlantAnalysisState extends BaseState {
   /// Tüm analizler
@@ -15,6 +51,9 @@ class PlantAnalysisState extends BaseState {
   /// Premium özellik mi gerekiyor
   final bool needsPremium;
 
+  /// Hata türü
+  final ErrorType? errorType;
+
   /// Constructor
   const PlantAnalysisState({
     this.analysisList = const [],
@@ -23,6 +62,7 @@ class PlantAnalysisState extends BaseState {
     super.isLoading = false,
     super.errorMessage,
     this.needsPremium = false,
+    this.errorType,
   });
 
   /// Başlangıç durumu
@@ -43,12 +83,13 @@ class PlantAnalysisState extends BaseState {
 
   /// Hata durumu
   factory PlantAnalysisState.error(String message,
-      {bool needsPremium = false}) {
+      {bool needsPremium = false, ErrorType errorType = ErrorType.unknown}) {
     return PlantAnalysisState(
       status: AnalysisStatus.error,
       errorMessage: message,
       isLoading: false,
       needsPremium: needsPremium,
+      errorType: errorType,
     );
   }
 
@@ -74,6 +115,7 @@ class PlantAnalysisState extends BaseState {
     bool? isLoading,
     String? errorMessage,
     bool? needsPremium,
+    ErrorType? errorType,
   }) {
     return PlantAnalysisState(
       analysisList: analysisList ?? this.analysisList,
@@ -83,6 +125,7 @@ class PlantAnalysisState extends BaseState {
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage ?? this.errorMessage,
       needsPremium: needsPremium ?? this.needsPremium,
+      errorType: errorType ?? this.errorType,
     );
   }
 
@@ -93,6 +136,7 @@ class PlantAnalysisState extends BaseState {
         selectedAnalysisResult,
         status,
         needsPremium,
+        errorType,
       ];
 }
 

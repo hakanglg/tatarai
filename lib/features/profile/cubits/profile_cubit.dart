@@ -5,6 +5,7 @@ import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/features/auth/models/user_model.dart';
 import 'package:tatarai/core/repositories/user_repository.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 /// Profil ekranı için state sınıfı
 class ProfileState extends Equatable {
@@ -321,6 +322,44 @@ class ProfileCubit extends Cubit<ProfileState> {
         isLoading: false,
         errorMessage: 'Çıkış yapılırken bir hata oluştu',
       ));
+    }
+  }
+
+  /// Kimlik doğrulama tokenını yeniler
+  Future<void> refreshAuthToken() async {
+    try {
+      AppLogger.i('Kimlik doğrulama tokenı yenileniyor...');
+
+      // Firebase Auth'tan mevcut kullanıcıyı al
+      final currentUser = FirebaseAuth.instance.currentUser;
+
+      if (currentUser != null) {
+        // Kullanıcı token'ını yenile
+        await currentUser.getIdToken(true);
+        AppLogger.i(
+            'Kimlik doğrulama tokenı başarıyla yenilendi, userId: ${currentUser.uid}');
+
+        // Kullanıcı verilerini yenile
+        await refreshUserData();
+      } else {
+        AppLogger.w('Token yenilenemedi: Kullanıcı oturum açmamış');
+      }
+    } catch (e) {
+      AppLogger.e('Token yenileme hatası', e.toString());
+    }
+  }
+
+  /// Profil fotoğrafı yükleme işlemini başlatmadan önce çağrılır
+  Future<void> prepareForImageUpload() async {
+    try {
+      // Önce token'ı yenile
+      await refreshAuthToken();
+
+      // Yükleme durumunu güncelle
+      setImageUploading(true);
+    } catch (e) {
+      AppLogger.e('Yükleme hazırlığı hatası', e.toString());
+      setImageUploading(false);
     }
   }
 

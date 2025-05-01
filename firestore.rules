@@ -11,13 +11,17 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == userId;
     }
     
-    // Kullanıcı profilleri - Sadece kendi verisine erişim
+    // Admin kontrolü (Başka bir koleksiyonda admin listesi tutularak yapılabilir)
+    function isAdmin() {
+      return isAuth() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // Kullanıcı profilleri - Giriş/kayıt için izin eklendi
     match /users/{userId} {
       // Kullanıcı, kendi verilerini okuyabilir ve yazabilir
-      allow read, write: if isOwner(userId);
-      
-      // Admin kullanıcılar tüm kullanıcı verilerine erişebilir (opsiyonel)
-      // allow read: if isAdmin();
+      allow get, list: if isAuth();
+      allow create: if isAuth() && request.auth.uid == userId;
+      allow update, delete: if isOwner(userId);
     }
     
     // Analizler - Sadece kendi analizlerine erişim
@@ -35,9 +39,26 @@ service cloud.firestore {
       allow create: if isAuth() && request.resource.data.userId == request.auth.uid;
     }
     
-    // Geliştirme amaçlı geçici kurallar
-    // NOT: Canlı ortama geçmeden önce kaldırılmalı!
+    // Admin kullanıcılarının listesi 
+    match /admins/{adminId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+    
+    // Cihaz token'ları - Notification için
+    match /deviceTokens/{tokenId} {
+      allow read, write: if isAuth() && request.auth.uid == resource.data.userId;
+    }
+    
+    // Genel okuma izni: Kimlik doğrulaması yapılmış her kullanıcı herhangi bir koleksiyonu okuyabilir
+    // Bu geçici bir kural ve güvenli olmadığından sadece DEVELOPMENT ortamında kullanılmalıdır
     match /{document=**} {
+      allow read: if isAuth();
+    }
+
+    // Geçici çözüm: Tüm kullanıcı belgelerine yazma erişimi
+    // ÖNEMLİ: Bu kural sadece sorun çözülene kadar geçici olarak kullanılmalıdır!
+    match /users/{userId} {
       allow read, write: if isAuth();
     }
   }

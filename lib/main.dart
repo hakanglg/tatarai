@@ -278,6 +278,7 @@ class _TatarAIState extends State<TatarAI> {
           create: (context) => PlantAnalysisCubit(
             repository: plantAnalysisRepository,
             authCubit: context.read<AuthCubit>(),
+            userRepository: userRepository,
           ),
         ),
         BlocProvider<ProfileCubit>(

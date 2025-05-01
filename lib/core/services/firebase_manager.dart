@@ -57,7 +57,7 @@ class FirebaseManager {
 
     AppLogger.i('FirebaseManager başlatılıyor...');
 
-    // Değişiklikleri düzgün takip edebilmek için önce bağlantı dinleyicisini kur
+    // Bağlantı durumunu kontrol et ve güncellemeleri izle
     try {
       _setupConnectivityListener();
     } catch (e) {
@@ -66,9 +66,8 @@ class FirebaseManager {
       // Bağlantı dinleyicisi hata verse bile devam et
     }
 
-    // Firebase Auth, Firestore ve Storage'ı başlatma
     try {
-      // Önce bağlantı durumunu kontrol et
+      // Bağlantı durumunu kontrol et
       var connectivityResult = await Connectivity().checkConnectivity();
       bool hasConnection = false;
 
@@ -78,6 +77,15 @@ class FirebaseManager {
 
       _hasNetworkConnection = hasConnection;
       AppLogger.i('Ağ bağlantısı durumu: $_hasNetworkConnection');
+
+      // Çevrimdışı kalıcılığı etkinleştir
+      try {
+        await enablePersistence();
+        AppLogger.i('Firebase çevrimdışı kalıcılık etkinleştirildi');
+      } catch (e) {
+        AppLogger.w('Çevrimdışı kalıcılık etkinleştirilemedi: $e');
+        // Hata olsa bile devam et
+      }
 
       // Auth zaten constructor'da başlatıldı, burada kontrolü yapalım
       try {
@@ -112,12 +120,20 @@ class FirebaseManager {
               'Firestore varsayılan instance kullanılıyor (tatarai olmadan)');
         }
 
-        // Firestore ayarlarını yapılandır
+        // Firestore ayarlarını iyileştir
         _firestore!.settings = const Settings(
           persistenceEnabled: true,
           cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
           sslEnabled: true,
         );
+
+        // Çevrimdışı durumda da çalışabilmesi için
+        if (!hasConnection) {
+          AppLogger.i('Ağ bağlantısı yok, çevrimdışı mod etkinleştiriliyor');
+          await _firestore!.disableNetwork();
+        } else {
+          await _firestore!.enableNetwork();
+        }
 
         AppLogger.i('Firestore yapılandırması: ${_firestore!.settings}');
       } catch (e, stackTrace) {
@@ -228,65 +244,21 @@ class FirebaseManager {
     }
   }
 
-  /// Firestore persistence ayarlarını yapılandırır
-  Future<void> _configureFirestorePersistence() async {
+  /// Firestore çevrimdışı kalıcılığını etkinleştirir
+  Future<void> enablePersistence() async {
     try {
-      bool isOffline = false;
-
-      // Connectivity kontrol et
-      try {
-        var connectivityResult = await Connectivity().checkConnectivity();
-
-        // Uyumluluk için kontrol ediyoruz
-        isOffline = !connectivityResult
-            .any((result) => result != ConnectivityResult.none);
-      } catch (e) {
-        AppLogger.w(
-            'Connectivity kontrolü sırasında hata oluştu, varsayılan olarak çevrimiçi kabul ediliyor',
-            e);
-        isOffline = false;
-      }
-
-      // Offline durumuna göre cache davranışını ayarla
-      final settings = Settings(
-        persistenceEnabled: true,
-        cacheSizeBytes: isOffline
-            ? Settings.CACHE_SIZE_UNLIMITED
-            : 100 * 1024 * 1024, // 100MB cache
-        sslEnabled: true,
+      await FirebaseFirestore.instance.enablePersistence(
+        const PersistenceSettings(
+          synchronizeTabs: true,
+        ),
       );
-
-      _firestore!.settings = settings;
-
-      // Network durumuna göre cache davranışını ayarla
-      if (isOffline) {
-        AppLogger.i(
-            'Cihaz offline, Firestore offline persistence aktif edildi');
-        try {
-          await _firestore!.enablePersistence(
-              const PersistenceSettings(synchronizeTabs: true));
-        } catch (e) {
-          AppLogger.w(
-              'Persistence aktif edilirken hata oluştu, devam ediliyor', e);
-          // Persistence hata verse bile devam ediyoruz
-        }
-      }
-
-      AppLogger.i('Firestore settings yapılandırıldı: ${_firestore!.settings}');
+      AppLogger.i('Firestore çevrimdışı kalıcılık etkinleştirildi');
     } catch (e) {
-      AppLogger.w('Firestore persistence ayarı yapılandırılamadı: $e');
-
-      // En basit yapılandırmayı deneyelim
-      try {
-        _firestore!.settings = const Settings(
-          persistenceEnabled: true,
-          cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
-        );
-        AppLogger.i('Firestore için temel ayarlar yapılandırıldı');
-      } catch (fallbackError) {
-        AppLogger.e(
-            'Firestore için temel ayarlar da yapılandırılamadı', fallbackError);
-        // Artık yapabileceğimiz bir şey kalmadı
+      if (e.toString().contains('already enabled')) {
+        AppLogger.i('Firestore çevrimdışı kalıcılık zaten etkin');
+      } else {
+        AppLogger.w('Çevrimdışı kalıcılık etkinleştirilemedi: $e');
+        rethrow;
       }
     }
   }

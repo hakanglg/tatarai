@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:logger/logger.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:tatarai/core/base/base_service.dart';
 import 'package:tatarai/core/services/firebase_manager.dart';
 import 'package:tatarai/features/auth/models/user_model.dart';
@@ -14,49 +15,218 @@ class AuthService extends BaseService {
   final Logger _logger = Logger();
   final firebase_auth.FirebaseAuth _firebaseAuth;
   final FirebaseFirestore _firestore;
+  final FirebaseManager _firebaseManager;
+  StreamSubscription? _connectivitySubscription;
+
+  /// Ağ bağlantısı durumu
+  bool _hasNetworkConnection = true;
 
   /// Maksimum yeniden deneme sayısı
-  static const int _maxRetries = 3;
+  static const int _maxRetries = 5;
 
   /// Yeniden denemeler arasındaki bekleme süresi (milisaniye)
   static const int _retryDelay = 2000;
+
+  /// Offline işlemler için başarısız istekleri depolayan kuyruk
+  final List<_PendingOperation> _pendingOperations = [];
+
+  /// Timer for processing pending operations
+  Timer? _pendingOperationsTimer;
 
   /// Varsayılan constructor
   AuthService({
     firebase_auth.FirebaseAuth? firebaseAuth,
     FirebaseFirestore? firestore,
     FirebaseManager? firebaseManager,
-  })  : _firebaseAuth =
-            firebaseAuth ?? (firebaseManager?.auth ?? FirebaseManager().auth),
-        _firestore = firestore ??
-            (firebaseManager?.firestore ??
-                FirebaseFirestore.instanceFor(
-                  app: Firebase.app(),
-                  databaseId: 'tatarai',
-                ));
+  })  : _firebaseManager = firebaseManager ?? FirebaseManager(),
+        _firebaseAuth = firebaseAuth ?? firebase_auth.FirebaseAuth.instance,
+        _firestore = firestore ?? FirebaseFirestore.instance {
+    _initFirebase();
+    _setupConnectivityListener();
+    _startPendingOperationsTimer();
+  }
+
+  /// Firebase servislerini başlat
+  Future<void> _initFirebase() async {
+    try {
+      // Firebase Manager'ı başlat
+      if (!_firebaseManager.isInitialized) {
+        _logger.i('Firebase Manager başlatılıyor...');
+        await _firebaseManager.initialize();
+        _logger.i('Firebase Manager başlatıldı');
+      }
+
+      // Firebase çevrimdışı kalıcılığı etkinleştir
+      await _enableFirestoreOfflinePersistence();
+    } catch (e) {
+      _logger.e('Firebase Manager başlatma hatası: $e');
+    }
+  }
+
+  /// Çevrimdışı kalıcılığı etkinleştirir
+  Future<void> _enableFirestoreOfflinePersistence() async {
+    try {
+      await FirebaseFirestore.instance.enablePersistence(
+        const PersistenceSettings(
+          synchronizeTabs: true,
+        ),
+      );
+      _logger.i('Firebase çevrimdışı kalıcılık etkinleştirildi');
+    } catch (e) {
+      if (e.toString().contains('already enabled')) {
+        _logger.i('Firebase çevrimdışı kalıcılık zaten etkin');
+      } else {
+        _logger.w('Çevrimdışı kalıcılık etkinleştirilemedi: $e');
+        // Hata olsa bile devam et
+      }
+    }
+  }
+
+  /// Bağlantı dinleyicisini ayarlar
+  void _setupConnectivityListener() {
+    _connectivitySubscription?.cancel();
+
+    _connectivitySubscription =
+        Connectivity().onConnectivityChanged.listen((results) {
+      final previousState = _hasNetworkConnection;
+      _hasNetworkConnection =
+          results.any((result) => result != ConnectivityResult.none);
+
+      // Bağlantı durumu değiştiyse
+      if (previousState != _hasNetworkConnection) {
+        _logger.i('Ağ bağlantısı durumu değişti: $_hasNetworkConnection');
+
+        // Bağlantı yeniden kurulduysa
+        if (_hasNetworkConnection && !previousState) {
+          _logger
+              .i('Ağ bağlantısı yeniden kuruldu, bekleyen işlemler işlenecek');
+          _processPendingOperations();
+        }
+      }
+    });
+  }
+
+  /// Timer başlatarak bekleyen işlemleri işler
+  void _startPendingOperationsTimer() {
+    _pendingOperationsTimer?.cancel();
+    _pendingOperationsTimer = Timer.periodic(
+      const Duration(minutes: 5),
+      (_) {
+        if (_hasNetworkConnection && _pendingOperations.isNotEmpty) {
+          _processPendingOperations();
+        }
+      },
+    );
+  }
+
+  /// Bekleyen işlemleri işler
+  Future<void> _processPendingOperations() async {
+    if (_pendingOperations.isEmpty) return;
+
+    _logger.i('Bekleyen ${_pendingOperations.length} işlem işleniyor...');
+
+    final operations = List<_PendingOperation>.from(_pendingOperations);
+    _pendingOperations.clear();
+
+    for (final operation in operations) {
+      try {
+        if (DateTime.now().difference(operation.timestamp).inHours > 24) {
+          _logger.w('İşlem 24 saatten eski, atlanıyor: ${operation.type}');
+          continue;
+        }
+
+        _logger.i('İşlem yeniden deneniyor: ${operation.type}');
+        await operation.execute();
+        _logger.i('İşlem başarıyla tamamlandı: ${operation.type}');
+      } catch (e) {
+        _logger.e('İşlem başarısız oldu: ${operation.type}, $e');
+
+        // İşlemi yeniden kuyruğa al
+        if (operation.retryCount < _maxRetries - 1) {
+          _pendingOperations.add(operation.incrementRetry());
+        } else {
+          _logger.w(
+              'Maksimum yeniden deneme sayısına ulaşıldı: ${operation.type}');
+        }
+      }
+    }
+  }
+
+  /// İnternet bağlantısını kontrol eder
+  Future<bool> _checkNetworkConnection() async {
+    try {
+      final connectivityResult = await Connectivity().checkConnectivity();
+      return connectivityResult
+          .any((result) => result != ConnectivityResult.none);
+    } catch (e) {
+      _logger.w('Bağlantı kontrolü hatası: $e');
+      return false;
+    }
+  }
 
   /// Yeniden deneme mekanizması ile işlem yapma
-  Future<T> _withRetry<T>(Future<T> Function() operation) async {
+  Future<T> _withRetry<T>(Future<T> Function() operation,
+      [String operationName = 'İşlem']) async {
+    // Firebase başlatıldığından emin ol
+    await _initFirebase();
+
+    // Ağ bağlantısı kontrolü
+    final hasConnection = await _checkNetworkConnection();
+    if (!hasConnection) {
+      _logger
+          .w('$operationName: Ağ bağlantısı yok, çevrimdışı modda çalışılıyor');
+    }
+
     int retryCount = 0;
+    Exception? lastException;
+
     while (retryCount < _maxRetries) {
       try {
         return await operation();
       } catch (e) {
+        lastException = e is Exception ? e : Exception(e.toString());
         retryCount++;
         _logger.w(
-          'İşlem başarısız oldu (Deneme $retryCount/$_maxRetries): $e',
+          '$operationName başarısız oldu (Deneme $retryCount/$_maxRetries): $e',
         );
 
-        if (retryCount < _maxRetries) {
-          _logger.i('$_retryDelay ms sonra yeniden denenecek...');
-          await Future.delayed(Duration(milliseconds: _retryDelay));
+        // Firebase bağlantı hatalarını kontrol et
+        if (_isNetworkRelatedError(e)) {
+          _logger.i('Ağ bağlantısı sorunu tespit edildi');
+
+          if (retryCount < _maxRetries) {
+            // Exponential backoff
+            final delay = _retryDelay * (1 << (retryCount - 1));
+            _logger.i('$delay ms sonra yeniden denenecek...');
+            await Future.delayed(Duration(milliseconds: delay));
+          } else {
+            _logger.e('Maksimum deneme sayısına ulaşıldı: $e');
+            throw Exception(
+                '$operationName sırasında ağ bağlantısı hatası oluştu. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.');
+          }
         } else {
-          _logger.e('Maksimum deneme sayısına ulaşıldı: $e');
+          // Eğer ağ bağlantısı hatası değilse, tekrar deneme olmadan hata fırlat
+          _logger.e('$operationName işlemi başarısız oldu: $e');
           rethrow;
         }
       }
     }
-    throw Exception('Beklenmeyen bir hata oluştu');
+
+    // Tüm denemeler başarısız oldu
+    _logger.e('$operationName için tüm denemeler başarısız oldu');
+    throw lastException ??
+        Exception('$operationName sırasında beklenmeyen bir hata oluştu');
+  }
+
+  /// Hatanın ağ bağlantısı ile ilgili olup olmadığını kontrol eder
+  bool _isNetworkRelatedError(dynamic error) {
+    final errorString = error.toString().toLowerCase();
+    return errorString.contains('network') ||
+        errorString.contains('timeout') ||
+        errorString.contains('unavailable') ||
+        errorString.contains('connection') ||
+        errorString.contains('offline') ||
+        errorString.contains('socket');
   }
 
   /// Mevcut giriş yapmış kullanıcıyı stream olarak döndürür
@@ -67,7 +237,10 @@ class AuthService extends BaseService {
       }
 
       try {
-        return await _withRetry(() => getUserFromFirestore(user.uid));
+        return await _withRetry(
+          () => getUserFromFirestore(user.uid),
+          'Kullanıcı verisi alma',
+        );
       } catch (e) {
         _logger.e('Firestore\'dan kullanıcı bilgileri alınamadı: $e');
         // Temel kullanıcı bilgileriyle devam et
@@ -127,7 +300,7 @@ class AuthService extends BaseService {
         throw Exception(
             'Kayıt işlemi sırasında beklenmeyen bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
       }
-    });
+    }, 'Kullanıcı kaydı');
   }
 
   /// E-posta ve şifre ile giriş yapma işlemini yapar
@@ -139,32 +312,102 @@ class AuthService extends BaseService {
       try {
         _logger.i('E-posta ile giriş başlatılıyor: $email');
 
+        // Firebase Auth doğrulaması başlatılıyor
+        _logger.d('Firebase Auth doğrulaması yapılıyor...');
+
+        // Önce token yenileme işlemini gerçekleştir
+        await _renewFirebaseToken();
+
         final userCredential = await _firebaseAuth.signInWithEmailAndPassword(
           email: email,
           password: password,
         );
 
         final user = userCredential.user!;
-        final userModel = await getUserFromFirestore(user.uid);
+        _logger
+            .i('Firebase Auth doğrulaması başarılı, kullanıcı ID: ${user.uid}');
+
+        // Firestore'dan kullanıcı bilgilerini al
+        _logger.d('Firestore\'dan kullanıcı verisi alınıyor...');
+        UserModel userModel;
+
+        try {
+          userModel = await getUserFromFirestore(user.uid);
+          _logger.i('Firestore\'dan kullanıcı verisi alındı');
+        } catch (firestoreError) {
+          _logger.w('Firestore\'dan kullanıcı alınamadı: $firestoreError');
+          _logger.i('Temel kullanıcı modeli oluşturuluyor...');
+
+          // Eğer Firestore'dan veri alınamazsa, temel bir kullanıcı modeli oluştur
+          userModel = UserModel.fromFirebaseUser(user);
+
+          // Firestore'a temel modeli kaydetmeyi dene
+          try {
+            await saveUserToFirestore(userModel);
+            _logger.i('Temel kullanıcı modeli Firestore\'a kaydedildi');
+          } catch (saveError) {
+            _logger
+                .e('Kullanıcı modeli Firestore\'a kaydedilemedi: $saveError');
+
+            // Kayıt hatası durumunda bekleyen işlemlere ekle
+            _addPendingOperation(
+              _PendingOperation(
+                type: 'SAVE_USER',
+                execute: () => saveUserToFirestore(userModel),
+                timestamp: DateTime.now(),
+              ),
+            );
+          }
+        }
 
         // Giriş zamanını güncelle
         final updatedModel = userModel.copyWith(
           lastLoginAt: DateTime.now(),
         );
 
-        await saveUserToFirestore(updatedModel);
+        // Firestore'a güncelleme yap
+        try {
+          _logger.d('Kullanıcı giriş tarihi güncelleniyor...');
+          await saveUserToFirestore(updatedModel);
+          _logger.i('Kullanıcı giriş tarihi güncellendi');
+        } catch (updateError) {
+          _logger.w('Giriş tarihi güncellenemedi: $updateError');
 
-        _logger.i('Giriş başarılı: ${user.uid}');
+          // Güncelleme hatası durumunda bekleyen işlemlere ekle
+          _addPendingOperation(
+            _PendingOperation(
+              type: 'UPDATE_USER',
+              execute: () => saveUserToFirestore(updatedModel),
+              timestamp: DateTime.now(),
+            ),
+          );
+        }
+
+        _logger.i('Giriş işlemi tamamlandı: ${user.uid}');
         return updatedModel;
       } on firebase_auth.FirebaseAuthException catch (e) {
-        _logger.w('Giriş hatası: ${e.code}');
+        _logger.w('Giriş hatası: ${e.code}, Mesaj: ${e.message}');
         throw _handleAuthException(e);
       } catch (e) {
         _logger.e('Beklenmeyen giriş hatası: $e');
         throw Exception(
             'Giriş işlemi sırasında beklenmeyen bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
       }
-    });
+    }, 'Kullanıcı girişi');
+  }
+
+  /// Firebase token'ını yeniler
+  Future<void> _renewFirebaseToken() async {
+    try {
+      final currentUser = _firebaseAuth.currentUser;
+      if (currentUser != null) {
+        await currentUser.getIdToken(true);
+        _logger.i('Firebase token yenilendi, userId: ${currentUser.uid}');
+      }
+    } catch (e) {
+      _logger.w('Token yenilenirken hata oluştu: $e');
+      // Hata olsa bile devam et
+    }
   }
 
   /// Kullanıcı çıkışı
@@ -179,7 +422,7 @@ class AuthService extends BaseService {
         throw Exception(
             'Çıkış yapılırken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
       }
-    });
+    }, 'Kullanıcı çıkışı');
   }
 
   /// E-posta doğrulama gönderme
@@ -194,6 +437,22 @@ class AuthService extends BaseService {
       _logger.i('E-posta doğrulama bağlantısı gönderildi: ${user.email}');
     } catch (e) {
       _logger.e('E-posta doğrulama hatası: $e');
+
+      if (_isNetworkRelatedError(e)) {
+        // Ağ bağlantısı hatasıysa bekleyen işlemlere ekle
+        final currentUser = _firebaseAuth.currentUser;
+        if (currentUser != null) {
+          _addPendingOperation(
+            _PendingOperation(
+              type: 'SEND_EMAIL_VERIFICATION',
+              execute: () => currentUser.sendEmailVerification(),
+              timestamp: DateTime.now(),
+            ),
+          );
+          _logger.i('E-posta doğrulama bekleyen işlemlere eklendi');
+        }
+      }
+
       throw Exception(
           'E-posta doğrulama bağlantısı gönderilirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
     }
@@ -209,9 +468,34 @@ class AuthService extends BaseService {
         _logger.i('E-posta doğrulandı: ${user.email}');
 
         // Firestore'daki kullanıcı bilgilerini güncelle
-        final userModel = await getUserFromFirestore(user.uid);
-        final updatedModel = userModel.copyWith(isEmailVerified: true);
-        await saveUserToFirestore(updatedModel);
+        try {
+          final userModel = await getUserFromFirestore(user.uid);
+          final updatedModel = userModel.copyWith(isEmailVerified: true);
+          await saveUserToFirestore(updatedModel);
+        } catch (e) {
+          _logger.w('Kullanıcı e-posta doğrulama durumu güncellenemedi: $e');
+
+          // Ağ bağlantısı hatasıysa bekleyen işlemlere ekle
+          if (_isNetworkRelatedError(e)) {
+            final currentUser = _firebaseAuth.currentUser;
+            if (currentUser != null) {
+              try {
+                final userModel = await getUserFromFirestore(user.uid);
+                final updatedModel = userModel.copyWith(isEmailVerified: true);
+
+                _addPendingOperation(
+                  _PendingOperation(
+                    type: 'UPDATE_EMAIL_VERIFICATION_STATUS',
+                    execute: () => saveUserToFirestore(updatedModel),
+                    timestamp: DateTime.now(),
+                  ),
+                );
+              } catch (innerError) {
+                _logger.e('Bekleyen işlem oluşturma hatası: $innerError');
+              }
+            }
+          }
+        }
 
         return true;
       } else {
@@ -232,6 +516,19 @@ class AuthService extends BaseService {
       _logger.i('Şifre sıfırlama e-postası gönderildi: $email');
     } on firebase_auth.FirebaseAuthException catch (e) {
       _logger.w('Şifre sıfırlama hatası: ${e.code}');
+
+      // Ağ bağlantısı hatasıysa bekleyen işlemlere ekle
+      if (_isNetworkRelatedError(e)) {
+        _addPendingOperation(
+          _PendingOperation(
+            type: 'SEND_PASSWORD_RESET',
+            execute: () => _firebaseAuth.sendPasswordResetEmail(email: email),
+            timestamp: DateTime.now(),
+          ),
+        );
+        _logger.i('Şifre sıfırlama bekleyen işlemlere eklendi: $email');
+      }
+
       throw _handleAuthException(e);
     } catch (e) {
       _logger.e('Beklenmeyen şifre sıfırlama hatası: $e');
@@ -249,7 +546,10 @@ class AuthService extends BaseService {
       }
 
       // Önce Firestore'dan kullanıcı verilerini sil
-      await _firestore.collection('users').doc(user.uid).delete();
+      await _withRetry(
+        () => _firestore.collection('users').doc(user.uid).delete(),
+        'Kullanıcı verilerini silme',
+      );
 
       // Sonra Authentication hesabını sil
       await user.delete();
@@ -298,6 +598,32 @@ class AuthService extends BaseService {
       return updatedUserModel;
     } catch (e) {
       _logger.e('Profil güncelleme hatası: $e');
+
+      // Profil güncellemeyi bekleyen işlemlere ekle
+      if (_isNetworkRelatedError(e)) {
+        try {
+          final user = _firebaseAuth.currentUser;
+          if (user != null) {
+            final userModel = await getUserFromFirestore(user.uid);
+            final updatedUserModel = userModel.copyWith(
+              displayName: displayName ?? userModel.displayName,
+              photoURL: photoURL ?? userModel.photoURL,
+            );
+
+            _addPendingOperation(
+              _PendingOperation(
+                type: 'UPDATE_USER_PROFILE',
+                execute: () => saveUserToFirestore(updatedUserModel),
+                timestamp: DateTime.now(),
+              ),
+            );
+            _logger.i('Profil güncelleme bekleyen işlemlere eklendi');
+          }
+        } catch (innerError) {
+          _logger.e('Bekleyen işlem oluşturma hatası: $innerError');
+        }
+      }
+
       throw Exception(
           'Kullanıcı profili güncellenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
     }
@@ -321,93 +647,139 @@ class AuthService extends BaseService {
       return updatedUserModel;
     } catch (e) {
       _logger.e('Kredi güncelleme hatası: $e');
+
+      // Kredi güncellemeyi bekleyen işlemlere ekle
+      if (_isNetworkRelatedError(e)) {
+        try {
+          final userModel = await getUserFromFirestore(userId);
+          final updatedUserModel = userModel.copyWith(
+            analysisCredits: credits,
+          );
+
+          _addPendingOperation(
+            _PendingOperation(
+              type: 'UPDATE_ANALYSIS_CREDITS',
+              execute: () => saveUserToFirestore(updatedUserModel),
+              timestamp: DateTime.now(),
+            ),
+          );
+          _logger.i('Kredi güncelleme bekleyen işlemlere eklendi');
+        } catch (innerError) {
+          _logger.e('Bekleyen işlem oluşturma hatası: $innerError');
+        }
+      }
+
       throw Exception(
           'Kullanıcı kredileri güncellenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
     }
   }
 
-  /// Firestore'dan kullanıcı bilgilerini alma
+  /// Firestore'dan kullanıcı bilgilerini alır
   Future<UserModel> getUserFromFirestore(String userId) async {
-    return _withRetry(() async {
-      try {
-        // Önce önbellekten okumayı dene
-        final docSnapshot = await _firestore
-            .collection('users')
-            .doc(userId)
-            .get(const GetOptions(source: Source.cache));
+    try {
+      _logger.d('Firestore\'dan kullanıcı verisi alınıyor: $userId');
 
-        // Eğer önbellekte varsa ve geçerliyse kullan
-        if (docSnapshot.exists && docSnapshot.data() != null) {
-          _logger.i('Kullanıcı bilgileri önbellekten alındı: $userId');
-          return UserModel.fromFirestore(docSnapshot);
+      // Retry ile Firestore'dan veri alma
+      final docSnapshot = await _withRetry(
+        () => _firestore.collection('users').doc(userId).get(),
+        'Kullanıcı verisi alma',
+      );
+
+      if (docSnapshot.exists) {
+        _logger.d('Kullanıcı verisi bulundu');
+        final data = docSnapshot.data();
+        if (data != null) {
+          final user = UserModel.fromFirestore(docSnapshot);
+          _logger.d('Kullanıcı modeli oluşturuldu: ${user.email}');
+          return user;
         }
-
-        // Önbellekte yoksa veya geçersizse sunucudan al
-        _logger.i('Kullanıcı bilgileri sunucudan alınıyor: $userId');
-
-        // Firestore ayarlarını kontrol et ve güncelle
-        if (_firestore.settings.host != 'firestore.googleapis.com') {
-          _firestore.settings = const Settings(
-            persistenceEnabled: true,
-            cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
-            sslEnabled: true,
-            host: 'firestore.googleapis.com',
-          );
-        }
-
-        final doc = await _firestore
-            .collection('users')
-            .doc(userId)
-            .get(const GetOptions(source: Source.server));
-
-        if (!doc.exists || doc.data() == null) {
-          _logger.w('Kullanıcı dökümanı bulunamadı: $userId');
-
-          // Firebase Auth'tan temel kullanıcı bilgilerini al
-          final authUser = _firebaseAuth.currentUser;
-          if (authUser?.uid == userId) {
-            return UserModel.fromFirebaseUser(authUser!);
-          }
-
-          throw Exception('Kullanıcı bilgileri bulunamadı.');
-        }
-
-        // Başarılı okuma durumunda önbelleğe kaydet
-        await _firestore
-            .collection('users')
-            .doc(userId)
-            .set(doc.data()!, SetOptions(merge: true));
-
-        return UserModel.fromFirestore(doc);
-      } catch (e) {
-        _logger.e('Firestore kullanıcı bilgisi alma hatası: $e');
-
-        // Hata durumunda Firebase Auth'tan temel bilgileri almayı dene
-        final authUser = _firebaseAuth.currentUser;
-        if (authUser?.uid == userId) {
-          _logger.i(
-              'Firebase Auth\'dan temel kullanıcı bilgileri alınıyor: $userId');
-          return UserModel.fromFirebaseUser(authUser!);
-        }
-
-        rethrow;
       }
-    });
+
+      _logger.w(
+          'Firestore\'da kullanıcı dokümanı bulunamadı, varsayılan model oluşturuluyor');
+      // Eğer Firestore'da veri yoksa, Firebase Auth'dan bir model oluştur
+      final authUser = _firebaseAuth.currentUser;
+      if (authUser != null && authUser.uid == userId) {
+        final userModel = UserModel(
+          id: userId,
+          email: authUser.email ?? '',
+          displayName: authUser.displayName,
+          isEmailVerified: authUser.emailVerified,
+          createdAt: DateTime.now(),
+          lastLoginAt: DateTime.now(),
+          role: UserRole.free,
+          analysisCredits: 3,
+          favoriteAnalysisIds: const [],
+        );
+
+        // Otomatik olarak Firestore'a kaydet
+        try {
+          await saveUserToFirestore(userModel);
+        } catch (e) {
+          _logger.w('Yeni kullanıcı verisi kaydedilemedi: $e');
+          // Ağ bağlantısı hatasıysa bekleyen işlemlere ekle
+          if (_isNetworkRelatedError(e)) {
+            _addPendingOperation(
+              _PendingOperation(
+                type: 'SAVE_NEW_USER',
+                execute: () => saveUserToFirestore(userModel),
+                timestamp: DateTime.now(),
+              ),
+            );
+          }
+        }
+        return userModel;
+      }
+
+      throw Exception('Kullanıcı bilgileri alınamadı');
+    } catch (e) {
+      _logger.e('Firestore\'dan kullanıcı alma hatası: $e');
+      rethrow;
+    }
   }
 
-  /// Firestore'a kullanıcı bilgilerini kaydetme
+  /// Kullanıcı bilgilerini Firestore'a kaydeder
   Future<void> saveUserToFirestore(UserModel user) async {
-    return _withRetry(() async {
-      try {
-        await _firestore.collection('users').doc(user.id).set(
+    try {
+      _logger.d('Kullanıcı Firestore\'a kaydediliyor: ${user.id}');
+
+      // Retry mekanizmasıyla Firestore'a kaydetme
+      await _withRetry(
+        () => _firestore.collection('users').doc(user.id).set(
               user.toFirestore(),
               SetOptions(merge: true),
-            );
-      } catch (e) {
-        _logger.e('Firestore kullanıcı kaydetme hatası: $e');
-        throw Exception('Kullanıcı bilgileri kaydedilirken bir hata oluştu.');
+            ),
+        'Kullanıcı verisi kaydetme',
+      );
+
+      _logger.i('Kullanıcı Firestore\'a kaydedildi: ${user.email}');
+    } catch (e) {
+      _logger.e('Firestore\'a kullanıcı kaydetme hatası: $e');
+
+      // Ağ bağlantısı hatasıysa bekleyen işlemlere ekle
+      if (_isNetworkRelatedError(e)) {
+        _addPendingOperation(
+          _PendingOperation(
+            type: 'SAVE_USER_TO_FIRESTORE',
+            execute: () => _firestore.collection('users').doc(user.id).set(
+                  user.toFirestore(),
+                  SetOptions(merge: true),
+                ),
+            timestamp: DateTime.now(),
+          ),
+        );
+        _logger.i('Kullanıcı kaydetme bekleyen işlemlere eklendi: ${user.id}');
       }
-    });
+
+      throw Exception('Kullanıcı bilgileri kaydedilemedi: $e');
+    }
+  }
+
+  /// Bekleyen işlemlere ekler
+  void _addPendingOperation(_PendingOperation operation) {
+    _pendingOperations.add(operation);
+    _logger.i(
+        'Bekleyen işlem eklendi: ${operation.type}, toplam: ${_pendingOperations.length}');
   }
 
   /// Firebase Auth hatalarını düzgün mesajlara dönüştürme
@@ -434,5 +806,36 @@ class AuthService extends BaseService {
       default:
         return 'Bir hata oluştu: ${e.message ?? e.code}';
     }
+  }
+
+  /// Kaynakları temizler
+  void dispose() {
+    _connectivitySubscription?.cancel();
+    _pendingOperationsTimer?.cancel();
+  }
+}
+
+/// Bekleyen işlemleri temsil eden sınıf
+class _PendingOperation {
+  final String type;
+  final Future<void> Function() execute;
+  final DateTime timestamp;
+  final int retryCount;
+
+  _PendingOperation({
+    required this.type,
+    required this.execute,
+    required this.timestamp,
+    this.retryCount = 0,
+  });
+
+  /// Retry sayacını arttırıp yeni bir operasyon döndürür
+  _PendingOperation incrementRetry() {
+    return _PendingOperation(
+      type: type,
+      execute: execute,
+      timestamp: timestamp,
+      retryCount: retryCount + 1,
+    );
   }
 }

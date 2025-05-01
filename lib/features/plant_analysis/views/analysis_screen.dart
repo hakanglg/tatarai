@@ -655,6 +655,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
         : null;
 
     // Plant Analysis Cubit'i üzerinden analizi başlat
+    // Kredi kontrolü ve premium kontrolü Cubit içinde yapılacak
     context.read<PlantAnalysisCubit>().analyzeImage(
           _selectedImage!,
           location: location,
@@ -932,6 +933,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
               }
             } else if (state.errorMessage != null) {
               // Hata durumunda kullanıcıya bilgi ver
+              // needsPremium true ise premium satın alma sayfasına yönlendirme seçeneği sunan diyalog göster
               _showErrorDialog(state.errorMessage!,
                   needsPremium: state.needsPremium);
             }

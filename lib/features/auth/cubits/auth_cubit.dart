@@ -1,11 +1,13 @@
 import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:tatarai/core/base/base_cubit.dart';
 import 'package:tatarai/features/auth/cubits/auth_state.dart';
 import 'package:tatarai/features/auth/models/user_model.dart';
 import 'package:tatarai/core/repositories/user_repository.dart';
 import 'package:tatarai/features/auth/services/auth_service.dart';
+import 'package:tatarai/core/utils/logger.dart';
 
 /// Kimlik doğrulama ve kullanıcı yönetimi için Cubit
 class AuthCubit extends BaseCubit<AuthState> {
@@ -13,6 +15,20 @@ class AuthCubit extends BaseCubit<AuthState> {
   final AuthService _authService;
   StreamSubscription<UserModel?>? _userSubscription;
   Timer? _emailVerificationTimer;
+  StreamSubscription? _connectivitySubscription;
+
+  /// İnternet bağlantısı durumu
+  bool _hasNetworkConnection = true;
+
+  /// Bekleyen işlem türleri
+  bool _hasPendingSignIn = false;
+  bool _hasPendingSignUp = false;
+
+  /// Son bağlantı hatası zamanı - art arda çok fazla hata göstermeyi önlemek için
+  DateTime? _lastConnectionErrorTime;
+
+  /// Otomatik yeniden bağlanma timer'ı
+  Timer? _reconnectTimer;
 
   AuthCubit({
     required UserRepository userRepository,
@@ -44,14 +60,111 @@ class AuthCubit extends BaseCubit<AuthState> {
     ));
   }
 
+  /// Hata uyarılarını işleme wrapper
+  void handleWarning(String operation, String message) {
+    AppLogger.w('$operation: $message');
+  }
+
+  /// Log Error wrapper
+  void logError(String message, String detail) {
+    handleError(message, Exception(detail));
+  }
+
+  /// Log Warning wrapper
+  void logWarning(String message, [String? detail]) {
+    if (detail != null) {
+      handleWarning(message, detail);
+    } else {
+      handleWarning(message, '');
+    }
+  }
+
   /// Cubit başlangıç fonksiyonu - user subscription'ı başlatır
   void _init() {
     try {
       logInfo('AuthCubit başlatılıyor');
       _subscribeToUserChanges();
+      _setupConnectivityListener();
     } catch (e, stack) {
       handleError('AuthCubit başlatma', e, stack);
       emitErrorState('Kimlik doğrulama servisi başlatılamadı');
+    }
+  }
+
+  /// Ağ bağlantısı değişikliklerini dinler
+  void _setupConnectivityListener() {
+    _connectivitySubscription?.cancel();
+
+    _connectivitySubscription =
+        Connectivity().onConnectivityChanged.listen((results) {
+      final previousState = _hasNetworkConnection;
+      _hasNetworkConnection =
+          results.any((result) => result != ConnectivityResult.none);
+
+      if (previousState != _hasNetworkConnection) {
+        logInfo('Ağ bağlantısı durumu değişti: $_hasNetworkConnection');
+
+        if (_hasNetworkConnection && !previousState) {
+          logInfo('Ağ bağlantısı geri geldi, yeniden bağlanmaya çalışılıyor');
+
+          // Bağlantı geri geldiğinde Firebase ile yeniden bağlantı kurmaya çalış
+          _reconnectToFirebase();
+
+          // Bekleyen işlemleri kontrol et
+          _checkPendingOperations();
+        }
+      }
+    });
+  }
+
+  /// Firebase ile yeniden bağlantı kurmaya çalışır
+  Future<void> _reconnectToFirebase() async {
+    try {
+      // Kullanıcı aboneliğini yenile
+      _subscribeToUserChanges();
+
+      // Eğer oturum açık ise, kullanıcı verilerini yenile
+      if (state.user != null) {
+        final userId = state.user!.id;
+        logInfo('Kullanıcı verilerini yenilemeye çalışılıyor: $userId');
+
+        try {
+          final freshUser = await _userRepository.fetchFreshUserData(userId);
+          if (freshUser != null) {
+            logSuccess('Kullanıcı verileri yenilendi',
+                'Kullanıcı: ${freshUser.email}');
+            emit(state.copyWith(user: freshUser));
+          }
+        } catch (e) {
+          logError('Kullanıcı verilerini yenileme hatası', e.toString());
+          // Kullanıcı deneyimi açısından hata mesajı göstermeyelim
+        }
+      }
+    } catch (e, stack) {
+      handleError('Firebase yeniden bağlantı', e, stack);
+    }
+  }
+
+  /// Bekleyen işlemleri kontrol eder
+  void _checkPendingOperations() {
+    // Bekleyen oturum açma işlemi varsa kullanıcıya bildir
+    if (_hasPendingSignIn) {
+      logInfo('Bekleyen oturum açma işlemi var, lütfen tekrar deneyin');
+      emit(state.copyWith(
+        pendingOperationMessage:
+            'İnternet bağlantınız geri geldi. Lütfen oturum açma işlemini tekrar deneyin.',
+      ));
+      _hasPendingSignIn = false;
+    }
+
+    // Bekleyen kayıt işlemi varsa kullanıcıya bildir
+    if (_hasPendingSignUp) {
+      logInfo('Bekleyen kayıt işlemi var, lütfen tekrar deneyin');
+      emit(state.copyWith(
+        pendingOperationMessage:
+            'İnternet bağlantınız geri geldi. Lütfen kayıt işlemini tekrar deneyin.',
+      ));
+      _hasPendingSignUp = false;
     }
   }
 
@@ -76,6 +189,7 @@ class AuthCubit extends BaseCubit<AuthState> {
             user: user,
             isLoading: false,
             errorMessage: null,
+            pendingOperationMessage: null,
           ),
         );
 
@@ -102,15 +216,74 @@ class AuthCubit extends BaseCubit<AuthState> {
   /// Kullanıcı stream'inde hata olduğunda çağrılır
   void _onUserError(Object error, StackTrace stack) {
     handleError('Kullanıcı dinleme', error, stack);
+
+    // Ağ bağlantısıyla ilgili hataları daha kullanıcı dostu şekilde göster
+    String errorMessage = error.toString();
+
+    if (_isNetworkError(error)) {
+      // Son bağlantı hatası üzerinden 30 saniye geçtiyse göster
+      final now = DateTime.now();
+      final showError = _lastConnectionErrorTime == null ||
+          now.difference(_lastConnectionErrorTime!).inSeconds > 30;
+
+      if (showError) {
+        _lastConnectionErrorTime = now;
+        errorMessage =
+            'Sunucuya bağlanırken bir sorun oluştu. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.';
+
+        // Yeniden bağlantı timer'ı başlat (eğer zaten çalışmıyorsa)
+        _startReconnectTimer();
+      } else {
+        // Çok fazla hata mesajı göstermemek için sessizce devam et
+        logWarning('Ağ bağlantısı hatası (sessiz): ${error.toString()}');
+        return;
+      }
+    }
+
     emit(
       state.copyWith(
         status: AuthStatus.unauthenticated,
         user: null,
         isLoading: false,
-        errorMessage: error.toString(),
+        errorMessage: errorMessage,
       ),
     );
     stopEmailVerificationCheck();
+  }
+
+  /// Yeniden bağlantı kurmak için timer başlatır
+  void _startReconnectTimer() {
+    _reconnectTimer?.cancel();
+
+    // 10 saniyede bir yeniden bağlanmayı dene
+    _reconnectTimer = Timer.periodic(
+      const Duration(seconds: 10),
+      (_) async {
+        if (_hasNetworkConnection) {
+          logInfo('Otomatik yeniden bağlanma deneniyor...');
+          await _reconnectToFirebase();
+
+          // Başarılı olduysa timer'ı durdur
+          if (state.status == AuthStatus.authenticated) {
+            logSuccess('Yeniden bağlantı başarılı');
+            _reconnectTimer?.cancel();
+            _reconnectTimer = null;
+          }
+        }
+      },
+    );
+  }
+
+  /// Hatanın ağ bağlantısıyla ilgili olup olmadığını kontrol eder
+  bool _isNetworkError(Object error) {
+    final errorMessage = error.toString().toLowerCase();
+    return errorMessage.contains('network') ||
+        errorMessage.contains('connection') ||
+        errorMessage.contains('unavailable') ||
+        errorMessage.contains('timeout') ||
+        errorMessage.contains('offline') ||
+        errorMessage.contains('socket') ||
+        errorMessage.contains('internet');
   }
 
   /// Asenkron işlem başlatma
@@ -121,14 +294,20 @@ class AuthCubit extends BaseCubit<AuthState> {
   /// Asenkron işlem hata ile bittiğinde
   void _handleError(String operation, Object error) {
     String errorMessage;
+    bool isNetworkError = _isNetworkError(error);
 
     if (error is firebase_auth.FirebaseAuthException) {
       // Hata mesajını direkt olarak kullanmak daha güvenilir
       errorMessage = error.message ?? 'Bir hata oluştu: ${error.code}';
       handleError(operation, error);
     } else {
-      errorMessage =
-          '$operation sırasında bir hata oluştu: ${error.toString()}';
+      if (isNetworkError) {
+        errorMessage =
+            '$operation işlemi sırasında bağlantı sorunu oluştu. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.';
+      } else {
+        errorMessage =
+            '$operation sırasında bir hata oluştu: ${error.toString()}';
+      }
       handleError('Beklenmeyen $operation', error);
     }
 
@@ -136,8 +315,15 @@ class AuthCubit extends BaseCubit<AuthState> {
       state.copyWith(
         isLoading: false,
         errorMessage: errorMessage,
+        // Hata geldiğinde bekleyen işlem mesajını temizle
+        pendingOperationMessage: null,
       ),
     );
+
+    // Ağ hatası durumunda yeniden bağlantı timer'ı başlat
+    if (isNetworkError) {
+      _startReconnectTimer();
+    }
   }
 
   /// E-posta ve şifre ile giriş yapar
@@ -146,15 +332,48 @@ class AuthCubit extends BaseCubit<AuthState> {
     required String password,
   }) async {
     try {
+      // İnternet bağlantısı kontrolü
+      if (!_hasNetworkConnection) {
+        logWarning('İnternet bağlantısı yok, giriş yapılamıyor');
+        emit(state.copyWith(
+          status: AuthStatus.unauthenticated,
+          isLoading: false,
+          errorMessage:
+              'İnternet bağlantısı bulunamadı. Lütfen bağlantınızı kontrol edin ve tekrar deneyin.',
+        ));
+        _hasPendingSignIn = true;
+        return;
+      }
+
       _startLoading();
       logInfo('Giriş yapılıyor: $email');
+
+      // Timeout ekle - 30 saniye sonra işlem tamamlanmazsa hata dön
+      Timer? timeoutTimer;
+      timeoutTimer = Timer(const Duration(seconds: 30), () {
+        if (state.isLoading) {
+          handleError(
+              'Giriş timeout',
+              Exception(
+                  'İşlem zaman aşımına uğradı. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.'));
+          emit(state.copyWith(
+            status: AuthStatus.unauthenticated,
+            isLoading: false,
+            errorMessage:
+                'İşlem zaman aşımına uğradı. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.',
+          ));
+        }
+      });
 
       // En fazla 3 kez yeniden deneme stratejisi ile giriş yap
       int retryCount = 0;
       UserModel? userModel;
+      Exception? lastException;
 
       while (retryCount < 3 && userModel == null) {
         try {
+          logInfo('Giriş denemesi ${retryCount + 1}/3');
+
           userModel = await _userRepository.signInWithEmailAndPassword(
             email: email,
             password: password,
@@ -162,17 +381,34 @@ class AuthCubit extends BaseCubit<AuthState> {
 
           // Başarılı giriş
           if (userModel != null) {
+            timeoutTimer.cancel(); // Timeout'u iptal et
             logInfo('Giriş başarılı: ${userModel.email}');
+            logSuccess('Giriş yapıldı', 'Kullanıcı: ${userModel.email}');
+
+            // Oturum başarıyla açıldığında state güncellemesi
+            emit(state.copyWith(
+              status: AuthStatus.authenticated,
+              user: userModel,
+              isLoading: false,
+              errorMessage: null,
+              pendingOperationMessage: null,
+            ));
 
             // E-posta doğrulama durumunu kontrol et
             if (!userModel.isEmailVerified) {
               startEmailVerificationCheck();
             }
 
+            // Bekleyen giriş işaretini temizle
+            _hasPendingSignIn = false;
+
             return; // Başarılı ise fonksiyondan çık
           }
         } catch (e) {
-          if (e.toString().contains('unavailable') && retryCount < 2) {
+          lastException = e is Exception ? e : Exception(e.toString());
+          handleError('Giriş denemesi başarısız', e);
+
+          if (_isNetworkError(e) && retryCount < 2) {
             // Servis geçici olarak kullanılamıyor, yeniden dene
             logInfo(
                 'Firebase servisine bağlantı hatası, yeniden deneme ${retryCount + 1}/3');
@@ -180,21 +416,70 @@ class AuthCubit extends BaseCubit<AuthState> {
 
             // Exponential backoff: her denemede artan bekleme süresi
             final backoffDelay = (retryCount * 2) * 1000; // ms cinsinden
+            logInfo('$backoffDelay ms bekliyor...');
             await Future.delayed(Duration(milliseconds: backoffDelay));
             continue;
           } else {
             // Maksimum deneme sayısına ulaşıldı veya başka bir hata
-            rethrow;
+            timeoutTimer.cancel(); // Timeout'u iptal et
+            handleError('Giriş başarısız', e);
+
+            // Ağ hatası ise bekleyen giriş işaretle
+            if (_isNetworkError(e)) {
+              _hasPendingSignIn = true;
+            }
+
+            // Hata mesajını UI'da göster
+            String errorMessage;
+            if (_isNetworkError(e)) {
+              errorMessage =
+                  'Bağlantı sorunu nedeniyle giriş yapılamadı. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.';
+            } else if (e.toString().contains('user-not-found') ||
+                e.toString().contains('wrong-password')) {
+              errorMessage =
+                  'E-posta veya şifre hatalı. Lütfen bilgilerinizi kontrol edip tekrar deneyin.';
+            } else {
+              errorMessage = e.toString();
+            }
+
+            emit(state.copyWith(
+              status: AuthStatus.unauthenticated,
+              isLoading: false,
+              errorMessage: errorMessage,
+              // Hata durumunda tekrar deneme butonu göstermek için
+              showRetryButton: _isNetworkError(e),
+            ));
+            return;
           }
         }
       }
 
       // Tüm yeniden denemeler başarısız oldu
       if (userModel == null) {
+        timeoutTimer.cancel(); // Timeout'u iptal et
+        handleError('Giriş başarısız',
+            lastException ?? Exception('Tüm denemeler başarısız oldu'));
+
+        // Ağ hatası ise bekleyen giriş işaretle
+        if (lastException != null && _isNetworkError(lastException)) {
+          _hasPendingSignIn = true;
+        }
+
+        String errorMessage;
+        if (lastException != null && _isNetworkError(lastException)) {
+          errorMessage =
+              'Bağlantı sorunu nedeniyle giriş yapılamadı. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.';
+        } else {
+          errorMessage = lastException?.toString() ??
+              'Giriş yapılamadı, lütfen bilgilerinizi kontrol edin.';
+        }
+
         emit(state.copyWith(
           status: AuthStatus.unauthenticated,
           isLoading: false,
-          errorMessage: 'Giriş yapılamadı, lütfen bilgilerinizi kontrol edin.',
+          errorMessage: errorMessage,
+          showRetryButton:
+              lastException != null && _isNetworkError(lastException),
         ));
       }
     } catch (e) {
@@ -214,15 +499,48 @@ class AuthCubit extends BaseCubit<AuthState> {
     required String displayName,
   }) async {
     try {
+      // İnternet bağlantısı kontrolü
+      if (!_hasNetworkConnection) {
+        logWarning('İnternet bağlantısı yok, kayıt yapılamıyor');
+        emit(state.copyWith(
+          status: AuthStatus.unauthenticated,
+          isLoading: false,
+          errorMessage:
+              'İnternet bağlantısı bulunamadı. Lütfen bağlantınızı kontrol edin ve tekrar deneyin.',
+        ));
+        _hasPendingSignUp = true;
+        return;
+      }
+
       _startLoading();
       logInfo('Kayıt olunuyor: $email');
+
+      // Timeout ekle - 30 saniye sonra işlem tamamlanmazsa hata dön
+      Timer? timeoutTimer;
+      timeoutTimer = Timer(const Duration(seconds: 30), () {
+        if (state.isLoading) {
+          handleError(
+              'Kayıt timeout',
+              Exception(
+                  'İşlem zaman aşımına uğradı. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.'));
+          emit(state.copyWith(
+            status: AuthStatus.unauthenticated,
+            isLoading: false,
+            errorMessage:
+                'İşlem zaman aşımına uğradı. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.',
+          ));
+        }
+      });
 
       // En fazla 3 kez yeniden deneme stratejisi ile kayıt ol
       int retryCount = 0;
       UserModel? userModel;
+      Exception? lastException;
 
       while (retryCount < 3 && userModel == null) {
         try {
+          logInfo('Kayıt denemesi ${retryCount + 1}/3');
+
           userModel = await _userRepository.signUpWithEmailAndPassword(
             email: email,
             password: password,
@@ -231,12 +549,29 @@ class AuthCubit extends BaseCubit<AuthState> {
 
           // Başarılı kayıt
           if (userModel != null) {
+            timeoutTimer.cancel(); // Timeout'u iptal et
             logInfo('Kullanıcı başarıyla kayıt oldu: $email');
             logSuccess('Kayıt', 'Kayıt olma başarılı: $email');
+
+            // State'i güncelle
+            emit(state.copyWith(
+              status: AuthStatus.authenticated,
+              user: userModel,
+              isLoading: false,
+              errorMessage: null,
+              pendingOperationMessage: null,
+            ));
+
+            // Bekleyen kayıt işaretini temizle
+            _hasPendingSignUp = false;
+
             return; // Başarılı ise fonksiyondan çık
           }
         } catch (e) {
-          if (e.toString().contains('unavailable') && retryCount < 2) {
+          lastException = e is Exception ? e : Exception(e.toString());
+          handleError('Kayıt denemesi başarısız', e);
+
+          if (_isNetworkError(e) && retryCount < 2) {
             // Servis geçici olarak kullanılamıyor, yeniden dene
             logInfo(
                 'Firebase servisine bağlantı hatası, yeniden deneme ${retryCount + 1}/3');
@@ -244,21 +579,68 @@ class AuthCubit extends BaseCubit<AuthState> {
 
             // Exponential backoff: her denemede artan bekleme süresi
             final backoffDelay = (retryCount * 2) * 1000; // ms cinsinden
+            logInfo('$backoffDelay ms bekliyor...');
             await Future.delayed(Duration(milliseconds: backoffDelay));
             continue;
           } else {
             // Maksimum deneme sayısına ulaşıldı veya başka bir hata
-            rethrow;
+            timeoutTimer.cancel(); // Timeout'u iptal et
+            handleError('Kayıt başarısız', e);
+
+            // Ağ hatası ise bekleyen kayıt işaretle
+            if (_isNetworkError(e)) {
+              _hasPendingSignUp = true;
+            }
+
+            // Hata mesajını UI'da göster
+            String errorMessage;
+            if (_isNetworkError(e)) {
+              errorMessage =
+                  'Bağlantı sorunu nedeniyle kayıt yapılamadı. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.';
+            } else if (e.toString().contains('email-already-in-use')) {
+              errorMessage =
+                  'Bu e-posta adresi zaten kullanılıyor. Lütfen başka bir e-posta adresi deneyin.';
+            } else {
+              errorMessage = e.toString();
+            }
+
+            emit(state.copyWith(
+              status: AuthStatus.unauthenticated,
+              isLoading: false,
+              errorMessage: errorMessage,
+              showRetryButton: _isNetworkError(e),
+            ));
+            return;
           }
         }
       }
 
       // Tüm yeniden denemeler başarısız oldu
       if (userModel == null) {
+        timeoutTimer.cancel(); // Timeout'u iptal et
+        handleError('Kayıt başarısız',
+            lastException ?? Exception('Tüm denemeler başarısız oldu'));
+
+        // Ağ hatası ise bekleyen kayıt işaretle
+        if (lastException != null && _isNetworkError(lastException)) {
+          _hasPendingSignUp = true;
+        }
+
+        String errorMessage;
+        if (lastException != null && _isNetworkError(lastException)) {
+          errorMessage =
+              'Bağlantı sorunu nedeniyle kayıt yapılamadı. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.';
+        } else {
+          errorMessage = lastException?.toString() ??
+              'Kayıt yapılamadı, lütfen bilgilerinizi kontrol edin ve tekrar deneyin.';
+        }
+
         emit(state.copyWith(
+          status: AuthStatus.unauthenticated,
           isLoading: false,
-          errorMessage:
-              'Kayıt sırasında bir sorun oluştu. Lütfen daha sonra tekrar deneyin.',
+          errorMessage: errorMessage,
+          showRetryButton:
+              lastException != null && _isNetworkError(lastException),
         ));
       }
     } catch (e) {
@@ -297,13 +679,29 @@ class AuthCubit extends BaseCubit<AuthState> {
   /// Parola sıfırlama e-postası gönderir
   Future<void> sendPasswordResetEmail(String email) async {
     try {
+      // İnternet bağlantısı kontrolü
+      if (!_hasNetworkConnection) {
+        logWarning(
+            'İnternet bağlantısı yok, şifre sıfırlama işlemi yapılamıyor');
+        emit(state.copyWith(
+          isLoading: false,
+          errorMessage:
+              'İnternet bağlantısı bulunamadı. Lütfen bağlantınızı kontrol edin ve tekrar deneyin.',
+        ));
+        return;
+      }
+
       _startLoading();
       logInfo('Parola sıfırlama e-postası gönderiliyor: $email');
 
       await _authService.sendPasswordResetEmail(email);
 
       logSuccess('Parola sıfırlama', 'Parola sıfırlama e-postası gönderildi');
-      emit(state.copyWith(isLoading: false));
+      emit(state.copyWith(
+        isLoading: false,
+        successMessage:
+            'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi. Lütfen e-postanızı kontrol edin.',
+      ));
     } catch (e) {
       _handleError('Parola sıfırlama e-postası gönderme', e);
     }
@@ -355,6 +753,30 @@ class AuthCubit extends BaseCubit<AuthState> {
   /// Firebase hata kodlarını kullanıcı dostu mesaja dönüştürür
   String getErrorMessage(firebase_auth.FirebaseAuthException exception) {
     return exception.message ?? 'Bir hata oluştu: ${exception.code}';
+  }
+
+  /// Yeniden deneme fonksiyonu - UI'da Tekrar Dene butonu için
+  Future<void> retryLastOperation() async {
+    if (_hasPendingSignIn) {
+      // UI'dan e-posta ve şifre bilgilerini almak gerekecek
+      emit(state.copyWith(
+        retryOperation: 'sign_in',
+        pendingOperationMessage: 'Lütfen giriş bilgilerinizi yeniden girin.',
+      ));
+    } else if (_hasPendingSignUp) {
+      // UI'dan kayıt bilgilerini almak gerekecek
+      emit(state.copyWith(
+        retryOperation: 'sign_up',
+        pendingOperationMessage: 'Lütfen kayıt bilgilerinizi yeniden girin.',
+      ));
+    } else {
+      // Diğer bekleyen işlemler
+      _reconnectToFirebase();
+      emit(state.copyWith(
+        errorMessage: null,
+        showRetryButton: false,
+      ));
+    }
   }
 
   /// Kullanıcı hesabını siler
@@ -473,7 +895,28 @@ class AuthCubit extends BaseCubit<AuthState> {
   /// Hata mesajını temizler
   void clearErrorMessage() {
     if (state.errorMessage != null) {
-      emit(state.copyWith(errorMessage: null));
+      emit(state.copyWith(
+        errorMessage: null,
+        showRetryButton: false,
+        pendingOperationMessage: null,
+      ));
+    }
+  }
+
+  /// Başarı mesajını temizler
+  void clearSuccessMessage() {
+    if (state.successMessage != null) {
+      emit(state.copyWith(successMessage: null));
+    }
+  }
+
+  /// Bekleyen işlem mesajını temizler
+  void clearPendingOperationMessage() {
+    if (state.pendingOperationMessage != null) {
+      emit(state.copyWith(
+        pendingOperationMessage: null,
+        retryOperation: null,
+      ));
     }
   }
 
@@ -481,6 +924,8 @@ class AuthCubit extends BaseCubit<AuthState> {
   Future<void> close() {
     _userSubscription?.cancel();
     _emailVerificationTimer?.cancel();
+    _connectivitySubscription?.cancel();
+    _reconnectTimer?.cancel();
     return super.close();
   }
 }

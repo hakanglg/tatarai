@@ -5,12 +5,20 @@ import 'package:tatarai/features/auth/models/user_model.dart';
 class AuthState extends BaseState {
   final AuthStatus status;
   final UserModel? user;
+  final bool showRetryButton;
+  final String? successMessage;
+  final String? pendingOperationMessage;
+  final String? retryOperation;
 
   const AuthState({
     this.status = AuthStatus.initial,
     this.user,
     super.isLoading = false,
     super.errorMessage,
+    this.showRetryButton = false,
+    this.successMessage,
+    this.pendingOperationMessage,
+    this.retryOperation,
   });
 
   /// İlk durum
@@ -59,12 +67,27 @@ class AuthState extends BaseState {
     bool? isLoading,
     bool clearUser = false,
     bool clearError = false,
+    bool? showRetryButton,
+    String? successMessage,
+    String? pendingOperationMessage,
+    String? retryOperation,
+    bool clearSuccessMessage = false,
+    bool clearPendingOperation = false,
+    bool clearRetryOperation = false,
   }) {
     return AuthState(
       status: status ?? this.status,
       user: clearUser ? null : (user ?? this.user),
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       isLoading: isLoading ?? this.isLoading,
+      showRetryButton: showRetryButton ?? this.showRetryButton,
+      successMessage:
+          clearSuccessMessage ? null : (successMessage ?? this.successMessage),
+      pendingOperationMessage: clearPendingOperation
+          ? null
+          : (pendingOperationMessage ?? this.pendingOperationMessage),
+      retryOperation:
+          clearRetryOperation ? null : (retryOperation ?? this.retryOperation),
     );
   }
 
@@ -81,8 +104,27 @@ class AuthState extends BaseState {
   /// Kullanıcının yeterli analiz kredisine sahip olup olmadığını kontrol eder
   bool get hasAnalysisCredits => user?.hasAnalysisCredits ?? false;
 
+  /// Bağlantı yeniden kurulduğunda yeniden deneme gösterilip gösterilmeyeceğini kontrol eder
+  bool get canRetry => showRetryButton || pendingOperationMessage != null;
+
+  /// Başarılı bir işlem sonucu mesaj varsa kontrol eder
+  bool get hasSuccessMessage =>
+      successMessage != null && successMessage!.isNotEmpty;
+
+  /// Bekleyen bir işlem mesajı varsa kontrol eder
+  bool get hasPendingOperationMessage =>
+      pendingOperationMessage != null && pendingOperationMessage!.isNotEmpty;
+
   @override
-  List<Object?> get props => [...super.props, status, user];
+  List<Object?> get props => [
+        ...super.props,
+        status,
+        user,
+        showRetryButton,
+        successMessage,
+        pendingOperationMessage,
+        retryOperation
+      ];
 
   /// State'in durumunu kontrol eden kolaylık metodları
   bool get isInitial => status == AuthStatus.initial;

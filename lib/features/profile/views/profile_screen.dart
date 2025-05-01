@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data'; // Uint8List için gerekli
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -955,21 +956,41 @@ class _ProfileScreenState extends State<ProfileScreen>
   Future<void> _pickImageFromSource(ImageSource source) async {
     try {
       final profileCubit = context.read<ProfileCubit>();
+
+      AppLogger.i(
+          'Profil fotoğrafı seçimi başlatılıyor, kaynak: ${source == ImageSource.camera ? 'Kamera' : 'Galeri'}');
+
       final XFile? image = await _imagePicker.pickImage(
         source: source,
-        maxWidth: 800,
-        maxHeight: 800,
-        imageQuality: 85,
+        maxWidth: 1024, // Daha yüksek çözünürlük sağlayalım
+        maxHeight: 1024,
+        imageQuality: 90, // Kaliteyi artıralım
       );
 
       if (image != null) {
+        final File imageFile = File(image.path);
+
+        // Dosya boyutu kontrolü (5MB sınırı)
+        final fileSize = await imageFile.length();
+        AppLogger.i(
+            'Seçilen resim: ${image.path}, boyut: ${(fileSize / 1024).toStringAsFixed(2)} KB');
+
+        // 5MB'dan büyükse kullanıcıya hata mesajı gösterelim
+        if (fileSize > 5 * 1024 * 1024) {
+          if (mounted) {
+            _showSnackBar(context,
+                'Seçilen fotoğraf çok büyük (${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB). Lütfen 5MB\'dan küçük bir fotoğraf seçin.');
+          }
+          return;
+        }
+
         setState(() {
           _selectedProfileImage = File(image.path);
           _isUploading = true;
         });
 
-        // ProfileCubit'e yükleme durumunu bildir
-        profileCubit.setImageUploading(true);
+        // Firebase Token'ını yenile ve yükleme durumunu ayarla
+        await profileCubit.prepareForImageUpload();
 
         try {
           // Resmi Firebase Storage'a yükle
@@ -984,10 +1005,28 @@ class _ProfileScreenState extends State<ProfileScreen>
             _showSnackBar(context, 'Profil fotoğrafınız başarıyla güncellendi');
           }
         } catch (e) {
-          AppLogger.e('Profil fotoğrafı yükleme hatası', e);
+          AppLogger.e('Profil fotoğrafı yükleme hatası', e.toString());
           if (mounted) {
-            _showSnackBar(context,
-                'Fotoğraf yüklenirken bir hata oluştu: ${e.toString()}');
+            String errorMsg = 'Fotoğraf yüklenirken bir hata oluştu';
+
+            // Hata mesajını kullanıcı dostu hale getirelim
+            if (e.toString().contains('storage/unauthorized')) {
+              errorMsg =
+                  'Yetki hatası: Lütfen tekrar giriş yapın ve tekrar deneyin';
+            } else if (e.toString().contains('storage/quota-exceeded')) {
+              errorMsg =
+                  'Depolama alanı doldu. Lütfen daha sonra tekrar deneyin';
+            } else if (e.toString().contains('storage/retry-limit-exceeded')) {
+              errorMsg =
+                  'Bağlantı hatası: Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin';
+            } else if (e.toString().contains('dosya bulunamadı')) {
+              errorMsg = 'Seçilen dosya artık mevcut değil veya erişilemiyor';
+            } else if (e.toString().contains('dosya boyutu çok büyük')) {
+              errorMsg =
+                  'Dosya boyutu 5MB sınırını aşıyor, lütfen daha küçük bir fotoğraf seçin';
+            }
+
+            _showSnackBar(context, errorMsg);
           }
         } finally {
           if (mounted) {
@@ -999,56 +1038,181 @@ class _ProfileScreenState extends State<ProfileScreen>
             profileCubit.setImageUploading(false);
           }
         }
+      } else {
+        AppLogger.i('Görüntü seçimi iptal edildi');
       }
     } catch (e) {
       setState(() {
         _isUploading = false;
       });
       context.read<ProfileCubit>().setImageUploading(false);
-      AppLogger.e('Profil fotoğrafı seçme hatası', e);
+
+      // Çeşitli hata tiplerini ele alalım
+      String errorMessage = 'Profil fotoğrafı seçme hatası: ${e.toString()}';
+      AppLogger.e(errorMessage, e.toString());
+
+      if (mounted) {
+        if (e is PlatformException) {
+          switch (e.code) {
+            case 'photo_access_denied':
+            case 'camera_access_denied':
+              _showSnackBar(context,
+                  'Erişim izni verilmedi. Lütfen uygulama ayarlarından izinleri kontrol edin.');
+              break;
+            case 'camera_not_available':
+              _showSnackBar(context, 'Kamera şu anda kullanılamıyor.');
+              break;
+            default:
+              _showSnackBar(
+                  context, 'Fotoğraf seçilirken bir hata oluştu: ${e.message}');
+          }
+        } else {
+          _showSnackBar(
+              context, 'Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.');
+        }
+      }
     }
   }
 
   /// Profil fotoğrafını Firebase Storage'a yükler
   Future<String> _uploadProfileImage(File imageFile) async {
     try {
+      AppLogger.i('Profil fotoğrafı yükleme başlatılıyor');
+
       // Firebase Storage referansını al
       final userId = context.read<ProfileCubit>().state.user?.id;
-      if (userId == null) {
-        throw Exception('Kullanıcı oturum açmamış');
+      if (userId == null || userId.isEmpty) {
+        AppLogger.e('Kullanıcı ID bulunamadı veya boş');
+        throw Exception('Kullanıcı oturum açmamış veya ID bulunamadı');
       }
 
-      // Firebase Storage'da profil fotoğrafları için klasör oluştur
+      AppLogger.i('Profil fotoğrafı yükleniyor, User ID: $userId');
+
+      // Dosya kontrolü
+      if (!imageFile.existsSync()) {
+        AppLogger.e('Dosya bulunamadı: ${imageFile.path}');
+        throw Exception('Seçilen dosya bulunamadı veya erişilemiyor');
+      }
+
+      final fileSize = await imageFile.length();
+      AppLogger.i('Dosya boyutu: ${(fileSize / 1024).toStringAsFixed(2)} KB');
+
+      if (fileSize > 5 * 1024 * 1024) {
+        // 5MB'dan büyük dosyaları reddet
+        AppLogger.e(
+            'Dosya çok büyük: ${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB');
+        throw Exception(
+            'Dosya boyutu çok büyük, lütfen daha küçük bir fotoğraf seçin (maks. 5MB)');
+      }
+
+      // Firebase Storage'a profil fotoğrafını yükle
       final storageRef = FirebaseStorage.instance.ref();
-      final profileImageRef = storageRef.child('profile_images/$userId.jpg');
 
-      // İmajı sıkıştır
-      final Uint8List compressedImage =
-          await FlutterImageCompress.compressWithFile(
-                imageFile.absolute.path,
-                quality: 85,
-                minWidth: 500,
-                minHeight: 500,
-              ) ??
-              await imageFile.readAsBytes();
+      // Storage kurallarına göre yol belirleme (userId/'profile.jpg' şeklinde)
+      final profileImageRef =
+          storageRef.child('profile_images/$userId/profile.jpg');
 
-      // Storage'a yükle
-      final uploadTask = profileImageRef.putData(
-        compressedImage,
-        SettableMetadata(contentType: 'image/jpeg'),
-      );
+      AppLogger.i(
+          'Storage referansı oluşturuldu: profile_images/$userId/profile.jpg');
 
-      // Yükleme tamamlanana kadar bekle
-      final TaskSnapshot taskSnapshot = await uploadTask;
+      try {
+        // İmajı sıkıştır
+        AppLogger.i('Görüntü sıkıştırma başlıyor');
+        final Uint8List? compressedImage =
+            await FlutterImageCompress.compressWithFile(
+          imageFile.absolute.path,
+          quality: 85,
+          minWidth: 500,
+          minHeight: 500,
+        );
 
-      // Yüklenen resmin URL'ini al
-      final downloadUrl = await taskSnapshot.ref.getDownloadURL();
+        if (compressedImage == null) {
+          AppLogger.w('Sıkıştırma başarısız, orijinal görüntü kullanılacak');
+          // Sıkıştırma başarısız olursa orijinal dosyayı kullan
+          final originalBytes = await imageFile.readAsBytes();
 
-      AppLogger.i('Profil fotoğrafı başarıyla yüklendi: $downloadUrl');
-      return downloadUrl;
+          // Storage'a yükle
+          AppLogger.i(
+              'Orijinal görüntü yükleniyor: ${originalBytes.length} bytes');
+          final uploadTask = profileImageRef.putData(
+            originalBytes,
+            SettableMetadata(contentType: 'image/jpeg'),
+          );
+
+          // İlerleme izleme
+          uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
+            final progress = snapshot.bytesTransferred / snapshot.totalBytes;
+            AppLogger.i(
+                'Yükleme ilerlemesi: ${(progress * 100).toStringAsFixed(2)}%');
+          }, onError: (e) {
+            AppLogger.e('Yükleme takibi sırasında hata', e.toString());
+          });
+
+          // Yükleme tamamlanana kadar bekle
+          final TaskSnapshot taskSnapshot = await uploadTask;
+          final downloadUrl = await taskSnapshot.ref.getDownloadURL();
+
+          AppLogger.i('Profil fotoğrafı başarıyla yüklendi: $downloadUrl');
+          return downloadUrl;
+        } else {
+          // Sıkıştırılmış görüntüyü kullan
+          AppLogger.i(
+              'Sıkıştırılmış görüntü yükleniyor: ${compressedImage.length} bytes');
+
+          // Storage'a yükle
+          final uploadTask = profileImageRef.putData(
+            compressedImage,
+            SettableMetadata(contentType: 'image/jpeg'),
+          );
+
+          // İlerleme izleme
+          uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
+            final progress = snapshot.bytesTransferred / snapshot.totalBytes;
+            AppLogger.i(
+                'Yükleme ilerlemesi: ${(progress * 100).toStringAsFixed(2)}%');
+          }, onError: (e) {
+            AppLogger.e('Yükleme takibi sırasında hata', e.toString());
+          });
+
+          // Yükleme tamamlanana kadar bekle
+          final TaskSnapshot taskSnapshot = await uploadTask;
+          final downloadUrl = await taskSnapshot.ref.getDownloadURL();
+
+          AppLogger.i('Profil fotoğrafı başarıyla yüklendi: $downloadUrl');
+          return downloadUrl;
+        }
+      } catch (storageError) {
+        AppLogger.e(
+            'Firebase Storage işlemi sırasında hata', storageError.toString());
+
+        // Hata tipine göre özel mesajlar
+        if (storageError is FirebaseException) {
+          switch (storageError.code) {
+            case 'storage/unauthorized':
+              throw Exception('Yetki hatası: Storage erişimi reddedildi');
+            case 'storage/canceled':
+              throw Exception('Yükleme iptal edildi');
+            case 'storage/quota-exceeded':
+              throw Exception('Storage kotası aşıldı');
+            case 'storage/invalid-checksum':
+              throw Exception(
+                  'Dosya bozuk veya transfer sırasında veri kaybı oldu');
+            case 'storage/retry-limit-exceeded':
+              throw Exception(
+                  'Yükleme denemesi sınırı aşıldı, lütfen daha sonra tekrar deneyin');
+            case 'storage/object-not-found':
+              throw Exception('Yüklenen dosya bulunamadı');
+            default:
+              throw Exception('Firebase Storage hatası: ${storageError.code}');
+          }
+        } else {
+          throw Exception(
+              'Dosya yükleme işlemi başarısız: ${storageError.toString()}');
+        }
+      }
     } catch (e) {
-      AppLogger.e('Profil fotoğrafı yükleme hatası (detay)', e);
-      throw Exception('Profil fotoğrafı yüklenirken bir hata oluştu');
+      AppLogger.e('Profil fotoğrafı yükleme hatası (detay)', e.toString());
+      throw Exception('⛔ Profil fotoğrafı yükleme hatası: ${e.toString()}');
     }
   }
 

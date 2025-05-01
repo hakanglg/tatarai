@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:tatarai/core/routing/route_names.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
 import 'package:tatarai/core/theme/dimensions.dart';
+import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/core/widgets/app_button.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
 import 'package:tatarai/features/auth/cubits/auth_state.dart';
@@ -23,6 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -34,6 +36,13 @@ class _LoginScreenState extends State<LoginScreen> {
   /// Giriş yap butonuna tıklandığında çalışır
   void _signIn() {
     if (_formKey.currentState?.validate() ?? false) {
+      // Klavyeyi kapat
+      FocusScope.of(context).unfocus();
+
+      setState(() {
+        _isSubmitting = true;
+      });
+
       context.read<AuthCubit>().signInWithEmailAndPassword(
             email: _emailController.text.trim(),
             password: _passwordController.text.trim(),
@@ -48,6 +57,19 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return BlocListener<AuthCubit, AuthState>(
       listener: (context, state) {
+        // Form durumunu güncelle
+        if (_isSubmitting && !state.isLoading) {
+          setState(() {
+            _isSubmitting = false;
+          });
+        }
+
+        // Loading durumunu gizle (isLoading durum güncellemesi olduğunda)
+        if (state.isLoading) {
+          // Loading ekranı gösterme
+          AppLogger.i('Giriş yükleniyor durumu: ${state.isLoading}');
+        }
+
         if (state.isAuthenticated) {
           // Başarılı giriş - hata mesajını temizle ve ana sayfaya yönlendir
           context.read<AuthCubit>().clearErrorMessage();
@@ -59,6 +81,12 @@ class _LoginScreenState extends State<LoginScreen> {
             _showErrorDialog(
               context,
               'Sunucuya bağlanırken bir sorun oluştu. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.',
+            );
+          } else if (state.errorMessage!.contains('timeout') ||
+              state.errorMessage!.contains('zaman aşımı')) {
+            _showErrorDialog(
+              context,
+              'İşlem zaman aşımına uğradı. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.',
             );
           } else {
             _showErrorDialog(context, state.errorMessage!);
@@ -198,12 +226,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       // Giriş butonu
                       AppButton(
                         text: 'Giriş Yap',
-                        isLoading: state.isLoading,
-                        onPressed: () {
-                          print('Giriş Yap butonuna basıldı!');
-                          _signIn();
-                        },
-                        height: dim.buttonHeight,
+                        isLoading: state.isLoading || _isSubmitting,
+                        onPressed:
+                            (state.isLoading || _isSubmitting) ? null : _signIn,
+                        icon: CupertinoIcons.arrow_right,
                       ),
                       SizedBox(height: dim.spaceL),
 
@@ -222,9 +248,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           SizedBox(width: dim.spaceXS),
                           CupertinoButton(
                             padding: EdgeInsets.zero,
-                            onPressed: () {
-                              context.goNamed(RouteNames.register);
-                            },
+                            onPressed: state.isLoading
+                                ? null
+                                : () {
+                                    context.goNamed(RouteNames.register);
+                                  },
                             child: const Text('Kayıt Ol'),
                           ),
                         ],
@@ -252,6 +280,19 @@ class _LoginScreenState extends State<LoginScreen> {
             onPressed: () => Navigator.pop(context),
             child: const Text('Tamam'),
           ),
+          // Eğer internet bağlantısı hatası ise yeniden deneme butonu ekle
+          if (message.contains('internet') ||
+              message.contains('bağlantı') ||
+              message.contains('Veritabanı') ||
+              message.contains('kurulamadı'))
+            CupertinoDialogAction(
+              onPressed: () {
+                Navigator.pop(context);
+                _signIn(); // Yeniden dene
+              },
+              isDefaultAction: true,
+              child: const Text('Tekrar Dene'),
+            ),
         ],
       ),
     );

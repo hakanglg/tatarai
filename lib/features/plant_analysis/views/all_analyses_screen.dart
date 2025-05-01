@@ -137,7 +137,8 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen> {
 
   Widget _buildErrorView(BuildContext context, String errorMessage) {
     // Hata mesajını analiz ederek daha spesifik bir mesaj ve icon seçelim
-    final ErrorInfo errorInfo = _parseErrorMessage(errorMessage);
+    final ErrorInfo errorInfo =
+        _getErrorInfo(context.read<PlantAnalysisCubit>().state.errorType);
 
     return Center(
       child: Padding(
@@ -201,75 +202,72 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen> {
     );
   }
 
-  ErrorInfo _parseErrorMessage(String errorMessage) {
-    // Bağlantı hatası
-    if (errorMessage.toLowerCase().contains('bağlantı') ||
-        errorMessage.toLowerCase().contains('connection') ||
-        errorMessage.toLowerCase().contains('network') ||
-        errorMessage.toLowerCase().contains('internet') ||
-        errorMessage.toLowerCase().contains('timeout')) {
-      return ErrorInfo(
-        icon: CupertinoIcons.wifi_slash,
-        color: CupertinoColors.systemOrange,
-        title: 'Bağlantı Hatası',
-        description: 'İnternet bağlantınızda bir sorun var.',
-        additionalInfo: 'Bağlantınızı kontrol edip tekrar deneyin.',
-      );
-    }
+  /// Cubit'in belirlediği hata türüne göre hata bilgisini döndürür
+  ErrorInfo _getErrorInfo(ErrorType? errorType) {
+    switch (errorType) {
+      case ErrorType.network:
+        return ErrorInfo(
+          icon: CupertinoIcons.wifi_slash,
+          color: CupertinoColors.systemOrange,
+          title: 'Bağlantı Hatası',
+          description: 'İnternet bağlantınızda bir sorun var.',
+          additionalInfo: 'Bağlantınızı kontrol edip tekrar deneyin.',
+        );
 
-    // Sunucu hatası
-    else if (errorMessage.toLowerCase().contains('server') ||
-        errorMessage.toLowerCase().contains('sunucu') ||
-        errorMessage.toLowerCase().contains('503') ||
-        errorMessage.toLowerCase().contains('500')) {
-      return ErrorInfo(
-        icon: CupertinoIcons.exclamationmark_circle,
-        color: CupertinoColors.systemRed,
-        title: 'Sunucu Hatası',
-        description: 'Sunucularımızda geçici bir sorun yaşanıyor.',
-        additionalInfo: 'Lütfen daha sonra tekrar deneyin.',
-      );
-    }
+      case ErrorType.server:
+        return ErrorInfo(
+          icon: CupertinoIcons.exclamationmark_circle,
+          color: CupertinoColors.systemRed,
+          title: 'Sunucu Hatası',
+          description: 'Sunucularımızda geçici bir sorun yaşanıyor.',
+          additionalInfo: 'Lütfen daha sonra tekrar deneyin.',
+        );
 
-    // Yetkilendirme hatası
-    else if (errorMessage.toLowerCase().contains('auth') ||
-        errorMessage.toLowerCase().contains('yetki') ||
-        errorMessage.toLowerCase().contains('oturum') ||
-        errorMessage.toLowerCase().contains('giriş') ||
-        errorMessage.toLowerCase().contains('login')) {
-      return ErrorInfo(
-        icon: CupertinoIcons.person_badge_minus,
-        color: CupertinoColors.systemRed,
-        title: 'Oturum Hatası',
-        description: 'Oturumunuz sonlanmış veya yetkiniz bulunmuyor.',
-        additionalInfo: 'Lütfen yeniden giriş yapın.',
-      );
-    }
+      case ErrorType.auth:
+        return ErrorInfo(
+          icon: CupertinoIcons.person_badge_minus,
+          color: CupertinoColors.systemRed,
+          title: 'Oturum Hatası',
+          description: 'Oturumunuz sonlanmış veya yetkiniz bulunmuyor.',
+          additionalInfo: 'Lütfen yeniden giriş yapın.',
+        );
 
-    // Veri hatası
-    else if (errorMessage.toLowerCase().contains('data') ||
-        errorMessage.toLowerCase().contains('veri') ||
-        errorMessage.toLowerCase().contains('format') ||
-        errorMessage.toLowerCase().contains('bulunamadı') ||
-        errorMessage.toLowerCase().contains('not found')) {
-      return ErrorInfo(
-        icon: CupertinoIcons.doc_text_search,
-        color: CupertinoColors.systemYellow,
-        title: 'Veri Hatası',
-        description: 'Analizleriniz yüklenirken bir sorun oluştu.',
-        additionalInfo: 'Verileriniz geçici olarak erişilemiyor olabilir.',
-      );
-    }
+      case ErrorType.premium:
+        return ErrorInfo(
+          icon: CupertinoIcons.star_slash,
+          color: CupertinoColors.systemYellow,
+          title: 'Premium Gerekiyor',
+          description:
+              'Bu özelliği kullanmak için premium aboneliğe sahip olmanız gerekiyor.',
+          additionalInfo: "Premium'a geçerek sınırsız analiz yapabilirsiniz.",
+        );
 
-    // Genel hata
-    else {
-      return ErrorInfo(
-        icon: CupertinoIcons.exclamationmark_triangle,
-        color: CupertinoColors.systemGrey,
-        title: 'Beklenmeyen Bir Hata Oluştu',
-        description: 'Analizleriniz yüklenirken bir sorun oluştu.',
-        additionalInfo: errorMessage,
-      );
+      case ErrorType.notFound:
+        return ErrorInfo(
+          icon: CupertinoIcons.doc_text_search,
+          color: CupertinoColors.systemYellow,
+          title: 'Veri Bulunamadı',
+          description: 'Aradığınız analiz sonuçları bulunamadı.',
+          additionalInfo: 'Henüz hiç analiz yapmamış olabilirsiniz.',
+        );
+
+      case ErrorType.database:
+        return ErrorInfo(
+          icon: CupertinoIcons.cloud_download,
+          color: CupertinoColors.systemOrange,
+          title: 'Veritabanı Hatası',
+          description: 'Veritabanından veriler alınırken bir sorun oluştu.',
+          additionalInfo: 'Lütfen daha sonra tekrar deneyin.',
+        );
+
+      default:
+        return ErrorInfo(
+          icon: CupertinoIcons.exclamationmark_triangle,
+          color: CupertinoColors.systemGrey,
+          title: 'Beklenmeyen Bir Hata Oluştu',
+          description: 'Analizleriniz yüklenirken bir sorun oluştu.',
+          additionalInfo: 'Lütfen daha sonra tekrar deneyin.',
+        );
     }
   }
 
