@@ -89,7 +89,6 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Widget _buildScreenContent(BuildContext context) {
     return CupertinoPageScaffold(
-      backgroundColor: CupertinoColors.systemGroupedBackground,
       navigationBar: CupertinoNavigationBar(
         // Scroll pozisyonuna göre başlık gösterimi
         middle: AnimatedOpacity(
@@ -103,7 +102,6 @@ class _ProfileScreenState extends State<ProfileScreen>
           ),
         ),
         // Modern ve hafif görünüm için arkaplan efekti
-        backgroundColor: CupertinoColors.systemBackground.withOpacity(0.8),
         // Blur efekti için
         border: null,
         transitionBetweenRoutes: false,
@@ -319,26 +317,6 @@ class _ProfileScreenState extends State<ProfileScreen>
           ),
         ),
 
-        // Ayarlar Başlığı
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: EdgeInsets.only(
-              left: context.dimensions.paddingL,
-              right: context.dimensions.paddingL,
-              top: context.dimensions.paddingM,
-              bottom: context.dimensions.paddingS,
-            ),
-            child: Text(
-              'Ayarlar',
-              style: AppTextTheme.headline5.copyWith(
-                color: CupertinoColors.systemGrey,
-                fontWeight: FontWeight.w600,
-                letterSpacing: -0.5,
-              ),
-            ),
-          ),
-        ),
-
         // Ayarlar Grupları
         SliverToBoxAdapter(
           child: Column(
@@ -434,7 +412,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                     title: 'Kredi Satın Al',
                     subtitle: user.isPremium
                         ? 'Premium üyelikle sınırsız analiz yapabilirsin'
-                        : 'Tek seferlik analiz kredileri al',
+                        : 'Yakında...',
+                    //: 'Tek seferlik analiz kredileri al',
                     onTap: () {
                       HapticFeedback.selectionClick();
                       // TODO: Kredi satın alma ekranı

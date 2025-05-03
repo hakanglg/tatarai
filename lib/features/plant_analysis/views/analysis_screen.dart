@@ -895,7 +895,6 @@ class _AnalysisScreenState extends State<AnalysisScreen>
     return CupertinoPageScaffold(
       navigationBar: const CupertinoNavigationBar(
         middle: Text('Bitki Analizi'),
-        backgroundColor: CupertinoColors.systemBackground,
         border: Border(
           bottom: BorderSide(color: CupertinoColors.separator, width: 0.5),
         ),

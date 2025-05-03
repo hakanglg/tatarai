@@ -24,13 +24,32 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen>
     with SingleTickerProviderStateMixin, _RegisterScreenMixin {
+  // Hata mesajlarının tekrarını önlemek için son gösterilen hata
+  String? _lastShownError;
+
+  @override
+  void dispose() {
+    // Son hata referansını temizle
+    _lastShownError = null;
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     // Responsive değerler için dimensions
     final dim = context.dimensions;
 
     return BlocListener<AuthCubit, AuthState>(
+      listenWhen: (previous, current) {
+        // Sadece hata mesajı değiştiğinde ya da yeni bir hata eklendiğinde dinle
+        return (previous.errorMessage != current.errorMessage &&
+                current.errorMessage != null) ||
+            previous.isAuthenticated != current.isAuthenticated;
+      },
       listener: (context, state) {
+        // Widget kaldırıldı mı kontrolü
+        if (!mounted) return;
+
         // Form durumunu güncelle
         if (_isSubmitting && !state.isLoading) {
           setState(() {
@@ -38,7 +57,6 @@ class _RegisterScreenState extends State<RegisterScreen>
           });
         }
 
-        // Loading durumunu gizle (isLoading durum güncellemesi olduğunda)
         if (state.isLoading) {
           // Loading ekranı gösterme
           AppLogger.i('Kayıt yükleniyor durumu: ${state.isLoading}');
@@ -48,37 +66,38 @@ class _RegisterScreenState extends State<RegisterScreen>
           // Başarılı kayıt - hata mesajını temizle ve ana sayfaya yönlendir
           context.read<AuthCubit>().clearErrorMessage();
           context.goNamed(RouteNames.home);
-        } else if (state.errorMessage != null && !state.isLoading) {
-          // Hata durumu - yükleme tamamlandıysa ve hata varsa göster
-          if (state.errorMessage!.contains('unavailable')) {
-            // Bağlantı hatası durumunda özel mesaj göster
-            _showErrorDialog(
-              context,
-              'Sunucuya bağlanırken bir sorun oluştu. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.',
-            );
-          } else if (state.errorMessage!.contains('timeout') ||
-              state.errorMessage!.contains('zaman aşımı')) {
-            _showErrorDialog(
-              context,
-              'İşlem zaman aşımına uğradı. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.',
-            );
-          } else if (state.errorMessage!.contains('email-already-in-use')) {
-            _showErrorDialog(
-              context,
-              'Bu e-posta adresi zaten kullanılıyor. Farklı bir e-posta adresi deneyin veya giriş yapın.',
-            );
-          } else {
-            _showErrorDialog(context, state.errorMessage!);
-          }
+        } else if (state.errorMessage != null &&
+            !state.isLoading &&
+            state.errorMessage != _lastShownError) {
+          // Hata durumu - yükleme tamamlandıysa, hata varsa ve daha önce gösterilmediyse göster
 
-          // Hata mesajını gösterdikten sonra temizle
-          Future.delayed(Duration.zero, () {
-            context.read<AuthCubit>().clearErrorMessage();
-          });
+          // Son gösterilen hatayı kaydet ve göster
+          _lastShownError = state.errorMessage;
+          _showErrorDialog(context, state.errorMessage!);
+
+          // Hata mesajını gösterdikten sonra temizle - ancak widget hala mounted ise
+          if (mounted) {
+            // Context'i güvenli şekilde kullanmak için yerel bir referans alıyoruz
+            final cubit = context.read<AuthCubit>();
+
+            Future.delayed(Duration.zero, () {
+              if (mounted) {
+                cubit.clearErrorMessage();
+
+                // Bir süre sonra son hata referansını temizle
+                Future.delayed(const Duration(seconds: 2), () {
+                  if (mounted) {
+                    setState(() {
+                      _lastShownError = null;
+                    });
+                  }
+                });
+              }
+            });
+          }
         }
       },
       child: Scaffold(
-        backgroundColor: CupertinoColors.systemBackground,
         body: SafeArea(
           child: BlocBuilder<AuthCubit, AuthState>(
             builder: (context, state) {

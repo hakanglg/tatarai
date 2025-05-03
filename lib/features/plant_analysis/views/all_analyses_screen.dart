@@ -32,7 +32,6 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen> {
     return Scaffold(
       body: CupertinoPageScaffold(
         navigationBar: CupertinoNavigationBar(
-          backgroundColor: CupertinoColors.systemBackground,
           middle: Text('Tüm Analizler', style: TextStyle(color: Colors.black)),
           leading: GestureDetector(
             onTap: () => Navigator.of(context).maybePop(),

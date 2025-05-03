@@ -294,39 +294,62 @@ class AuthCubit extends BaseCubit<AuthState> {
     emitLoadingState();
   }
 
-  /// Asenkron işlem hata ile bittiğinde
-  void _handleError(String operation, Object error) {
-    String errorMessage;
-    bool isNetworkError = _isNetworkError(error);
+  /// Hata durumlarını işleyen özel metod.
+  void _handleError(String operation, Object error, [StackTrace? stackTrace]) {
+    handleError(operation, error, stackTrace);
 
-    if (error is firebase_auth.FirebaseAuthException) {
-      // Hata mesajını direkt olarak kullanmak daha güvenilir
-      errorMessage = error.message ?? 'Bir hata oluştu: ${error.code}';
-      handleError(operation, error);
-    } else {
-      if (isNetworkError) {
-        errorMessage =
-            '$operation işlemi sırasında bağlantı sorunu oluştu. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.';
+    String userFriendlyMessage;
+
+    // Firebase hata mesajlarını özelleştir
+    if (error.toString().contains('firebase_auth') ||
+        error.toString().contains('FirebaseAuth')) {
+      if (error.toString().contains('network-request-failed')) {
+        userFriendlyMessage =
+            'İnternet bağlantınızda bir sorun var. Lütfen bağlantınızı kontrol edin ve tekrar deneyin.';
+      } else if (error.toString().contains('too-many-requests')) {
+        userFriendlyMessage =
+            'Çok fazla istek gönderildi. Lütfen bir süre bekleyip tekrar deneyin.';
+      } else if (error.toString().contains('email-already-in-use')) {
+        userFriendlyMessage =
+            'Bu e-posta adresi zaten kullanılıyor. Lütfen başka bir e-posta adresi deneyin.';
+      } else if (error.toString().contains('weak-password')) {
+        userFriendlyMessage =
+            'Şifreniz çok zayıf. Lütfen en az 6 karakter içeren daha güçlü bir şifre belirleyin.';
+      } else if (error.toString().contains('invalid-email')) {
+        userFriendlyMessage =
+            'Geçersiz e-posta adresi. Lütfen geçerli bir e-posta adresi girin.';
+      } else if (error.toString().contains('user-not-found') ||
+          error.toString().contains('wrong-password')) {
+        userFriendlyMessage =
+            'E-posta veya şifre hatalı. Lütfen bilgilerinizi kontrol edin.';
+      } else if (error.toString().contains('createUserWithEmailAndPassword')) {
+        userFriendlyMessage =
+            'Hesap oluşturulurken bir sorun oluştu. Lütfen bilgilerinizi kontrol edip tekrar deneyin.';
       } else {
-        errorMessage =
-            '$operation sırasında bir hata oluştu: ${error.toString()}';
+        // Genel Firebase hatası
+        userFriendlyMessage =
+            'İşlem sırasında bir sorun oluştu. Lütfen daha sonra tekrar deneyin.';
       }
-      handleError('Beklenmeyen $operation', error);
+    } else if (error.toString().contains('timeout') ||
+        error.toString().contains('timed out')) {
+      userFriendlyMessage =
+          'İşlem zaman aşımına uğradı. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.';
+    } else if (_isNetworkError(error)) {
+      userFriendlyMessage =
+          'İnternet bağlantınızda bir sorun var. Lütfen bağlantınızı kontrol edin ve tekrar deneyin.';
+    } else {
+      // Genel hata
+      userFriendlyMessage =
+          'Bir sorun oluştu. Lütfen daha sonra tekrar deneyin.';
     }
 
-    emit(
-      state.copyWith(
-        isLoading: false,
-        errorMessage: errorMessage,
-        // Hata geldiğinde bekleyen işlem mesajını temizle
-        pendingOperationMessage: null,
-      ),
-    );
-
-    // Ağ hatası durumunda yeniden bağlantı timer'ı başlat
-    if (isNetworkError) {
-      _startReconnectTimer();
-    }
+    emit(state.copyWith(
+      status: state.user != null
+          ? AuthStatus.authenticated
+          : AuthStatus.unauthenticated,
+      isLoading: false,
+      errorMessage: userFriendlyMessage,
+    ));
   }
 
   /// E-posta ve şifre ile giriş yapar
@@ -738,18 +761,41 @@ class AuthCubit extends BaseCubit<AuthState> {
             if (_isNetworkError(e)) {
               errorMessage =
                   'Bağlantı sorunu nedeniyle kayıt yapılamadı. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.';
-            } else if (e.toString().contains('email-already-in-use')) {
+            } else if (lastException != null &&
+                lastException.toString().contains('email-already-in-use')) {
               errorMessage =
                   'Bu e-posta adresi zaten kullanılıyor. Lütfen başka bir e-posta adresi deneyin.';
+            } else if (lastException != null &&
+                lastException.toString().contains('weak-password')) {
+              errorMessage =
+                  'Şifreniz çok zayıf. Lütfen en az 6 karakter içeren daha güçlü bir şifre belirleyin.';
+            } else if (lastException != null &&
+                lastException.toString().contains('invalid-email')) {
+              errorMessage =
+                  'Geçersiz e-posta adresi formatı. Lütfen geçerli bir e-posta adresi giriniz.';
+            } else if (lastException != null &&
+                lastException
+                    .toString()
+                    .contains('createUserWithEmailAndPassword')) {
+              errorMessage =
+                  'Hesap oluşturulurken bir sorun oluştu. Lütfen bilgilerinizi kontrol edip tekrar deneyin.';
             } else {
-              errorMessage = e.toString();
+              // Daha kullanıcı dostu genel hata mesajı
+              errorMessage =
+                  'Kayıt yapılamadı, lütfen daha sonra tekrar deneyin.';
+
+              // Debug için detaylı hatayı loglara yaz
+              if (lastException != null) {
+                logError('Ham hata mesajı', lastException.toString());
+              }
             }
 
             emit(state.copyWith(
               status: AuthStatus.unauthenticated,
               isLoading: false,
               errorMessage: errorMessage,
-              showRetryButton: _isNetworkError(e),
+              showRetryButton:
+                  lastException != null && _isNetworkError(lastException),
             ));
             return;
           }
@@ -771,9 +817,32 @@ class AuthCubit extends BaseCubit<AuthState> {
         if (lastException != null && _isNetworkError(lastException)) {
           errorMessage =
               'Bağlantı sorunu nedeniyle kayıt yapılamadı. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.';
+        } else if (lastException != null &&
+            lastException.toString().contains('email-already-in-use')) {
+          errorMessage =
+              'Bu e-posta adresi zaten kullanılıyor. Lütfen başka bir e-posta adresi deneyin.';
+        } else if (lastException != null &&
+            lastException.toString().contains('weak-password')) {
+          errorMessage =
+              'Şifreniz çok zayıf. Lütfen en az 6 karakter içeren daha güçlü bir şifre belirleyin.';
+        } else if (lastException != null &&
+            lastException.toString().contains('invalid-email')) {
+          errorMessage =
+              'Geçersiz e-posta adresi formatı. Lütfen geçerli bir e-posta adresi giriniz.';
+        } else if (lastException != null &&
+            lastException
+                .toString()
+                .contains('createUserWithEmailAndPassword')) {
+          errorMessage =
+              'Hesap oluşturulurken bir sorun oluştu. Lütfen bilgilerinizi kontrol edip tekrar deneyin.';
         } else {
-          errorMessage = lastException?.toString() ??
-              'Kayıt yapılamadı, lütfen bilgilerinizi kontrol edin ve tekrar deneyin.';
+          // Daha kullanıcı dostu genel hata mesajı
+          errorMessage = 'Kayıt yapılamadı, lütfen daha sonra tekrar deneyin.';
+
+          // Debug için detaylı hatayı loglara yaz
+          if (lastException != null) {
+            logError('Ham hata mesajı', lastException.toString());
+          }
         }
 
         emit(state.copyWith(

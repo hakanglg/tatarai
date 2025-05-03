@@ -43,6 +43,12 @@ class AppConstants {
   static const String tokenPackMediumId = 'com.tatarai.tokens.medium';
   static const String tokenPackLargeId = 'com.tatarai.tokens.large';
 
+  // Varsayılan abonelik fiyatları
+  static const String defaultMonthlyPrice = "\$5.00";
+  static const String defaultYearlyPrice = "\$40.00";
+  static const String defaultMonthlyOfYearlyPrice = "\$3.33"; // 40/12
+  static const double savingsPercentage = 34; // 100 - ((40/12)/5)*100
+
   // Resim sıkıştırma kalitesi (0-100)
   static const int imageQuality = 80;
 

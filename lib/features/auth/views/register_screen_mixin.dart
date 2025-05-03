@@ -67,20 +67,28 @@ mixin _RegisterScreenMixin on State<RegisterScreen> {
 
   @override
   void dispose() {
+    // Controller'ları temizle
     _displayNameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+
+    // Animasyon kontrolcüsünü temizle
     _animationController.dispose();
+
     super.dispose();
   }
 
   /// Kayıt ol butonuna tıklandığında çalışır
   void _signUp() {
+    // Widget kaldırıldıysa işlemi pas geçiyoruz
+    if (!mounted) return;
+
     if (_formKey.currentState?.validate() ?? false) {
       // Klavyeyi kapat
       FocusScope.of(context).unfocus();
 
+      // Yerel kontroller (Firebase ile ilgili değil)
       if (!_acceptTerms) {
         _showErrorDialog(
           context,
@@ -94,46 +102,122 @@ mixin _RegisterScreenMixin on State<RegisterScreen> {
         return;
       }
 
-      setState(() {
-        _isSubmitting = true;
-      });
+      // Sadece widget hala etkinse setState çağır
+      if (mounted) {
+        setState(() {
+          _isSubmitting = true;
+        });
 
-      context.read<AuthCubit>().signUpWithEmailAndPassword(
-            email: _emailController.text.trim(),
-            password: _passwordController.text.trim(),
-            displayName: _displayNameController.text.trim(),
-          );
+        // Firebase kayıt işlemi - hatalar BlocListener tarafından yakalanacak
+        context.read<AuthCubit>().signUpWithEmailAndPassword(
+              email: _emailController.text.trim(),
+              password: _passwordController.text.trim(),
+              displayName: _displayNameController.text.trim(),
+            );
+      }
     }
   }
 
   /// Hata mesajlarını gösterir
   void _showErrorDialog(BuildContext context, String message) {
-    showCupertinoDialog(
-      context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              CupertinoIcons.exclamationmark_triangle,
-              color: CupertinoColors.systemRed,
-              size: 20,
+    // Widget kaldırıldıysa dialog göstermeyi pas geçiyoruz
+    if (!mounted) return;
+
+    // Firebase hata mesajlarını kullanıcı dostu hale getir
+    String userFriendlyMessage = message;
+
+    // Exception: içeren veya teknik detaylı tüm hataları kullanıcı dostu hale getir
+    if (message.contains('Exception:') ||
+        message.contains('Error:') ||
+        message.contains('firebase') ||
+        message.contains('Firebase')) {
+      // Özel hata durumları
+      if (message.toLowerCase().contains('email-already-in-use') ||
+          message.toLowerCase().contains('already in use')) {
+        userFriendlyMessage =
+            'Bu e-posta adresi zaten kullanılıyor. Başka bir e-posta adresi kullanabilir veya giriş yapmayı deneyebilirsiniz.';
+      } else if (message.toLowerCase().contains('weak-password') ||
+          message.toLowerCase().contains('weak password')) {
+        userFriendlyMessage =
+            'Şifreniz çok zayıf. Lütfen en az 6 karakter içeren daha güçlü bir şifre belirleyin.';
+      } else if (message.toLowerCase().contains('invalid-email') ||
+          message.toLowerCase().contains('invalid email')) {
+        userFriendlyMessage =
+            'Geçersiz e-posta adresi. Lütfen düzgün bir e-posta formatı kullanın.';
+      } else if (message.toLowerCase().contains('network') ||
+          message.toLowerCase().contains('connection') ||
+          message.toLowerCase().contains('unavailable') ||
+          message.toLowerCase().contains('internet')) {
+        userFriendlyMessage =
+            'İnternet bağlantınızda bir sorun var. Lütfen bağlantınızı kontrol edin ve tekrar deneyin.';
+      } else if (message.toLowerCase().contains('timeout') ||
+          message.toLowerCase().contains('timed out')) {
+        userFriendlyMessage =
+            'İşlem çok uzun sürdü. Lütfen daha sonra tekrar deneyin.';
+      } else if (message
+              .toLowerCase()
+              .contains('createuserwithemailandpassword') ||
+          message.toLowerCase().contains('create user')) {
+        userFriendlyMessage =
+            'Hesap oluşturulurken bir sorun oluştu. Lütfen bilgilerinizi kontrol edip tekrar deneyin.';
+      } else {
+        // Genel hata durumu
+        userFriendlyMessage =
+            'Hesap oluşturulurken bir sorun oluştu. Lütfen daha sonra tekrar deneyin.';
+      }
+    }
+
+    // Dialog'u yalnızca widget hala kullanımdaysa göster
+    if (mounted) {
+      showCupertinoDialog(
+        context: context,
+        builder: (dialogContext) => CupertinoAlertDialog(
+          title: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                CupertinoIcons.exclamationmark_triangle,
+                color: CupertinoColors.systemRed,
+                size: 22,
+              ),
+              SizedBox(width: 8),
+              Text(
+                'Bir sorun oluştu',
+                style: TextStyle(
+                  fontFamily: 'sfpro',
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          content: Padding(
+            padding: const EdgeInsets.only(top: 12.0, bottom: 4.0),
+            child: Text(
+              userFriendlyMessage,
+              style: TextStyle(
+                fontFamily: 'sfpro',
+                fontSize: 14,
+              ),
+              textAlign: TextAlign.center,
             ),
-            SizedBox(width: 8),
-            Text('Hata'),
+          ),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () {
+                // Dialog'u kapat - güvenli erişim için dialogContext kullanıyoruz
+                Navigator.of(dialogContext).pop();
+              },
+              child: const Text(
+                'Anladım',
+                style: TextStyle(
+                  fontFamily: 'sfpro',
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
           ],
         ),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 8.0),
-          child: Text(message),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Tamam'),
-          ),
-        ],
-      ),
-    );
+      );
+    }
   }
 }

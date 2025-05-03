@@ -259,7 +259,6 @@ class _PremiumScreenState extends State<PremiumScreen>
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         middle: const Text('Premium'),
-        backgroundColor: CupertinoColors.systemBackground,
         border: const Border(
           bottom: BorderSide(color: Colors.transparent),
         ),
@@ -542,18 +541,18 @@ class _PremiumScreenState extends State<PremiumScreen>
     // Ürünleri bul veya varsayılan değerleri kullan
     final String monthlyPrice = hasProducts
         ? _findProductPrice(AppConstants.subscriptionMonthlyId)
-        : '₺29,99';
+        : AppConstants.defaultMonthlyPrice;
     final String yearlyPrice = hasProducts
         ? _findProductPrice(AppConstants.subscriptionYearlyId)
-        : '₺199,99';
+        : AppConstants.defaultYearlyPrice;
 
     // Yıllık fiyatın aylık karşılığını hesapla
     final String yearlyMonthlyPrice = hasProducts
         ? _calculateMonthlyPrice(AppConstants.subscriptionYearlyId)
-        : '₺16,67';
+        : AppConstants.defaultMonthlyOfYearlyPrice;
 
     // Yıllık abone olunduğunda tasarruf oranı
-    final double savingsPercentage = 45; // Varsayılan olarak %45 tasarruf
+    final double savingsPercentage = AppConstants.savingsPercentage;
 
     return Row(
       children: [
@@ -983,7 +982,9 @@ class _PremiumScreenState extends State<PremiumScreen>
       final product = _products.firstWhere((p) => p.id == productId);
       return product.price;
     } catch (e) {
-      return productId.contains('monthly') ? '₺29,99' : '₺199,99';
+      return productId.contains('monthly')
+          ? AppConstants.defaultMonthlyPrice
+          : AppConstants.defaultYearlyPrice;
     }
   }
 
@@ -992,9 +993,9 @@ class _PremiumScreenState extends State<PremiumScreen>
     try {
       final product = _products.firstWhere((p) => p.id == yearlyProductId);
       final price = product.rawPrice / 12;
-      return price.toStringAsFixed(2).replaceAll('.', ',');
+      return "\$${price.toStringAsFixed(2)}";
     } catch (e) {
-      return '₺16,67'; // Varsayılan değer
+      return AppConstants.defaultMonthlyOfYearlyPrice; // Varsayılan değer
     }
   }
 
@@ -1029,5 +1030,28 @@ class _FeatureItem {
     required this.title,
     required this.description,
     required this.color,
+  });
+}
+
+// Örnek test kodu
+void testInAppPurchase() async {
+  // Test modunu etkinleştir
+  InAppPurchase.instance.isAvailable().then((available) {
+    if (available) {
+      AppLogger.i('In-app purchase kullanılabilir');
+      // Test ürünlerini sorgula
+      final Set<String> ids = {
+        AppConstants.subscriptionMonthlyId,
+        AppConstants.subscriptionYearlyId,
+      };
+      InAppPurchase.instance.queryProductDetails(ids).then((response) {
+        if (response.notFoundIDs.isNotEmpty) {
+          AppLogger.w('Bulunamayan ürünler: ${response.notFoundIDs}');
+        }
+        for (final product in response.productDetails) {
+          AppLogger.i('Ürün bulundu: ${product.id} - ${product.price}');
+        }
+      });
+    }
   });
 }

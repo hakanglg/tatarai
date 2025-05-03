@@ -6,6 +6,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:tatarai/core/theme/app_theme.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
 import 'package:tatarai/core/theme/dimensions.dart';
 import 'package:tatarai/core/theme/text_theme.dart';
@@ -176,7 +177,6 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
       return CupertinoPageScaffold(
         navigationBar: CupertinoNavigationBar(
           middle: Text('Analiz Sonucu Yüklenemedi'),
-          backgroundColor: CupertinoColors.systemBackground,
           leading: GestureDetector(
             onTap: () => Navigator.of(context).maybePop(),
             child: Icon(
@@ -260,7 +260,6 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
               ? result.fieldName!
               : result.plantName,
         ),
-        backgroundColor: CupertinoColors.systemBackground,
         automaticallyImplyLeading: false,
         leading: GestureDetector(
           onTap: () => Navigator.of(context).maybePop(),
@@ -1278,7 +1277,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                 borderRadius: BorderRadius.circular(4),
                 child: LinearProgressIndicator(
                   value: score / 100,
-                  backgroundColor: CupertinoColors.systemGrey5,
+                  backgroundColor: AppColors.divider,
                   valueColor: AlwaysStoppedAnimation<Color>(
                     _getGrowthScoreColor(score),
                   ),

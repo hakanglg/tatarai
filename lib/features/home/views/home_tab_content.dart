@@ -70,7 +70,6 @@ class _HomeTabContentState extends State<HomeTabContent>
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      backgroundColor: CupertinoColors.systemGroupedBackground,
       navigationBar: CupertinoNavigationBar(
         middle: Text(
           AppConstants.appName,
@@ -79,8 +78,6 @@ class _HomeTabContentState extends State<HomeTabContent>
             letterSpacing: -0.5,
           ),
         ),
-        backgroundColor: CupertinoColors.systemBackground.withOpacity(0.9),
-        border: null,
       ),
       child: SafeArea(
         child: CustomScrollView(

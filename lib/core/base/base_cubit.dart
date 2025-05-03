@@ -8,11 +8,31 @@ abstract class BaseCubit<T extends BaseState> extends Cubit<T> {
 
   /// Hata durumunu işleme
   void handleError(String operation, dynamic error, [StackTrace? stackTrace]) {
+    // Hata mesajını loglara yazdır
     AppLogger.e('$runtimeType - $operation hatası: $error', error, stackTrace);
 
-    final errorMessage =
-        error is Exception ? error.toString() : 'Bir hata oluştu';
-    emitErrorState(errorMessage);
+    // Firebase ve diğer hatalar için teknik detayları loglara yazdırıp,
+    // kullanıcıya gösterilmemesini sağla
+    emitErrorState(_sanitizeErrorMessage(error));
+  }
+
+  /// Hata mesajını kullanıcı dostu hale getirir
+  String _sanitizeErrorMessage(dynamic error) {
+    if (error == null) {
+      return 'Bilinmeyen bir hata oluştu';
+    }
+
+    String errorString = error.toString();
+
+    // Hata mesajı içinde teknik detaylar içeriyorsa bunları filtrele
+    if (errorString.contains('Exception:') ||
+        errorString.contains('Error:') ||
+        errorString.contains('firebase_auth') ||
+        errorString.contains('FirebaseAuth')) {
+      return 'Bir sorun oluştu, lütfen daha sonra tekrar deneyin';
+    }
+
+    return errorString;
   }
 
   /// Hata durumunu emit etme (implementasyonu alt sınıflar yapacak)

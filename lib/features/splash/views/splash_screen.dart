@@ -197,7 +197,6 @@ class _SplashScreenState extends BaseState<SplashScreen>
 
     return Scaffold(
       body: CupertinoPageScaffold(
-        backgroundColor: AppColors.background,
         child: SafeArea(
           child: Center(
             child: AnimatedBuilder(

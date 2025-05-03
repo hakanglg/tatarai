@@ -19,7 +19,7 @@ class AppColors {
   static const Color black = Color(0xFF000000);
 
   // Arka plan renkleri
-  static const Color background = Color(0xFFF9F9F9);
+  static const Color background = Color(0xFFf9f9f9);
   static const Color surface = Color(0xFFFFFFFF);
   static const Color surfaceVariant = Color(0xFFECEFF1);
 

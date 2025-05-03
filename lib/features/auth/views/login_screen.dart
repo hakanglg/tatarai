@@ -75,7 +75,6 @@ class _LoginScreenState extends State<LoginScreen>
         }
       },
       child: Scaffold(
-        backgroundColor: CupertinoColors.systemBackground,
         body: SafeArea(
           child: BlocBuilder<AuthCubit, AuthState>(
             builder: (context, state) {
