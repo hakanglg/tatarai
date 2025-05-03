@@ -8,7 +8,7 @@ import 'package:tatarai/core/widgets/app_button.dart';
 import 'package:tatarai/features/plant_analysis/cubits/plant_analysis_cubit.dart';
 import 'package:tatarai/features/plant_analysis/models/plant_analysis_result.dart';
 import 'package:tatarai/features/plant_analysis/cubits/plant_analysis_state.dart';
-import 'package:tatarai/features/plant_analysis/views/analysis_result_screen.dart';
+import 'package:tatarai/features/plant_analysis/views/analyses_result/analysis_result_screen.dart';
 import 'package:tatarai/features/plant_analysis/views/widgets/analysis_card.dart';
 
 /// Tüm analizleri gösteren ekran
@@ -54,10 +54,11 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen> {
                       Text(
                         'Analizler yükleniyor...',
                         style: AppTextTheme.bodyMedium
-                            .copyWith(color: AppTextTheme.bodySmall.color),
+                            .copyWith(color: AppTextTheme.bodyMedium.color),
                       ),
                       SizedBox(height: context.dimensions.spaceXS),
-                      Text('Lütfen bekleyin...', style: AppTextTheme.bodySmall),
+                      Text('Lütfen bekleyin...',
+                          style: AppTextTheme.smallCaption),
                     ],
                   ),
                 );
@@ -129,7 +130,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen> {
                 // Hata açıklaması
                 Text(
                   errorInfo.description,
-                  style: AppTextTheme.subtitle2
+                  style: AppTextTheme.caption
                       .copyWith(color: AppColors.textSecondary),
                   textAlign: TextAlign.center,
                 ),

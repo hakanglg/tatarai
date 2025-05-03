@@ -12,8 +12,8 @@ import 'package:tatarai/features/auth/views/register_screen.dart';
 import 'package:tatarai/features/home/views/home_screen.dart';
 import 'package:tatarai/features/navbar/navigation_manager.dart';
 import 'package:tatarai/features/payment/views/premium_screen.dart';
-import 'package:tatarai/features/plant_analysis/views/analysis_result_screen.dart';
-import 'package:tatarai/features/plant_analysis/views/analysis_screen.dart';
+import 'package:tatarai/features/plant_analysis/views/analyses_result/analysis_result_screen.dart';
+import 'package:tatarai/features/plant_analysis/views/analysis/analysis_screen.dart';
 import 'package:tatarai/features/profile/views/profile_screen.dart';
 import 'package:tatarai/features/splash/views/splash_screen.dart';
 

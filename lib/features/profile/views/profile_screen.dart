@@ -22,8 +22,7 @@ import 'package:flutter/material.dart';
 import 'package:tatarai/features/profile/cubits/profile_cubit.dart';
 import 'package:sprung/sprung.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:app_settings/app_settings.dart';
+import 'package:tatarai/core/utils/permission_manager.dart';
 
 /// Kullanıcı profil bilgilerini gösteren ve düzenleyen ekran
 /// Apple Human Interface Guidelines'a uygun modern tasarım
@@ -120,7 +119,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     SizedBox(height: context.dimensions.spaceM),
                     Text(
                       'Yükleniyor...',
-                      style: AppTextTheme.subtitle2.copyWith(
+                      style: AppTextTheme.caption.copyWith(
                         color: CupertinoColors.systemGrey,
                       ),
                     ),
@@ -181,9 +180,10 @@ class _ProfileScreenState extends State<ProfileScreen>
             final user = state.user;
 
             if (user == null) {
-              return const Center(
+              return Center(
                 child: Text('Oturum açık değil',
-                    style: TextStyle(color: CupertinoColors.systemGrey)),
+                    style: AppTextTheme.captionL
+                        .copyWith(color: CupertinoColors.systemGrey)),
               );
             }
 
@@ -247,7 +247,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                       SizedBox(width: 7),
                       Text(
                         user.email,
-                        style: AppTextTheme.subtitle2.copyWith(
+                        style: AppTextTheme.caption.copyWith(
                           color: AppColors.textSecondary.withOpacity(0.85),
                           letterSpacing: -0.3,
                           fontSize: 15,
@@ -1413,14 +1413,24 @@ class _ProfileScreenState extends State<ProfileScreen>
                 Navigator.pop(context);
                 _pickImageFromSource(ImageSource.camera);
               },
-              child: const Text('Kamera'),
+              child: Text(
+                'Kamera',
+                style: AppTextTheme.largeBody.copyWith(
+                  color: AppColors.primary,
+                ),
+              ),
             ),
             CupertinoActionSheetAction(
               onPressed: () {
                 Navigator.pop(context);
                 _pickImageFromSource(ImageSource.gallery);
               },
-              child: const Text('Galeri'),
+              child: Text(
+                'Galeri',
+                style: AppTextTheme.largeBody.copyWith(
+                  color: AppColors.primary,
+                ),
+              ),
             ),
           ],
           cancelButton: CupertinoActionSheetAction(
@@ -1442,12 +1452,19 @@ class _ProfileScreenState extends State<ProfileScreen>
       AppLogger.i(
           'Profil fotoğrafı seçimi başlatılıyor, kaynak: ${source == ImageSource.camera ? 'Kamera' : 'Galeri'}');
 
-      // İzin kontrolü
-      bool hasPermission = await _checkPermission(source);
+      // İzin kontrolü - yeni merkezi PermissionManager kullanımı
+      final permissionType = source == ImageSource.camera
+          ? AppPermissionType.camera
+          : AppPermissionType.photos;
+
+      bool hasPermission = await PermissionManager.requestPermission(
+        permissionType,
+        context: context,
+      );
+
       if (!hasPermission) {
-        if (mounted) {
-          _showPermissionDeniedDialog(context, source);
-        }
+        AppLogger.w(
+            '${source == ImageSource.camera ? 'Kamera' : 'Galeri'} izni alınamadı');
         return;
       }
 
@@ -1546,70 +1563,18 @@ class _ProfileScreenState extends State<ProfileScreen>
   // Kaynak türüne göre izin kontrolü yapar
   Future<bool> _checkPermission(ImageSource source) async {
     try {
-      if (source == ImageSource.camera) {
-        // Kamera izni kontrolü
-        final status = await Permission.camera.status;
-        if (status.isDenied) {
-          // İzin istenecek
-          final result = await Permission.camera.request();
-          return result.isGranted;
-        }
-        return status.isGranted;
-      } else {
-        // Galeri izni kontrolü
-        final status = await Permission.photos.status;
-        if (status.isDenied) {
-          // İzin istenecek
-          final result = await Permission.photos.request();
-          return result.isGranted;
-        }
-        return status.isGranted;
-      }
+      final permissionType = source == ImageSource.camera
+          ? AppPermissionType.camera
+          : AppPermissionType.photos;
+
+      return await PermissionManager.requestPermission(
+        permissionType,
+        context: context,
+      );
     } catch (e) {
       AppLogger.e('İzin kontrolü hatası', e.toString());
       return false;
     }
-  }
-
-  // İzin reddedildiğinde gösterilecek diyalog
-  void _showPermissionDeniedDialog(BuildContext context, ImageSource source) {
-    showCupertinoDialog(
-      context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              CupertinoIcons.exclamationmark_circle,
-              color: CupertinoColors.systemRed,
-              size: 20,
-            ),
-            SizedBox(width: 8),
-            Text('İzin Gerekli'),
-          ],
-        ),
-        content: Text(
-          source == ImageSource.camera
-              ? 'Kamerayı kullanabilmek için uygulama ayarlarından kamera iznini vermeniz gerekiyor.'
-              : 'Fotoğraf galerisine erişebilmek için uygulama ayarlarından galeri iznini vermeniz gerekiyor.',
-          style: TextStyle(fontSize: 14),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            child: Text('İptal'),
-            onPressed: () => Navigator.pop(context),
-          ),
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            child: Text('Ayarlara Git'),
-            onPressed: () {
-              Navigator.pop(context);
-              openAppSettings();
-            },
-          ),
-        ],
-      ),
-    );
   }
 
   // Hata mesajlarını kullanıcı dostu hale getir

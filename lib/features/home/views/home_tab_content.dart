@@ -4,6 +4,7 @@ import 'package:tatarai/core/constants/app_constants.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
 import 'package:tatarai/core/theme/text_theme.dart';
 import 'package:tatarai/core/utils/logger.dart';
+import 'package:tatarai/core/widgets/app_button.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
 import 'package:tatarai/features/auth/cubits/auth_state.dart';
 import 'package:tatarai/features/home/cubits/home_cubit.dart';
@@ -12,8 +13,8 @@ import 'package:tatarai/features/navbar/navigation_manager.dart';
 import 'package:tatarai/features/plant_analysis/cubits/plant_analysis_cubit.dart';
 import 'package:tatarai/features/plant_analysis/models/plant_analysis_result.dart';
 import 'package:tatarai/features/plant_analysis/cubits/plant_analysis_state.dart';
-import 'package:tatarai/features/plant_analysis/views/analysis_result_screen.dart';
-import 'package:tatarai/features/plant_analysis/views/all_analyses_screen.dart';
+import 'package:tatarai/features/plant_analysis/views/analyses_result/analysis_result_screen.dart';
+import 'package:tatarai/features/plant_analysis/views/all_analysis/all_analyses_screen.dart';
 import 'package:tatarai/core/theme/dimensions.dart';
 import 'package:sprung/sprung.dart';
 import 'package:flutter/foundation.dart';
@@ -147,8 +148,8 @@ class _HomeTabContentState extends State<HomeTabContent>
               children: [
                 Text(
                   'Merhaba,',
-                  style: AppTextTheme.bodyText1.copyWith(
-                    color: CupertinoColors.white.withOpacity(0.9),
+                  style: AppTextTheme.largeBody.copyWith(
+                    color: AppColors.white.withOpacity(0.9),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -156,12 +157,12 @@ class _HomeTabContentState extends State<HomeTabContent>
                 Text(
                   userName,
                   style: AppTextTheme.headline3.copyWith(
-                    color: CupertinoColors.white,
+                    color: AppColors.white,
                     fontWeight: FontWeight.bold,
                     letterSpacing: -0.5,
                     shadows: [
                       Shadow(
-                        color: CupertinoColors.black.withOpacity(0.1),
+                        color: AppColors.black.withOpacity(0.1),
                         offset: const Offset(0, 1),
                         blurRadius: 2,
                       ),
@@ -171,8 +172,8 @@ class _HomeTabContentState extends State<HomeTabContent>
                 SizedBox(height: context.dimensions.spaceS),
                 Text(
                   'Bitkilerinin sağlığını kontrol etmeye hazır mısın?',
-                  style: AppTextTheme.bodyText2.copyWith(
-                    color: CupertinoColors.white.withOpacity(0.9),
+                  style: AppTextTheme.body.copyWith(
+                    color: AppColors.white.withOpacity(0.9),
                     fontWeight: FontWeight.w400,
                   ),
                 ),
@@ -200,7 +201,7 @@ class _HomeTabContentState extends State<HomeTabContent>
             ),
             child: Text(
               'Hızlı İşlemler',
-              style: AppTextTheme.headline6.copyWith(
+              style: AppTextTheme.headline5.copyWith(
                 color: AppColors.textPrimary,
                 fontWeight: FontWeight.w600,
                 letterSpacing: -0.5,
@@ -254,7 +255,7 @@ class _HomeTabContentState extends State<HomeTabContent>
               title: 'Tüm Analizler',
               subtitle: 'Geçmiş analiz sonuçlarına göz at',
               iconData: CupertinoIcons.doc_chart,
-              color: CupertinoColors.activeOrange,
+              color: AppColors.primary,
               onTap: () {
                 Navigator.of(context).push(
                   CupertinoPageRoute(
@@ -283,11 +284,11 @@ class _HomeTabContentState extends State<HomeTabContent>
       child: Container(
         padding: EdgeInsets.all(context.dimensions.paddingM),
         decoration: BoxDecoration(
-          color: CupertinoColors.systemBackground,
+          color: AppColors.white,
           borderRadius: BorderRadius.circular(context.dimensions.radiusM),
           boxShadow: [
             BoxShadow(
-              color: CupertinoColors.systemGrey5.withOpacity(0.8),
+              color: AppColors.black.withOpacity(0.1),
               blurRadius: 8,
               offset: const Offset(0, 2),
               spreadRadius: 0,
@@ -423,28 +424,9 @@ class _HomeTabContentState extends State<HomeTabContent>
                         letterSpacing: -0.5,
                       ),
                     ),
-                    CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      child: Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: context.dimensions.paddingS,
-                          vertical: context.dimensions.spaceXXS,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(
-                            context.dimensions.radiusS,
-                          ),
-                        ),
-                        child: Text(
-                          'Tümünü Gör',
-                          style: AppTextTheme.button.copyWith(
-                            color: AppColors.primary,
-                            fontSize: context.dimensions.fontSizeS,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
+                    AppButton(
+                      text: "Tümünü Gör",
+                      type: AppButtonType.text,
                       onPressed: () {
                         Navigator.of(context).push(
                           CupertinoPageRoute(
@@ -452,7 +434,7 @@ class _HomeTabContentState extends State<HomeTabContent>
                           ),
                         );
                       },
-                    ),
+                    )
                   ],
                 ),
                 SizedBox(height: context.dimensions.spaceS),
@@ -492,11 +474,11 @@ class _HomeTabContentState extends State<HomeTabContent>
       child: Container(
         padding: EdgeInsets.all(context.dimensions.paddingL),
         decoration: BoxDecoration(
-          color: CupertinoColors.systemBackground,
+          color: AppColors.white,
           borderRadius: BorderRadius.circular(context.dimensions.radiusM),
           boxShadow: [
             BoxShadow(
-              color: CupertinoColors.systemGrey5.withOpacity(0.8),
+              color: AppColors.black.withOpacity(0.1),
               blurRadius: 8,
               offset: const Offset(0, 2),
               spreadRadius: 0,

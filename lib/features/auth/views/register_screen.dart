@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:tatarai/core/routing/route_names.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
 import 'package:tatarai/core/theme/dimensions.dart';
+import 'package:tatarai/core/theme/text_theme.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/core/widgets/app_button.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
@@ -134,9 +135,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                       SizedBox(width: dim.spaceXXS),
                                       Text(
                                         'Giriş',
-                                        style: TextStyle(
-                                          fontFamily: 'sfpro',
-                                          fontSize: dim.fontSizeS,
+                                        style: AppTextTheme.captionL.copyWith(
                                           color: AppColors.primary,
                                         ),
                                       ),
@@ -151,21 +150,13 @@ class _RegisterScreenState extends State<RegisterScreen>
                             // Başlık ve açıklama
                             Text(
                               'Hesap Oluştur',
-                              style: TextStyle(
-                                fontFamily: 'sfpro',
-                                fontSize: dim.fontSizeXL,
-                                fontWeight: FontWeight.bold,
-                                color: CupertinoColors.label,
-                                letterSpacing: -0.5,
-                              ),
+                              style: AppTextTheme.headline3,
                             ),
                             SizedBox(height: dim.spaceS),
                             Text(
                               'TatarAI yapay zeka tarım asistanını kullanmak için hesap oluşturun',
-                              style: TextStyle(
-                                fontFamily: 'sfpro',
-                                fontSize: dim.fontSizeS,
-                                color: CupertinoColors.secondaryLabel,
+                              style: AppTextTheme.captionL.copyWith(
+                                color: AppColors.textSecondary,
                               ),
                             ),
                             SizedBox(height: dim.spaceXL),
@@ -207,7 +198,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                   _obscurePassword
                                       ? CupertinoIcons.eye
                                       : CupertinoIcons.eye_slash,
-                                  color: CupertinoColors.systemGrey,
+                                  color: AppColors.textSecondary,
                                   size: dim.iconSizeS,
                                 ),
                               ),
@@ -232,7 +223,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                   _obscureConfirmPassword
                                       ? CupertinoIcons.eye
                                       : CupertinoIcons.eye_slash,
-                                  color: CupertinoColors.systemGrey,
+                                  color: AppColors.textSecondary,
                                   size: dim.iconSizeS,
                                 ),
                               ),
@@ -242,8 +233,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                             // Kullanım koşulları onay
                             Container(
                               decoration: BoxDecoration(
-                                color: CupertinoColors.systemGreen
-                                    .withOpacity(0.4),
+                                color: AppColors.primary.withOpacity(0.4),
                                 borderRadius:
                                     BorderRadius.circular(dim.radiusM),
                               ),
@@ -275,10 +265,8 @@ class _RegisterScreenState extends State<RegisterScreen>
                                       },
                                       child: Text(
                                         'Kullanım koşullarını ve gizlilik politikasını kabul ediyorum',
-                                        style: TextStyle(
-                                          fontFamily: 'sfpro',
-                                          fontSize: dim.fontSizeS,
-                                          color: CupertinoColors.secondaryLabel,
+                                        style: AppTextTheme.captionL.copyWith(
+                                          color: AppColors.textSecondary,
                                         ),
                                       ),
                                     ),
@@ -308,10 +296,8 @@ class _RegisterScreenState extends State<RegisterScreen>
                               children: [
                                 Text(
                                   'Zaten bir hesabınız var mı?',
-                                  style: TextStyle(
-                                    fontFamily: 'sfpro',
-                                    fontSize: dim.fontSizeS,
-                                    color: CupertinoColors.secondaryLabel,
+                                  style: AppTextTheme.captionL.copyWith(
+                                    color: AppColors.textSecondary,
                                   ),
                                 ),
                                 SizedBox(width: dim.spaceXS),
@@ -324,8 +310,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                         },
                                   child: Text(
                                     'Giriş Yap',
-                                    style: TextStyle(
-                                      fontFamily: 'sfpro',
+                                    style: AppTextTheme.captionL.copyWith(
                                       fontWeight: FontWeight.w600,
                                       color: AppColors.primary,
                                     ),
@@ -390,15 +375,9 @@ class _RegisterScreenState extends State<RegisterScreen>
         decoration: const BoxDecoration(
           border: null,
         ),
-        style: TextStyle(
-          fontFamily: 'sfpro',
-          fontSize: dim.fontSizeM,
-          color: CupertinoColors.label,
-        ),
-        placeholderStyle: TextStyle(
-          fontFamily: 'sfpro',
-          fontSize: dim.fontSizeM,
-          color: CupertinoColors.placeholderText,
+        style: AppTextTheme.body,
+        placeholderStyle: AppTextTheme.body.copyWith(
+          color: AppColors.textSecondary.withOpacity(0.7),
         ),
       ),
     );
@@ -445,29 +424,26 @@ class _RegisterScreenState extends State<RegisterScreen>
           color: Colors.transparent,
           child: InkWell(
             onTap: onPressed,
-            splashColor: CupertinoColors.white.withOpacity(0.1),
-            highlightColor: CupertinoColors.white.withOpacity(0.05),
+            splashColor: AppColors.white.withOpacity(0.1),
+            highlightColor: AppColors.white.withOpacity(0.05),
             child: Center(
               child: isLoading
-                  ? const CupertinoActivityIndicator(
-                      color: CupertinoColors.white)
+                  ? const CupertinoActivityIndicator(color: AppColors.white)
                   : Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
                           text,
-                          style: TextStyle(
-                            fontFamily: 'sfpro',
-                            fontSize: dim.fontSizeM,
+                          style: AppTextTheme.body.copyWith(
                             fontWeight: FontWeight.w600,
-                            color: CupertinoColors.white,
+                            color: AppColors.white,
                             letterSpacing: 0.3,
                           ),
                         ),
                         SizedBox(width: dim.spaceXS),
                         Icon(
                           icon,
-                          color: CupertinoColors.white,
+                          color: AppColors.white,
                           size: dim.iconSizeS,
                         ),
                       ],

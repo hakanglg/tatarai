@@ -35,29 +35,13 @@ class _PremiumScreenState extends State<PremiumScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _slideAnimation;
+  late Animation<double> _scaleAnimation;
 
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-
-    _fadeAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOut,
-    );
-
-    _slideAnimation = Tween<double>(begin: 30, end: 0).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeOut,
-      ),
-    );
-
+    _setupAnimations();
     _initInAppPurchase();
-    _animationController.forward();
   }
 
   @override
@@ -65,6 +49,41 @@ class _PremiumScreenState extends State<PremiumScreen>
     _subscription.cancel();
     _animationController.dispose();
     super.dispose();
+  }
+
+  /// Animasyonları ayarla
+  void _setupAnimations() {
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+
+    _fadeAnimation = CurvedAnimation(
+      parent: _animationController,
+      curve: const Interval(0.0, 0.8, curve: Curves.easeOut),
+    );
+
+    _slideAnimation = Tween<double>(
+      begin: 50,
+      end: 0,
+    ).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: const Interval(0.0, 0.8, curve: Curves.easeOut),
+      ),
+    );
+
+    _scaleAnimation = Tween<double>(
+      begin: 0.8,
+      end: 1.0,
+    ).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: const Interval(0.0, 0.8, curve: Curves.easeOut),
+      ),
+    );
+
+    _animationController.forward();
   }
 
   /// In-App Purchase'ı başlat
@@ -297,76 +316,165 @@ class _PremiumScreenState extends State<PremiumScreen>
                         child: FadeTransition(
                           opacity: _fadeAnimation,
                           child: Padding(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: context.dimensions.paddingL,
-                              vertical: context.dimensions.paddingM,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
                             ),
-                            child: _buildFeaturesList(),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Premium Avantajları',
+                                  style: AppTextTheme.headline4.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                ..._buildFeatureList(),
+                              ],
+                            ),
                           ),
                         ),
                       ),
 
-                      // Paket seçimi
-                      if (!isPremium && !_isLoading && _errorMessage == null)
+                      // Abonelik seçenekleri
+                      if (!isPremium)
                         SliverToBoxAdapter(
                           child: FadeTransition(
                             opacity: _fadeAnimation,
-                            child: Padding(
-                              padding:
-                                  EdgeInsets.all(context.dimensions.paddingL),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Abonelik Seçenekleri',
-                                    style: AppTextTheme.headline5.copyWith(
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
-                                  SizedBox(height: context.dimensions.spaceM),
-                                  _buildSubscriptionOptions(),
-                                  SizedBox(height: context.dimensions.spaceL),
-                                  _buildPurchaseButton(),
-                                ],
+                            child: ScaleTransition(
+                              scale: _scaleAnimation,
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: _isLoading
+                                    ? const Center(
+                                        child: Padding(
+                                          padding: EdgeInsets.all(24),
+                                          child: CupertinoActivityIndicator(),
+                                        ),
+                                      )
+                                    : _products.isEmpty
+                                        ? Center(
+                                            child: Column(
+                                              children: [
+                                                const Icon(
+                                                  CupertinoIcons
+                                                      .exclamationmark_circle,
+                                                  color: AppColors.warning,
+                                                  size: 48,
+                                                ),
+                                                const SizedBox(height: 16),
+                                                Text(
+                                                  'Abonelik bilgilerini şu anda yükleyemiyoruz.',
+                                                  style: AppTextTheme.body
+                                                      .copyWith(
+                                                    color:
+                                                        AppColors.textSecondary,
+                                                  ),
+                                                  textAlign: TextAlign.center,
+                                                ),
+                                                const SizedBox(height: 16),
+                                                AppButton(
+                                                  text: 'Tekrar Dene',
+                                                  onPressed: _initInAppPurchase,
+                                                  type: AppButtonType.secondary,
+                                                  width: 200,
+                                                ),
+                                              ],
+                                            ),
+                                          )
+                                        : Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'Abonelik Seçenekleri',
+                                                style: AppTextTheme.headline4
+                                                    .copyWith(
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 16),
+                                              _buildSubscriptionOptions(),
+                                              const SizedBox(height: 24),
+                                              _buildPurchaseButton(),
+                                            ],
+                                          ),
                               ),
                             ),
                           ),
                         ),
 
-                      // Boşluk
-                      SliverToBoxAdapter(
-                        child:
-                            SizedBox(height: context.dimensions.spaceXXL * 2),
+                      // Boşluk ekle
+                      const SliverToBoxAdapter(
+                        child: SizedBox(height: 100),
                       ),
                     ],
                   ),
 
-                  // Yükleme göstergesi
-                  if (_isLoading)
-                    Positioned.fill(
-                      child: _buildLoadingOverlay(),
-                    ),
-
-                  // Hata mesajları
+                  // Hata mesajı
                   if (_errorMessage != null)
-                    Positioned.fill(
-                      child: _buildErrorOverlay(),
+                    Positioned(
+                      top: 10,
+                      left: 16,
+                      right: 16,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.error.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              CupertinoIcons.exclamationmark_triangle,
+                              color: AppColors.error,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                _errorMessage!,
+                                style: AppTextTheme.captionL.copyWith(
+                                  color: AppColors.error,
+                                ),
+                              ),
+                            ),
+                            CupertinoButton(
+                              padding: EdgeInsets.zero,
+                              onPressed: () {
+                                setState(() {
+                                  _errorMessage = null;
+                                });
+                              },
+                              child: Icon(
+                                CupertinoIcons.clear_circled_solid,
+                                color: AppColors.error.withOpacity(0.7),
+                                size: 20,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
 
-                  // Premium kullanıcı için overlay
-                  if (isPremium)
-                    Positioned.fill(
-                      child: _buildPremiumOverlay(),
+                  // Yükleniyor göstergesi
+                  if (_isPurchasePending)
+                    Container(
+                      color: AppColors.black.withOpacity(0.5),
+                      child: const Center(
+                        child: CupertinoActivityIndicator(
+                          radius: 15,
+                          color: AppColors.white,
+                        ),
+                      ),
                     ),
-
-                  // Alt bölüm - Gizlilik ve koşullar
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    child: _buildFooter(),
-                  ),
                 ],
               );
             },
@@ -376,103 +484,140 @@ class _PremiumScreenState extends State<PremiumScreen>
     );
   }
 
+  /// Premium başlığını oluştur
   Widget _buildPremiumHeader(bool isPremium) {
     return Container(
-      padding: EdgeInsets.all(context.dimensions.paddingL),
+      padding: const EdgeInsets.all(16),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Logo/İkon
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFFCA70EF),
-                  Color(0xFF9747FF),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.primary.withOpacity(0.7),
+                      AppColors.primary,
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.3),
+                      blurRadius: 10,
+                      offset: const Offset(0, 5),
+                    )
+                  ],
+                ),
+                child: const Center(
+                  child: Icon(
+                    CupertinoIcons.sparkles,
+                    color: AppColors.white,
+                    size: 30,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isPremium ? 'Premium Aktif' : 'TatarAI Premium',
+                      style: AppTextTheme.headline3.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      isPremium
+                          ? 'Tüm premium özelliklere erişiminiz var.'
+                          : 'Daha fazla analiz ve özelleştirilmiş tarım asistanı',
+                      style: AppTextTheme.body.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (isPremium) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.success.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.success.withOpacity(0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    CupertinoIcons.checkmark_seal_fill,
+                    color: AppColors.success,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Premium üyeliğiniz aktif. Tüm özelliklere sınırsız erişebilirsiniz.',
+                      style: AppTextTheme.captionL.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
                 ],
               ),
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF9747FF).withOpacity(0.2),
-                  blurRadius: 15,
-                  offset: const Offset(0, 8),
-                  spreadRadius: 2,
-                ),
-              ],
             ),
-            child: const Center(
-              child: Icon(
-                CupertinoIcons.star_fill,
-                color: CupertinoColors.white,
-                size: 40,
-              ),
-            ),
-          ),
-          SizedBox(height: context.dimensions.spaceM),
-
-          // Başlık
-          Text(
-            isPremium ? 'Premium Üyeliğiniz Aktif' : 'Premium\'a Yükselin',
-            style: AppTextTheme.headline2.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          SizedBox(height: context.dimensions.spaceM),
-
-          // Açıklama
-          Text(
-            isPremium
-                ? 'Tüm premium özelliklerden yararlanıyorsunuz. Teşekkür ederiz!'
-                : 'Daha fazla analiz, daha az bekleyiş. Tüm potansiyelinizi ortaya çıkarın.',
-            style: AppTextTheme.bodyText1.copyWith(
-              color: CupertinoColors.systemGrey,
-              height: 1.4,
-            ),
-            textAlign: TextAlign.center,
-          ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildFeaturesList() {
+  List<Widget> _buildFeatureList() {
     final features = [
       _FeatureItem(
+        title: 'Sınırsız Bitki Analizi',
+        description:
+            'Premium üyelik ile sınırsız bitki analizi yapabilirsiniz.',
         icon: CupertinoIcons.infinite,
-        title: 'Sınırsız Analiz',
-        description: 'Kısıtlama olmadan istediğiniz kadar bitki analizi yapın',
-        color: const Color(0xFF9747FF),
+        color: AppColors.primary,
       ),
       _FeatureItem(
-        icon: CupertinoIcons.bolt_fill,
-        title: 'Öncelikli İşleme',
-        description: 'Analizleriniz premium kuyruğunda hızla işlenir',
-        color: const Color(0xFFFF9500),
+        title: 'Öncelikli Analiz',
+        description:
+            'Analizleriniz öncelikli olarak yapılır, daha az beklersiniz.',
+        icon: CupertinoIcons.timer,
+        color: AppColors.info,
       ),
       _FeatureItem(
-        icon: CupertinoIcons.doc_chart_fill,
-        title: 'Detaylı Raporlar',
-        description: 'Bitki sağlığı ve bakımı için kapsamlı bilgiler alın',
-        color: const Color(0xFF34C759),
+        title: 'İleri Teşhis ve Öneriler',
+        description: 'Daha detaylı teşhis ve tedavi önerileri alırsınız.',
+        icon: CupertinoIcons.doc_text_search,
+        color: AppColors.success,
       ),
       _FeatureItem(
-        icon: CupertinoIcons.cloud_download_fill,
-        title: 'PDF Dışa Aktarma',
-        description: 'Tüm raporlarınızı PDF formatında kaydedebilirsiniz',
-        color: const Color(0xFF007AFF),
+        title: 'Analiz Geçmişi',
+        description: 'Tüm analiz geçmişinize sınırsız erişim sağlarsınız.',
+        icon: CupertinoIcons.chart_bar_alt_fill,
+        color: AppColors.warning,
       ),
     ];
 
-    return Column(
-      children: features.map((feature) {
-        return _buildFeatureItem(feature);
-      }).toList(),
-    );
+    return features.map((feature) {
+      return _buildFeatureItem(feature);
+    }).toList();
   }
 
   Widget _buildFeatureItem(_FeatureItem feature) {
@@ -480,11 +625,11 @@ class _PremiumScreenState extends State<PremiumScreen>
       margin: EdgeInsets.only(bottom: context.dimensions.spaceM),
       padding: EdgeInsets.all(context.dimensions.paddingM),
       decoration: BoxDecoration(
-        color: CupertinoColors.systemBackground,
+        color: AppColors.white,
         borderRadius: BorderRadius.circular(context.dimensions.radiusL),
         boxShadow: [
           BoxShadow(
-            color: CupertinoColors.systemGrey5.withOpacity(0.5),
+            color: AppColors.black.withOpacity(0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -514,15 +659,15 @@ class _PremiumScreenState extends State<PremiumScreen>
               children: [
                 Text(
                   feature.title,
-                  style: AppTextTheme.headline6.copyWith(
+                  style: AppTextTheme.headline5.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 SizedBox(height: context.dimensions.spaceXXS),
                 Text(
                   feature.description,
-                  style: AppTextTheme.bodyText2.copyWith(
-                    color: CupertinoColors.systemGrey,
+                  style: AppTextTheme.body.copyWith(
+                    color: AppColors.textSecondary,
                     height: 1.3,
                   ),
                 ),
@@ -617,14 +762,14 @@ class _PremiumScreenState extends State<PremiumScreen>
                       children: [
                         const Icon(
                           CupertinoIcons.tag_fill,
-                          color: CupertinoColors.white,
+                          color: AppColors.white,
                           size: 12,
                         ),
                         SizedBox(width: context.dimensions.spaceXXS),
                         Text(
                           '%$savingsPercentage tasarruf',
-                          style: AppTextTheme.caption.copyWith(
-                            color: CupertinoColors.white,
+                          style: AppTextTheme.captionL.copyWith(
+                            color: AppColors.white,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -651,12 +796,11 @@ class _PremiumScreenState extends State<PremiumScreen>
       duration: const Duration(milliseconds: 300),
       padding: EdgeInsets.all(context.dimensions.paddingM),
       decoration: BoxDecoration(
-        color: isSelected
-            ? AppColors.primary.withOpacity(0.05)
-            : CupertinoColors.systemBackground,
+        color:
+            isSelected ? AppColors.primary.withOpacity(0.05) : AppColors.white,
         borderRadius: BorderRadius.circular(context.dimensions.radiusL),
         border: Border.all(
-          color: isSelected ? AppColors.primary : CupertinoColors.systemGrey5,
+          color: isSelected ? AppColors.primary : AppColors.divider,
           width: isSelected ? 2 : 1,
         ),
         boxShadow: isSelected
@@ -678,9 +822,9 @@ class _PremiumScreenState extends State<PremiumScreen>
             children: [
               Text(
                 title,
-                style: AppTextTheme.subtitle1.copyWith(
+                style: AppTextTheme.captionL.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: isSelected ? AppColors.primary : CupertinoColors.label,
+                  color: isSelected ? AppColors.primary : AppColors.textPrimary,
                 ),
               ),
               Container(
@@ -688,13 +832,9 @@ class _PremiumScreenState extends State<PremiumScreen>
                 height: 22,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isSelected
-                      ? AppColors.primary
-                      : CupertinoColors.systemGrey5,
+                  color: isSelected ? AppColors.primary : AppColors.divider,
                   border: Border.all(
-                    color: isSelected
-                        ? AppColors.primary
-                        : CupertinoColors.systemGrey4,
+                    color: isSelected ? AppColors.primary : AppColors.divider,
                     width: 1,
                   ),
                 ),
@@ -702,7 +842,7 @@ class _PremiumScreenState extends State<PremiumScreen>
                     ? const Center(
                         child: Icon(
                           CupertinoIcons.checkmark,
-                          color: CupertinoColors.white,
+                          color: AppColors.white,
                           size: 14,
                         ),
                       )
@@ -716,15 +856,15 @@ class _PremiumScreenState extends State<PremiumScreen>
             price,
             style: AppTextTheme.headline3.copyWith(
               fontWeight: FontWeight.w700,
-              color: isSelected ? AppColors.primary : CupertinoColors.label,
+              color: isSelected ? AppColors.primary : AppColors.textPrimary,
             ),
           ),
           SizedBox(height: context.dimensions.spaceXXS),
           // Alt açıklama
           Text(
             subtitle,
-            style: AppTextTheme.caption.copyWith(
-              color: CupertinoColors.systemGrey,
+            style: AppTextTheme.captionL.copyWith(
+              color: AppColors.textSecondary,
             ),
           ),
         ],
@@ -752,227 +892,19 @@ class _PremiumScreenState extends State<PremiumScreen>
           children: [
             const Icon(
               CupertinoIcons.shield_fill,
-              color: CupertinoColors.systemGreen,
+              color: AppColors.primary,
               size: 14,
             ),
             SizedBox(width: context.dimensions.spaceXS),
             Text(
               'Güvenli Ödeme & 7 Gün İade Garantisi',
-              style: AppTextTheme.caption.copyWith(
-                color: CupertinoColors.systemGrey,
+              style: AppTextTheme.captionL.copyWith(
+                color: AppColors.textSecondary,
               ),
             ),
           ],
         ),
       ],
-    );
-  }
-
-  Widget _buildFooter() {
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-        child: Container(
-          padding: EdgeInsets.all(context.dimensions.paddingM),
-          decoration: BoxDecoration(
-            color: CupertinoColors.systemBackground.withOpacity(0.7),
-            border: const Border(
-              top: BorderSide(
-                color: CupertinoColors.systemGrey5,
-                width: 0.5,
-              ),
-            ),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Aboneliğiniz otomatik olarak yenilenir. İstediğiniz zaman iptal edebilirsiniz.',
-                  style: AppTextTheme.caption.copyWith(
-                    color: CupertinoColors.systemGrey,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: context.dimensions.spaceS),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      onPressed: () {},
-                      child: Text(
-                        'Gizlilik Politikası',
-                        style: AppTextTheme.caption.copyWith(
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      '•',
-                      style: TextStyle(
-                        color: CupertinoColors.systemGrey,
-                      ),
-                    ),
-                    CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      onPressed: () {},
-                      child: Text(
-                        'Kullanım Koşulları',
-                        style: AppTextTheme.caption.copyWith(
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLoadingOverlay() {
-    return Container(
-      color: CupertinoColors.systemBackground.withOpacity(0.8),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const CupertinoActivityIndicator(radius: 20),
-            SizedBox(height: context.dimensions.spaceM),
-            Text(
-              'Abonelik bilgileri yükleniyor...',
-              style: AppTextTheme.bodyText1.copyWith(
-                color: CupertinoColors.systemGrey,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildErrorOverlay() {
-    return Container(
-      color: CupertinoColors.systemBackground.withOpacity(0.9),
-      padding: EdgeInsets.all(context.dimensions.paddingL),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: CupertinoColors.systemRed.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                CupertinoIcons.exclamationmark_triangle_fill,
-                color: CupertinoColors.systemRed,
-                size: 40,
-              ),
-            ),
-            SizedBox(height: context.dimensions.spaceM),
-            Text(
-              'Bir Hata Oluştu',
-              style: AppTextTheme.headline5.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            SizedBox(height: context.dimensions.spaceXS),
-            Text(
-              _errorMessage ?? 'Bilinmeyen bir hata oluştu.',
-              textAlign: TextAlign.center,
-              style: AppTextTheme.bodyText1.copyWith(
-                color: CupertinoColors.systemGrey,
-              ),
-            ),
-            SizedBox(height: context.dimensions.spaceL),
-            AppButton(
-              text: 'Tekrar Dene',
-              icon: CupertinoIcons.refresh,
-              type: AppButtonType.secondary,
-              onPressed: () {
-                setState(() {
-                  _isLoading = true;
-                  _errorMessage = null;
-                });
-                _loadProducts();
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPremiumOverlay() {
-    return Container(
-      color: CupertinoColors.systemBackground.withOpacity(0.9),
-      padding: EdgeInsets.all(context.dimensions.paddingL),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFFCA70EF),
-                    Color(0xFF9747FF),
-                  ],
-                ),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF9747FF).withOpacity(0.3),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-              child: const Icon(
-                CupertinoIcons.checkmark_alt_circle_fill,
-                color: CupertinoColors.white,
-                size: 60,
-              ),
-            ),
-            SizedBox(height: context.dimensions.spaceL),
-            Text(
-              'Premium Üyeliğiniz Aktif',
-              style: AppTextTheme.headline4.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            SizedBox(height: context.dimensions.spaceM),
-            Text(
-              'Tüm premium özelliklerimizden yararlanabilirsiniz. Bizi tercih ettiğiniz için teşekkür ederiz!',
-              textAlign: TextAlign.center,
-              style: AppTextTheme.bodyText1.copyWith(
-                color: CupertinoColors.systemGrey,
-                height: 1.4,
-              ),
-            ),
-            SizedBox(height: context.dimensions.spaceXL),
-            AppButton(
-              text: 'Anasayfaya Dön',
-              icon: CupertinoIcons.home,
-              type: AppButtonType.secondary,
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-          ],
-        ),
-      ),
     );
   }
 

@@ -177,14 +177,13 @@ mixin _RegisterScreenMixin on State<RegisterScreen> {
             children: [
               Icon(
                 CupertinoIcons.exclamationmark_triangle,
-                color: CupertinoColors.systemRed,
+                color: AppColors.error,
                 size: 22,
               ),
               SizedBox(width: 8),
               Text(
                 'Bir sorun oluştu',
-                style: TextStyle(
-                  fontFamily: 'sfpro',
+                style: AppTextTheme.body.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -194,10 +193,7 @@ mixin _RegisterScreenMixin on State<RegisterScreen> {
             padding: const EdgeInsets.only(top: 12.0, bottom: 4.0),
             child: Text(
               userFriendlyMessage,
-              style: TextStyle(
-                fontFamily: 'sfpro',
-                fontSize: 14,
-              ),
+              style: AppTextTheme.captionL,
               textAlign: TextAlign.center,
             ),
           ),
@@ -207,10 +203,9 @@ mixin _RegisterScreenMixin on State<RegisterScreen> {
                 // Dialog'u kapat - güvenli erişim için dialogContext kullanıyoruz
                 Navigator.of(dialogContext).pop();
               },
-              child: const Text(
+              child: Text(
                 'Anladım',
-                style: TextStyle(
-                  fontFamily: 'sfpro',
+                style: AppTextTheme.body.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
               ),

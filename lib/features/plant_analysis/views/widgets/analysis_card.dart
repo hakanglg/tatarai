@@ -8,7 +8,7 @@ import 'package:tatarai/core/theme/dimensions.dart';
 import 'package:tatarai/core/theme/text_theme.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/features/plant_analysis/models/plant_analysis_result.dart';
-import 'package:tatarai/features/plant_analysis/views/analysis_result_screen.dart';
+import 'package:tatarai/features/plant_analysis/views/analyses_result/analysis_result_screen.dart';
 
 /// Analiz kartı widget'ı
 ///
@@ -51,22 +51,16 @@ class AnalysisCard extends StatelessWidget {
           },
       child: Container(
         decoration: BoxDecoration(
-          color: CupertinoColors.systemBackground,
+          color: AppColors.white,
           borderRadius: BorderRadius.circular(
               cardSize == AnalysisCardSize.compact
                   ? context.dimensions.radiusM
                   : context.dimensions.radiusL),
           boxShadow: [
             BoxShadow(
-              color: CupertinoColors.systemGrey5.withOpacity(0.6),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-              spreadRadius: 0,
-            ),
-            BoxShadow(
-              color: CupertinoColors.systemGrey4.withOpacity(0.1),
-              blurRadius: 1,
-              offset: const Offset(0, 1),
+              color: AppColors.black.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
               spreadRadius: 0,
             ),
           ],
@@ -347,7 +341,7 @@ class AnalysisCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         fieldName ?? analysis.plantName,
-                        style: AppTextTheme.subtitle1.copyWith(
+                        style: AppTextTheme.caption.copyWith(
                           fontWeight: FontWeight.bold,
                           letterSpacing: -0.3,
                         ),

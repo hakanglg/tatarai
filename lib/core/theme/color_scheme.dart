@@ -4,28 +4,27 @@ import 'package:flutter/material.dart';
 class AppColors {
   AppColors._();
 
-  // Ana renkler - Çiftçi temasına uygun yeşil tonları
-  static const Color primary = Color(0xFF2E7D32); // Koyu yeşil
-  static const Color secondary = Color(0xFF66BB6A); // Açık yeşil
-  static const Color tertiary = Color(0xFFA5D6A7); // Çok açık yeşil
+  // Ana renkler
+  static const Color primary = Color(0xFF2E7D32); // Yeşil
+  static const Color white = Color(0xFFFFFFFF); // Beyaz
+  static const Color black = Color(0xFF080808); // Siyah
 
   // Metin renkleri
-  static const Color onPrimary = Color(0xFFFFFFFF);
-  static const Color onSecondary = Color.fromARGB(255, 146, 144, 144);
-  static const Color onBackground = Color(0xFF1C1C1E);
-  static const Color textPrimary = Color(0xFF1C1C1E);
-  static const Color textSecondary = Color(0xFF666666);
-  static const Color textTertiary = Color(0xFF999999);
-  static const Color black = Color(0xFF000000);
+  static const Color onPrimary = white;
+  static const Color onSecondary = black;
+  static const Color onBackground = black;
+  static const Color textPrimary = black;
+  static const Color textSecondary = Color(0xFF666666); // Gri tonu
+  static const Color textTertiary = Color(0xFF999999); // Açık gri tonu
 
   // Arka plan renkleri
-  static const Color background = Color(0xFFf9f9f9);
-  static const Color surface = Color(0xFFFFFFFF);
-  static const Color surfaceVariant = Color(0xFFECEFF1);
+  static const Color background = white;
+  static const Color surface = white;
+  static const Color surfaceVariant = Color(0xFFF5F5F5); // Çok açık gri
 
   // Durum renkleri
   static const Color error = Color(0xFFB00020);
-  static const Color success = Color(0xFF2E7D32);
+  static const Color success = primary;
   static const Color warning = Color(0xFFF57C00);
   static const Color info = Color(0xFF0288D1);
 
@@ -39,7 +38,7 @@ class AppColors {
     return const ColorScheme(
       primary: primary,
       onPrimary: onPrimary,
-      secondary: secondary,
+      secondary: primary,
       onSecondary: onSecondary,
       surface: surface,
       onSurface: onBackground,
@@ -48,8 +47,10 @@ class AppColors {
       brightness: Brightness.light,
       outline: divider,
       outlineVariant: disabled,
-      tertiary: tertiary,
+      tertiary: primary,
       onTertiary: onSecondary,
+      background: background,
+      onBackground: onBackground,
     );
   }
 }

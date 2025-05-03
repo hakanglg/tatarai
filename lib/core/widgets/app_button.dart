@@ -165,6 +165,7 @@ class _AppButtonState extends State<AppButton>
                     style: AppTextTheme.labelLarge.copyWith(
                       color: _getTextColor(),
                       letterSpacing: 0.5,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],

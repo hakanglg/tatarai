@@ -1,7 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/features/home/views/home_tab_content.dart';
-import 'package:tatarai/features/plant_analysis/views/analysis_screen.dart';
+import 'package:tatarai/features/plant_analysis/views/analysis/analysis_screen.dart';
 import 'package:tatarai/features/profile/views/profile_screen.dart';
 
 /// Navigasyon öğeleri için varsayılan ikonlar ve başlıklar

@@ -5,7 +5,7 @@ import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/features/home/views/home_tab_content.dart';
 import 'package:tatarai/features/navbar/navigation_manager.dart';
 import 'package:tatarai/features/navbar/widgets/app_bottom_navigation_bar.dart';
-import 'package:tatarai/features/plant_analysis/views/analysis_screen.dart';
+import 'package:tatarai/features/plant_analysis/views/analysis/analysis_screen.dart';
 import 'package:tatarai/features/profile/views/profile_screen.dart';
 
 /// Ana ekran widget'ı - TabBar içeren ana sayfa

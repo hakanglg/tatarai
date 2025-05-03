@@ -12,10 +12,10 @@ class AppTheme {
   /// Cupertino temasını döndürür
   static CupertinoThemeData get cupertinoTheme {
     return CupertinoThemeData(
-      primaryColor: CupertinoColors.systemGrey,
-      primaryContrastingColor: AppColors.onPrimary,
-      barBackgroundColor: AppColors.background,
-      scaffoldBackgroundColor: AppColors.background,
+      primaryColor: AppColors.primary,
+      primaryContrastingColor: AppColors.white,
+      barBackgroundColor: AppColors.white,
+      scaffoldBackgroundColor: AppColors.white,
       textTheme: AppTextTheme.cupertinoTextTheme,
       brightness: Brightness.light,
     );
@@ -26,9 +26,9 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: AppColors.colorScheme,
-      scaffoldBackgroundColor: AppColors.background,
+      scaffoldBackgroundColor: AppColors.white,
       appBarTheme: AppBarTheme(
-        backgroundColor: AppColors.background,
+        backgroundColor: AppColors.white,
         elevation: 0,
         centerTitle: true,
         iconTheme: const IconThemeData(color: AppColors.primary),
@@ -44,7 +44,7 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          foregroundColor: AppColors.onPrimary,
+          foregroundColor: AppColors.white,
           backgroundColor: AppColors.primary,
         ),
       ),

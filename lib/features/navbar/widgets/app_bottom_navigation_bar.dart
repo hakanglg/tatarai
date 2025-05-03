@@ -13,15 +13,15 @@ class AppBottomNavigationBar extends CupertinoTabBar {
     super.height = 54.0, // iOS standart yüksekliği
     super.iconSize = 26.0, // iOS standart ikon boyutu
     Color super.activeColor = AppColors.primary,
-    super.inactiveColor = CupertinoColors.systemGrey,
-    super.backgroundColor = CupertinoColors.systemBackground,
+    super.inactiveColor = AppColors.textSecondary,
+    super.backgroundColor = AppColors.white,
   }) : super(
-         onTap: onTabSelected,
-         border: const Border(
-           top: BorderSide(
-             color: CupertinoColors.separator,
-             width: 0.3, // iOS'daki ince separator çizgisi
-           ),
-         ),
-       );
+          onTap: onTabSelected,
+          border: const Border(
+            top: BorderSide(
+              color: AppColors.divider,
+              width: 0.3, // iOS'daki ince separator çizgisi
+            ),
+          ),
+        );
 }

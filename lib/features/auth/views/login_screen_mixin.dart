@@ -109,21 +109,34 @@ mixin _LoginScreenMixin on State<LoginScreen> {
           children: [
             Icon(
               CupertinoIcons.exclamationmark_triangle,
-              color: CupertinoColors.systemRed,
+              color: AppColors.error,
               size: 20,
             ),
             SizedBox(width: 8),
-            Text('Hata'),
+            Text(
+              'Hata',
+              style: AppTextTheme.body.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
         ),
         content: Padding(
           padding: const EdgeInsets.only(top: 8.0),
-          child: Text(message),
+          child: Text(
+            message,
+            style: AppTextTheme.captionL,
+          ),
         ),
         actions: [
           CupertinoDialogAction(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Tamam'),
+            child: Text(
+              'Tamam',
+              style: AppTextTheme.body.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
           // Eğer internet bağlantısı hatası ise yeniden deneme butonu ekle
           if (message.contains('internet') ||
@@ -136,7 +149,13 @@ mixin _LoginScreenMixin on State<LoginScreen> {
                 _signIn(); // Yeniden dene
               },
               isDefaultAction: true,
-              child: const Text('Tekrar Dene'),
+              child: Text(
+                'Tekrar Dene',
+                style: AppTextTheme.body.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary,
+                ),
+              ),
             ),
         ],
       ),
@@ -164,16 +183,21 @@ mixin _LoginScreenMixin on State<LoginScreen> {
                     size: 20,
                   ),
                   SizedBox(width: 8),
-                  Text('Şifre Sıfırlama'),
+                  Text(
+                    'Şifre Sıfırlama',
+                    style: AppTextTheme.body.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ],
               ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     'Şifre sıfırlama bağlantısı gönderilecek e-posta adresinizi giriniz:',
-                    style: TextStyle(fontSize: 14),
+                    style: AppTextTheme.captionL,
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
@@ -192,15 +216,18 @@ mixin _LoginScreenMixin on State<LoginScreen> {
                         color: CupertinoColors.tertiarySystemFill,
                         borderRadius: BorderRadius.circular(8),
                       ),
+                      style: AppTextTheme.body,
+                      placeholderStyle: AppTextTheme.body.copyWith(
+                        color: AppColors.textSecondary.withOpacity(0.7),
+                      ),
                     ),
                   ),
                   if (errorText != null) ...[
                     const SizedBox(height: 8),
                     Text(
                       errorText!,
-                      style: const TextStyle(
-                        color: CupertinoColors.destructiveRed,
-                        fontSize: 12,
+                      style: AppTextTheme.smallCaption.copyWith(
+                        color: AppColors.error,
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -209,12 +236,21 @@ mixin _LoginScreenMixin on State<LoginScreen> {
               ),
               actions: [
                 CupertinoDialogAction(
-                  child: const Text('İptal'),
+                  child: Text(
+                    'İptal',
+                    style: AppTextTheme.body,
+                  ),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
                 CupertinoDialogAction(
                   isDefaultAction: true,
-                  child: const Text('Gönder'),
+                  child: Text(
+                    'Gönder',
+                    style: AppTextTheme.body.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
+                    ),
+                  ),
                   onPressed: () async {
                     final email = emailController.text.trim();
                     if (email.isEmpty) {

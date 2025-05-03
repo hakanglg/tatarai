@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:tatarai/core/routing/route_names.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
 import 'package:tatarai/core/theme/dimensions.dart';
+import 'package:tatarai/core/theme/text_theme.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/core/widgets/app_button.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
@@ -26,21 +27,38 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin, _LoginScreenMixin {
+  // Hata mesajlarının tekrarını önlemek için son gösterilen hata
+  String? _lastShownError;
+
+  @override
+  void dispose() {
+    // Son hata referansını temizle
+    _lastShownError = null;
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Responsive değerler için dimensions sınıfına erişim
+    // Responsive değerler için dimensions
     final dim = context.dimensions;
 
     return BlocListener<AuthCubit, AuthState>(
+      listenWhen: (previous, current) {
+        // Sadece hata mesajı değiştiğinde ya da yeni bir hata eklendiğinde dinle
+        return (previous.errorMessage != current.errorMessage &&
+                current.errorMessage != null) ||
+            previous.isAuthenticated != current.isAuthenticated;
+      },
       listener: (context, state) {
-        // Form durumunu güncelle
+        // Widget kaldırıldı mı kontrolü
+        if (!mounted) return;
+
         if (_isSubmitting && !state.isLoading) {
           setState(() {
             _isSubmitting = false;
           });
         }
 
-        // Loading durumunu gizle (isLoading durum güncellemesi olduğunda)
         if (state.isLoading) {
           // Loading ekranı gösterme
           AppLogger.i('Giriş yükleniyor durumu: ${state.isLoading}');
@@ -50,28 +68,35 @@ class _LoginScreenState extends State<LoginScreen>
           // Başarılı giriş - hata mesajını temizle ve ana sayfaya yönlendir
           context.read<AuthCubit>().clearErrorMessage();
           context.goNamed(RouteNames.home);
-        } else if (state.errorMessage != null && !state.isLoading) {
-          // Hata durumu - yükleme tamamlandıysa ve hata varsa göster
-          if (state.errorMessage!.contains('unavailable')) {
-            // Bağlantı hatası durumunda özel mesaj göster
-            _showErrorDialog(
-              context,
-              'Sunucuya bağlanırken bir sorun oluştu. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.',
-            );
-          } else if (state.errorMessage!.contains('timeout') ||
-              state.errorMessage!.contains('zaman aşımı')) {
-            _showErrorDialog(
-              context,
-              'İşlem zaman aşımına uğradı. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.',
-            );
-          } else {
-            _showErrorDialog(context, state.errorMessage!);
-          }
+        } else if (state.errorMessage != null &&
+            !state.isLoading &&
+            state.errorMessage != _lastShownError) {
+          // Hata durumu - yükleme tamamlandıysa, hata varsa ve daha önce gösterilmediyse göster
 
-          // Hata mesajını gösterdikten sonra temizle
-          Future.delayed(Duration.zero, () {
-            context.read<AuthCubit>().clearErrorMessage();
-          });
+          // Son gösterilen hatayı kaydet ve göster
+          _lastShownError = state.errorMessage;
+          _showErrorDialog(context, state.errorMessage!);
+
+          // Hata mesajını gösterdikten sonra temizle - ancak widget hala mounted ise
+          if (mounted) {
+            // Context'i güvenli şekilde kullanmak için yerel bir referans alıyoruz
+            final cubit = context.read<AuthCubit>();
+
+            Future.delayed(Duration.zero, () {
+              if (mounted) {
+                cubit.clearErrorMessage();
+
+                // Bir süre sonra son hata referansını temizle
+                Future.delayed(const Duration(seconds: 2), () {
+                  if (mounted) {
+                    setState(() {
+                      _lastShownError = null;
+                    });
+                  }
+                });
+              }
+            });
+          }
         }
       },
       child: Scaffold(
@@ -125,10 +150,7 @@ class _LoginScreenState extends State<LoginScreen>
                                     SizedBox(width: dim.spaceS),
                                     Text(
                                       'TatarAI',
-                                      style: TextStyle(
-                                        fontFamily: 'sfpro',
-                                        fontSize: dim.fontSizeXL,
-                                        fontWeight: FontWeight.bold,
+                                      style: AppTextTheme.headline3.copyWith(
                                         color: AppColors.primary,
                                         letterSpacing: -1.0,
                                       ),
@@ -139,11 +161,8 @@ class _LoginScreenState extends State<LoginScreen>
                                 Text(
                                   'Hesabınıza Giriş Yapın',
                                   textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontFamily: 'sfpro',
-                                    fontSize: dim.fontSizeM,
+                                  style: AppTextTheme.body.copyWith(
                                     fontWeight: FontWeight.w600,
-                                    color: CupertinoColors.label,
                                     letterSpacing: -0.5,
                                   ),
                                 ),
@@ -151,10 +170,8 @@ class _LoginScreenState extends State<LoginScreen>
                                 Text(
                                   'Yapay zeka asistanınıza hoş geldiniz',
                                   textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontFamily: 'sfpro',
-                                    fontSize: dim.fontSizeXS,
-                                    color: CupertinoColors.secondaryLabel,
+                                  style: AppTextTheme.captionL.copyWith(
+                                    color: AppColors.textSecondary,
                                     height: 1.0,
                                   ),
                                 ),
@@ -190,7 +207,7 @@ class _LoginScreenState extends State<LoginScreen>
                                       _obscurePassword
                                           ? CupertinoIcons.eye
                                           : CupertinoIcons.eye_slash,
-                                      color: CupertinoColors.systemGrey,
+                                      color: AppColors.textSecondary,
                                       size: dim.iconSizeS,
                                     ),
                                   ),
@@ -205,9 +222,7 @@ class _LoginScreenState extends State<LoginScreen>
                                     },
                                     child: Text(
                                       'Şifremi Unuttum',
-                                      style: TextStyle(
-                                        fontFamily: 'sfpro',
-                                        fontSize: dim.fontSizeS,
+                                      style: AppTextTheme.captionL.copyWith(
                                         color: AppColors.primary,
                                       ),
                                     ),
@@ -236,10 +251,9 @@ class _LoginScreenState extends State<LoginScreen>
                                           horizontal: dim.spaceM),
                                       child: Text(
                                         'VEYA',
-                                        style: TextStyle(
-                                          fontFamily: 'sfpro',
-                                          fontSize: dim.fontSizeXS,
-                                          color: CupertinoColors.secondaryLabel,
+                                        style:
+                                            AppTextTheme.smallCaption.copyWith(
+                                          color: AppColors.textSecondary,
                                           fontWeight: FontWeight.w500,
                                         ),
                                       ),
@@ -285,10 +299,8 @@ class _LoginScreenState extends State<LoginScreen>
                               children: [
                                 Text(
                                   'Hesabınız yok mu?',
-                                  style: TextStyle(
-                                    fontFamily: 'sfpro',
-                                    fontSize: dim.fontSizeS,
-                                    color: CupertinoColors.secondaryLabel,
+                                  style: AppTextTheme.captionL.copyWith(
+                                    color: AppColors.textSecondary,
                                   ),
                                 ),
                                 AppButton(
@@ -335,10 +347,7 @@ class _LoginScreenState extends State<LoginScreen>
         SizedBox(height: dim.spaceM),
         Text(
           'TatarAI',
-          style: TextStyle(
-            fontFamily: 'sfpro',
-            fontSize: dim.fontSizeXXL,
-            fontWeight: FontWeight.bold,
+          style: AppTextTheme.headline1.copyWith(
             color: AppColors.primary,
             letterSpacing: -1.0,
           ),
@@ -388,15 +397,9 @@ class _LoginScreenState extends State<LoginScreen>
         decoration: const BoxDecoration(
           border: null,
         ),
-        style: TextStyle(
-          fontFamily: 'sfpro',
-          fontSize: dim.fontSizeM,
-          color: CupertinoColors.label,
-        ),
-        placeholderStyle: TextStyle(
-          fontFamily: 'sfpro',
-          fontSize: dim.fontSizeM,
-          color: CupertinoColors.placeholderText,
+        style: AppTextTheme.body,
+        placeholderStyle: AppTextTheme.body.copyWith(
+          color: AppColors.textSecondary.withOpacity(0.7),
         ),
       ),
     );

@@ -16,6 +16,8 @@ import 'package:tatarai/features/plant_analysis/cubits/plant_analysis_cubit.dart
 import 'package:tatarai/features/plant_analysis/models/plant_analysis_result.dart';
 import 'package:tatarai/features/plant_analysis/views/widgets/font_size_control.dart';
 
+part 'analysis_result_screen_mixin.dart';
+
 /// Analiz sonuçları ekranı
 /// Yapay zeka tarafından yapılan bitki analiz sonuçlarını gösterir
 class AnalysisResultScreen extends StatefulWidget {
@@ -30,124 +32,8 @@ class AnalysisResultScreen extends StatefulWidget {
 }
 
 class _AnalysisResultScreenState extends State<AnalysisResultScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, _AnalysisScreenResultMixin {
   // Analiz sonucunu local olarak tutmak için
-  PlantAnalysisResult? _analysisResult;
-  bool _isLoading = true;
-  String? _errorMessage;
-  bool _initialLoadComplete = false;
-
-  // Yazı boyutu seviyesi için state değişkeni
-  int _fontSizeLevel = 0;
-
-  // Animasyon kontrolcüsü
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    // Animasyon kontrolcüsünü başlat
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-
-    _fadeAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOut,
-    );
-
-    // Analiz ID'sini logla
-    AppLogger.i(
-      'AnalysisResultScreen açıldı - ID: ${widget.analysisId}, Uzunluk: ${widget.analysisId.length}',
-    );
-
-    // Analiz sonucunu yükle (sadece bir kez)
-    _loadAnalysisResult();
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
-  }
-
-  // Analiz sonucunu yükle ve yerel state'i güncelle
-  Future<void> _loadAnalysisResult() async {
-    try {
-      setState(() {
-        _isLoading = true;
-        _errorMessage = null;
-      });
-
-      final cubit = context.read<PlantAnalysisCubit>();
-      final completer = Completer<PlantAnalysisResult?>();
-
-      final subscription = cubit.stream.listen((state) {
-        if (!completer.isCompleted) {
-          if (state.isLoading) {
-            // Yükleme aşamasında bekle
-            return;
-          } else if (state.errorMessage != null) {
-            // Hata durumunda tamamla
-            completer.complete(null);
-          } else if (state.selectedAnalysisResult != null) {
-            // Sonuç hazır olduğunda tamamla
-            completer.complete(state.selectedAnalysisResult);
-          }
-        }
-      });
-
-      // cubit metodunu çağır
-      cubit.getAnalysisResult(widget.analysisId);
-
-      // Sonucu bekle
-      final result = await completer.future.timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          subscription.cancel();
-          return null;
-        },
-      );
-
-      subscription.cancel();
-
-      if (result == null) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'Analiz sonucu bulunamadı';
-          _initialLoadComplete = true;
-        });
-        return;
-      }
-
-      setState(() {
-        _analysisResult = result;
-        _isLoading = false;
-        _initialLoadComplete = true;
-      });
-
-      // Analiz sonucu yüklendiğinde animasyonu başlat
-      _animationController.forward();
-
-      AppLogger.i('Analiz sonucu başarıyla yüklendi - ID: ${result.id}');
-
-      // Başarılı yükleme için hafif titreşim
-      HapticFeedback.lightImpact();
-    } catch (error) {
-      AppLogger.e(
-        'Analiz sonucu yüklenirken hata - ID: ${widget.analysisId}',
-        error,
-      );
-      setState(() {
-        _isLoading = false;
-        _errorMessage =
-            'Analiz sonucu yüklenirken hata oluştu: ${error.toString()}';
-        _initialLoadComplete = true;
-      });
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -331,13 +217,13 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                   ),
                   decoration: BoxDecoration(
                     color: result.isHealthy
-                        ? CupertinoColors.systemGreen.withOpacity(0.12)
-                        : CupertinoColors.systemRed.withOpacity(0.12),
+                        ? AppColors.primary.withOpacity(0.12)
+                        : AppColors.error.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                       color: result.isHealthy
-                          ? CupertinoColors.systemGreen.withOpacity(0.3)
-                          : CupertinoColors.systemRed.withOpacity(0.3),
+                          ? AppColors.primary.withOpacity(0.3)
+                          : AppColors.error.withOpacity(0.3),
                       width: 1.5,
                     ),
                   ),
@@ -347,8 +233,8 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: result.isHealthy
-                              ? CupertinoColors.systemGreen.withOpacity(0.2)
-                              : CupertinoColors.systemRed.withOpacity(0.2),
+                              ? AppColors.primary.withOpacity(0.2)
+                              : AppColors.error.withOpacity(0.2),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
@@ -356,8 +242,8 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                               ? CupertinoIcons.checkmark_circle_fill
                               : CupertinoIcons.exclamationmark_circle_fill,
                           color: result.isHealthy
-                              ? CupertinoColors.systemGreen
-                              : CupertinoColors.systemRed,
+                              ? AppColors.primary
+                              : AppColors.error,
                           size: 24,
                         ),
                       ),
@@ -370,10 +256,10 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                               result.isHealthy
                                   ? 'Bitkiniz Sağlıklı'
                                   : 'Sağlık Sorunu Tespit Edildi',
-                              style: AppTextTheme.subtitle1.copyWith(
+                              style: AppTextTheme.caption.copyWith(
                                 color: result.isHealthy
-                                    ? CupertinoColors.systemGreen
-                                    : CupertinoColors.systemRed,
+                                    ? AppColors.primary
+                                    : AppColors.error,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -384,11 +270,8 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                                   : 'Bitkinizde bazı sorunlar tespit edildi',
                               style: AppTextTheme.caption.copyWith(
                                 color: result.isHealthy
-                                    ? CupertinoColors.systemGreen
-                                        .withOpacity(0.8)
-                                    : CupertinoColors.systemRed.withOpacity(
-                                        0.8,
-                                      ),
+                                    ? AppColors.primary.withOpacity(0.8)
+                                    : AppColors.error.withOpacity(0.8),
                               ),
                             ),
                           ],
@@ -403,11 +286,11 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                   margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: CupertinoColors.systemBackground,
+                    color: AppColors.white,
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
-                        color: CupertinoColors.systemGrey5.withOpacity(0.4),
+                        color: AppColors.black.withOpacity(0.1),
                         blurRadius: 12,
                         offset: const Offset(0, 2),
                         spreadRadius: 2,
@@ -434,12 +317,12 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                             Container(
                               padding: const EdgeInsets.all(6),
                               decoration: BoxDecoration(
-                                color: AppColors.secondary.withOpacity(0.12),
+                                color: AppColors.primary.withOpacity(0.12),
                                 shape: BoxShape.circle,
                               ),
                               child: const Icon(
                                 CupertinoIcons.location_solid,
-                                color: AppColors.secondary,
+                                color: AppColors.primary,
                                 size: 14,
                               ),
                             ),
@@ -448,7 +331,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                               child: Text(
                                 result.location!,
                                 style: AppTextTheme.bodyText2.copyWith(
-                                  color: CupertinoColors.systemGrey,
+                                  color: AppColors.textSecondary,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                                 maxLines: 2,
@@ -481,7 +364,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                               child: Text(
                                 "Tarla: ${result.fieldName!}",
                                 style: AppTextTheme.bodyText2.copyWith(
-                                  color: CupertinoColors.systemGrey,
+                                  color: AppColors.textSecondary,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                                 maxLines: 2,
@@ -1249,7 +1132,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
             const SizedBox(width: 8),
             Text(
               "Hakkında",
-              style: AppTextTheme.subtitle1.copyWith(
+              style: AppTextTheme.caption.copyWith(
                 fontWeight: FontWeight.w600,
                 color: AppColors.primary,
               ),

@@ -113,13 +113,13 @@ class FontSizeControl extends StatelessWidget {
           decoration: BoxDecoration(
             color: isEnabled
                 ? AppColors.primary.withOpacity(0.1)
-                : CupertinoColors.systemGrey5,
+                : AppColors.divider,
             borderRadius: BorderRadius.circular(6),
           ),
           child: Icon(
             icon,
             size: 16,
-            color: isEnabled ? AppColors.primary : CupertinoColors.systemGrey3,
+            color: isEnabled ? AppColors.primary : AppColors.textTertiary,
           ),
         ),
       ),
