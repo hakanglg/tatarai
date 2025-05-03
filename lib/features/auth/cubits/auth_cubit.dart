@@ -74,9 +74,9 @@ class AuthCubit extends BaseCubit<AuthState> {
   }
 
   /// Log Warning wrapper
-  void logWarning(String message, [String? detail]) {
+  void logWarning(String message, [dynamic detail]) {
     if (detail != null) {
-      handleWarning(message, detail);
+      handleWarning(message, detail.toString());
     } else {
       handleWarning(message, '');
     }

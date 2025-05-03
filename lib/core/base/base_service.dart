@@ -1,48 +1,57 @@
-import 'package:logger/logger.dart';
+import 'package:tatarai/core/utils/logger.dart';
 
 /// Tüm servislerin temel sınıfı.
 /// Loglama ve hata yönetimi için ortak metotlar içerir.
 abstract class BaseService {
-  final Logger _logger = Logger(
-    output: ConsoleOutput(),
-  );
+  /// Servis sınıfının adını döndüren getter
+  String get _serviceName => runtimeType.toString();
 
   /// Bilgi seviyesinde log mesajı
   void logInfo(String title, [String? message]) {
-    _logger.i('$title${message != null ? ' - $message' : ''}');
+    AppLogger.logWithContext(_serviceName, title, message);
   }
 
   /// Başarı seviyesinde log mesajı
   void logSuccess(String title, [String? message]) {
-    _logger.i('✅ $title${message != null ? ' - $message' : ''}');
+    AppLogger.successWithContext(_serviceName, title, message);
   }
 
   /// Uyarı seviyesinde log mesajı
   void logWarning(String title, [String? message]) {
-    _logger.w('⚠️ $title${message != null ? ' - $message' : ''}');
+    AppLogger.warnWithContext(_serviceName, title, message);
   }
 
   /// Hata seviyesinde log mesajı
   void logError(String title, [String? message]) {
-    _logger.e('❌ $title${message != null ? ' - $message' : ''}');
+    AppLogger.errorWithContext(_serviceName, title, message);
   }
 
   /// Debug seviyesinde log mesajı
   void logDebug(String title, [String? message]) {
-    _logger.d('🔍 $title${message != null ? ' - $message' : ''}');
+    AppLogger.d(
+        '[$_serviceName] 🔍 $title${message != null ? ' - $message' : ''}');
   }
 
   /// Ayrıntılı log mesajı
   void logVerbose(String title, [String? message]) {
-    _logger.v('📝 $title${message != null ? ' - $message' : ''}');
+    AppLogger.v(
+        '[$_serviceName] 📝 $title${message != null ? ' - $message' : ''}');
+  }
+
+  /// İşlem başlangıcını logla
+  void logStart(String operation, [String? details]) {
+    AppLogger.i(
+        '[$_serviceName] 🚀 $operation başlatılıyor${details != null ? ' - $details' : ''}');
+  }
+
+  /// İşlem bitişini logla
+  void logEnd(String operation, [String? details]) {
+    AppLogger.i(
+        '[$_serviceName] 🏁 $operation tamamlandı${details != null ? ' - $details' : ''}');
   }
 
   /// Standart hata işleme metodu
-  void handleError(String operation, dynamic error) {
-    if (error is Exception || error is Error) {
-      logError('$operation hatası', error.toString());
-    } else {
-      logError('$operation hatası', error?.toString() ?? 'Bilinmeyen hata');
-    }
+  void handleError(String operation, dynamic error, [StackTrace? stackTrace]) {
+    AppLogger.errorWithContext(_serviceName, operation, error, stackTrace);
   }
 }

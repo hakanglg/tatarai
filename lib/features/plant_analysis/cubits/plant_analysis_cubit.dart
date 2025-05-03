@@ -7,6 +7,7 @@ import 'package:tatarai/core/constants/app_constants.dart';
 import 'package:tatarai/core/repositories/plant_analysis_repository.dart';
 import 'package:tatarai/core/repositories/user_repository.dart';
 import 'package:tatarai/core/utils/logger.dart';
+import 'package:tatarai/core/utils/validation_util.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
 import 'package:tatarai/features/auth/models/user_model.dart';
 import 'package:tatarai/features/plant_analysis/cubits/plant_analysis_state.dart';
@@ -41,48 +42,25 @@ class PlantAnalysisCubit extends BaseCubit<PlantAnalysisState> {
   /// Kredisi yoksa ve premium değilse, premium satın almaya yönlendirir
   /// @return bool - Analiz yapılabilir mi?
   Future<bool> checkUserCredits() async {
-    try {
-      AppLogger.i('Kullanıcı kredi kontrolü yapılıyor');
+    logInfo('Kullanıcı kredi kontrolü yapılıyor');
 
-      // Kullanıcı model nesnesini mevcut AuthCubit'ten al
-      final UserModel? currentUser = _authCubit.state.user;
+    // Kullanıcı model nesnesini mevcut AuthCubit'ten al
+    final UserModel? currentUser = _authCubit.state.user;
 
-      if (currentUser == null) {
-        AppLogger.e('Kullanıcı oturum açmamış');
-        emit(PlantAnalysisState.error('Kullanıcı oturum açmamış'));
-        return false;
-      }
+    // ValidationUtil üzerinden kullanıcı kredilerini kontrol et
+    final ValidationResult result =
+        await ValidationUtil.checkUserCredits(currentUser);
 
-      // Debug için auth state ve user bilgilerini logla
-      AppLogger.i(
-          'AuthCubit State: status=${_authCubit.state.status}, isLoading=${_authCubit.state.isLoading}');
-      AppLogger.i(
-          'UserModel: id=${currentUser.id}, isPremium=${currentUser.isPremium}, analysisCredits=${currentUser.analysisCredits}, hasAnalysisCredits=${currentUser.hasAnalysisCredits}');
-
-      // Eğer kullanıcı premium ise veya kredisi varsa analiz yapılabilir
-      if (currentUser.isPremium || currentUser.hasAnalysisCredits) {
-        AppLogger.i('Kullanıcı analiz yapabilir',
-            'Premium: ${currentUser.isPremium}, Kalan kredi: ${currentUser.analysisCredits}');
-        return true;
-      }
-
-      // Kredisi yoksa ve premium değilse hata mesajı göster
-      AppLogger.w('Kullanıcının analiz kredisi yok',
-          'Premium: ${currentUser.isPremium}, Kalan kredi: ${currentUser.analysisCredits}');
-
+    if (!result.isValid) {
+      AppLogger.w('Kullanıcı kredi kontrolü başarısız', result.message);
       emit(PlantAnalysisState.error(
-          'Ücretsiz analiz hakkınızı kullandınız. Premium üyelik satın alarak sınırsız analiz yapabilirsiniz.',
-          needsPremium: true));
-
-      return false;
-    } catch (error) {
-      AppLogger.e('Kredi kontrolü sırasında hata oluştu', error);
-
-      // Hata durumunda analiz yapmaya izin verme
-      emit(PlantAnalysisState.error(
-          'Kullanıcı bilgileriniz yüklenirken bir hata oluştu. Lütfen tekrar deneyin.'));
+          result.message ?? 'Analiz yapma izni alınamadı.',
+          needsPremium: result.needsPremium));
       return false;
     }
+
+    logSuccess('Kullanıcı kredi kontrolü başarılı');
+    return true;
   }
 
   /// Analiz yapmadan önce gereken tüm kontrolleri yapar
@@ -95,51 +73,40 @@ class PlantAnalysisCubit extends BaseCubit<PlantAnalysisState> {
   ///
   /// @return bool - Analiz işlemi başlatılabilir mi?
   Future<bool> validateBeforeAnalysis(File? imageFile) async {
-    AppLogger.i('Analiz öncesi tüm kontroller yapılıyor');
+    logInfo('Analiz öncesi tüm kontroller yapılıyor');
 
     // 1. Dosya kontrolü
-    if (imageFile == null || !imageFile.existsSync()) {
-      AppLogger.e('Analiz için geçerli bir görüntü dosyası mevcut değil');
-      emit(PlantAnalysisState.error('Lütfen geçerli bir bitki fotoğrafı seçin.',
-          errorType: ErrorType.image));
-      return false;
-    }
-
-    // 2. Dosya boyutu kontrolü (20MB'den büyük olmamalı)
-    final fileSize = await imageFile.length();
-    if (fileSize > 20 * 1024 * 1024) {
-      // 20MB
-      AppLogger.e(
-          'Dosya boyutu çok büyük: ${(fileSize / (1024 * 1024)).toStringAsFixed(2)}MB');
+    final ValidationResult imageValidation =
+        await ValidationUtil.validateImageFile(imageFile);
+    if (!imageValidation.isValid) {
+      AppLogger.w(
+          'Görüntü dosyası doğrulaması başarısız', imageValidation.message);
       emit(PlantAnalysisState.error(
-          'Seçilen fotoğraf çok büyük. Lütfen 20MB\'den küçük bir fotoğraf seçin.',
+          imageValidation.message ?? 'Görüntü dosyası hatası',
           errorType: ErrorType.image));
       return false;
     }
 
-    // 3. Kullanıcı oturum açmış mı ve premium/kredi durumu kontrolü
+    // 2. Kullanıcı oturum açmış mı ve premium/kredi durumu kontrolü
     final userValidation = await validateUserForAnalysis();
     if (!userValidation) {
       // Mesaj validateUserForAnalysis metodu içinde emit edildi
       return false;
     }
 
-    // 4. Bağlantı durumu kontrol et
-    try {
-      final bool isConnected = await _repository.checkConnectivity();
-      if (!isConnected) {
-        AppLogger.w('Analiz başlatılırken ağ bağlantısı bulunamadı');
-        emit(PlantAnalysisState.error(
-            'İnternet bağlantısı bulunamadı. Lütfen bağlantınızı kontrol edip tekrar deneyin.',
-            errorType: ErrorType.network));
-        return false;
-      }
-    } catch (e) {
-      AppLogger.w('Bağlantı durumu kontrol edilirken hata oluştu: $e');
-      // Bağlantı kontrolünde hata olsa bile devam etmeye çalışalım
+    // 3. Bağlantı durumu kontrol et
+    final ValidationResult connectivityValidation =
+        await ValidationUtil.checkConnectivity();
+    if (!connectivityValidation.isValid) {
+      AppLogger.w(
+          'Bağlantı kontrolü başarısız', connectivityValidation.message);
+      emit(PlantAnalysisState.error(
+          connectivityValidation.message ?? 'Ağ bağlantısı hatası',
+          errorType: ErrorType.network));
+      return false;
     }
 
-    AppLogger.i('Tüm ön kontroller başarılı, analiz başlatılabilir');
+    logSuccess('Tüm ön kontroller başarılı, analiz başlatılabilir');
     return true;
   }
 
@@ -151,7 +118,7 @@ class PlantAnalysisCubit extends BaseCubit<PlantAnalysisState> {
   ///
   /// @return - Kullanıcı analiz yapabilir mi?
   Future<bool> validateUserForAnalysis() async {
-    AppLogger.i('Kullanıcı analiz validasyonu yapılıyor');
+    logInfo('Kullanıcı analiz validasyonu yapılıyor');
 
     try {
       // Önce AuthCubit'ten mevcut kullanıcıyı al
@@ -163,74 +130,70 @@ class PlantAnalysisCubit extends BaseCubit<PlantAnalysisState> {
         return false;
       }
 
-      AppLogger.i('AuthCubit üzerinden alınan kullanıcı bilgileri:');
-      AppLogger.i(
+      logInfo('AuthCubit üzerinden alınan kullanıcı bilgileri:',
           'ID: ${currentUser.id}, Premium: ${currentUser.isPremium}, Krediler: ${currentUser.analysisCredits}');
 
-      // UserRepository üzerinden en güncel kullanıcı bilgilerini al (önbellekten değil, Firestore'dan)
+      // Önce bağlantı kontrolü yap
+      final ValidationResult connectivityValidation =
+          await ValidationUtil.checkConnectivity();
+      if (!connectivityValidation.isValid) {
+        emit(PlantAnalysisState.error(
+            connectivityValidation.message ?? 'Ağ bağlantısı hatası',
+            errorType: ErrorType.network));
+        return false;
+      }
+
       try {
+        // UserRepository üzerinden en güncel kullanıcı bilgilerini al
         final freshUser =
             await _userRepository.fetchFreshUserData(currentUser.id);
+
         if (freshUser != null) {
-          AppLogger.i('Firestore\'dan alınan güncel kullanıcı bilgileri:');
-          AppLogger.i(
-              'ID: ${freshUser.id}, Premium: ${freshUser.isPremium}, Krediler: ${freshUser.analysisCredits}');
+          // ValidationUtil ile kullanıcı kontrolü yap
+          final ValidationResult freshUserValidation =
+              await ValidationUtil.checkUserCredits(freshUser);
 
-          // Premium kontrolü
-          if (freshUser.isPremium) {
-            AppLogger.i('Kullanıcı premium üye, analize devam edilebilir');
-            return true;
-          }
-
-          // Kredi kontrolü - doğrudan analysisCredits değerine bak
-          if (freshUser.analysisCredits > 0) {
-            AppLogger.i(
-                'Kullanıcının ${freshUser.analysisCredits} adet kredisi var, analize devam edilebilir');
+          if (freshUserValidation.isValid) {
+            logSuccess(
+                'Güncel kullanıcı kontrolü başarılı', 'Analiz yapılabilir');
             return true;
           } else {
-            AppLogger.w(
-                'Kullanıcının kredisi yok (${freshUser.analysisCredits})');
-
             emit(PlantAnalysisState.error(
-                'Analiz yapmak için yeterli krediniz bulunmuyor. Premium üyelik satın alarak veya kredi yükleyerek analizlere devam edebilirsiniz.',
-                needsPremium: true));
-
+                freshUserValidation.message ??
+                    'Analiz için yeterli krediniz bulunmuyor.',
+                needsPremium: freshUserValidation.needsPremium));
             return false;
           }
         }
+
+        // Güncel kullanıcı bilgileri alınamadıysa, önbellekteki bilgilerle devam et
+        logWarning(
+            'Güncel kullanıcı bilgileri alınamadı, önbellekteki bilgilerle devam ediliyor');
       } catch (e) {
-        AppLogger.e('Taze kullanıcı verisi getirilirken hata: $e');
-        // Taze veri alınamazsa, AuthCubit'teki verileri kullan
+        // Hata durumunda loglama yap ama önbellekteki bilgilerle devam et
+        logWarning(
+            'Güncel kullanıcı bilgileri alınırken hata oluştu', e.toString());
       }
 
-      // Buraya geldiyse, taze veriler alınamadı demektir, AuthCubit'teki verileri kullan
+      // Önbellekteki kullanıcı bilgileriyle doğrulama
+      final ValidationResult cachedUserValidation =
+          await ValidationUtil.checkUserCredits(currentUser);
 
-      // Premium üye kontrolü
-      if (currentUser.isPremium) {
-        AppLogger.i(
-            'Analiz öncesi doğrulama: Kullanıcı premium üye, analize devam edilebilir');
-        return true;
-      }
-
-      // Kredi kontrolü - doğrudan integer değerini kontrol edelim
-      if (currentUser.analysisCredits > 0) {
-        AppLogger.i(
-            'Analiz öncesi doğrulama: Kullanıcının ${currentUser.analysisCredits} adet kredisi var, analize devam edilebilir');
+      if (cachedUserValidation.isValid) {
+        logSuccess(
+            'Önbellekteki kullanıcı kontrolü başarılı', 'Analiz yapılabilir');
         return true;
       } else {
-        AppLogger.w(
-            'Analiz öncesi doğrulama: Kullanıcının kredisi yok (${currentUser.analysisCredits})');
-
         emit(PlantAnalysisState.error(
-            'Analiz yapmak için yeterli krediniz bulunmuyor. Premium üyelik satın alarak veya kredi yükleyerek analizlere devam edebilirsiniz.',
-            needsPremium: true));
-
+            cachedUserValidation.message ??
+                'Analiz için yeterli krediniz bulunmuyor.',
+            needsPremium: cachedUserValidation.needsPremium));
         return false;
       }
-    } catch (e) {
-      AppLogger.e('Analiz öncesi doğrulama hatası', e);
+    } catch (error) {
+      AppLogger.e('Kullanıcı validasyonu sırasında beklenmeyen hata', error);
       emit(PlantAnalysisState.error(
-          'Kullanıcı bilgileriniz kontrol edilirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.'));
+          'Kullanıcı bilgileriniz kontrol edilirken bir hata oluştu.'));
       return false;
     }
   }

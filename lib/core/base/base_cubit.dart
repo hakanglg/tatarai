@@ -6,10 +6,13 @@ import 'package:tatarai/core/utils/logger.dart';
 abstract class BaseCubit<T extends BaseState> extends Cubit<T> {
   BaseCubit(super.initialState);
 
+  /// Sınıf adını döndürür
+  String get _cubitName => runtimeType.toString();
+
   /// Hata durumunu işleme
   void handleError(String operation, dynamic error, [StackTrace? stackTrace]) {
     // Hata mesajını loglara yazdır
-    AppLogger.e('$runtimeType - $operation hatası: $error', error, stackTrace);
+    AppLogger.errorWithContext(_cubitName, operation, error, stackTrace);
 
     // Firebase ve diğer hatalar için teknik detayları loglara yazdırıp,
     // kullanıcıya gösterilmemesini sağla
@@ -43,13 +46,16 @@ abstract class BaseCubit<T extends BaseState> extends Cubit<T> {
 
   /// Başarılı işlemleri loglama
   void logSuccess(String operation, [String? details]) {
-    AppLogger.i(
-      '$runtimeType - $operation başarılı${details != null ? ': $details' : ''}',
-    );
+    AppLogger.successWithContext(_cubitName, operation, details);
   }
 
   /// Bilgi loglama
-  void logInfo(String message) {
-    AppLogger.i('$runtimeType - $message');
+  void logInfo(String message, [dynamic details]) {
+    AppLogger.logWithContext(_cubitName, message, details);
+  }
+
+  /// Uyarı loglama
+  void logWarning(String message, [dynamic details]) {
+    AppLogger.warnWithContext(_cubitName, message, details);
   }
 }

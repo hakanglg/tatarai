@@ -5,6 +5,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:tatarai/core/base/base_service.dart';
 import 'package:tatarai/core/constants/app_constants.dart';
+import 'package:tatarai/core/utils/validation_util.dart';
+import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/features/plant_analysis/services/gemini_service.dart';
 import 'package:tatarai/features/auth/services/auth_service.dart';
 
@@ -48,112 +50,88 @@ class PlantAnalysisService extends BaseService {
     String? fieldName,
   }) async {
     try {
-      logInfo('PlantAnalysisService.analyzePlant başlatılıyor',
+      logStart('analyzePlant',
           'Görsel boyutu: ${imageBytes.length} bayt, UserId: $userId');
 
+      // 1. Kullanıcı kontrolü
       final user = _authService.currentUser;
       if (user == null) {
         logError('Kullanıcı oturum açmamış');
-        throw Exception('Kullanıcı oturum açmamış');
-      }
-
-      // Kullanıcı kredi kontrolü
-      final userDocRef = await _firestore
-          .collection(AppConstants.usersCollection)
-          .doc(userId)
-          .get();
-      final userDataMap = userDocRef.data();
-
-      if (userDataMap == null) {
-        logWarning('Kullanıcı bilgileri bulunamadı', 'userId: $userId');
         return AnalysisResponse(
           success: false,
-          message: 'Kullanıcı bilgileri bulunamadı.',
+          message: 'Kullanıcı oturum açmamış',
         );
       }
 
-      final int userCredits = userDataMap['analysisCredits'] ?? 0;
-      final bool isPremium = userDataMap['isPremium'] ?? false;
-
-      // Eğer kullanıcı premium değilse ve kredisi yoksa analiz yapılamaz
-      if (userCredits <= 0 && !isPremium) {
-        logWarning('Kullanıcının kredisi yok',
-            'userId: $userId, credits: $userCredits');
+      // 2. Bağlantı kontrolü
+      final ValidationResult connectivityValidation =
+          await ValidationUtil.checkConnectivity();
+      if (!connectivityValidation.isValid) {
+        logWarning(
+            'Bağlantı kontrolü başarısız', connectivityValidation.message);
         return AnalysisResponse(
           success: false,
           message:
-              'Ücretsiz analiz hakkınızı kullandınız. Premium üyelik satın alarak sınırsız analiz yapabilirsiniz.',
-          needsPremium: true,
+              connectivityValidation.message ?? 'İnternet bağlantısı hatası',
         );
       }
 
-      logInfo('Bitki analizi başlatılıyor...',
-          'Konum: ${location ?? "belirtilmemiş"}, İl: ${province ?? "belirtilmemiş"}, İlçe: ${district ?? "belirtilmemiş"}');
+      // 3. Kullanıcı kredisi kontrolü
+      final ValidationResult creditValidation =
+          await ValidationUtil.checkUserCreditsFromFirestore(
+              userId, _firestore);
 
-      // Eğer konum bilgisi verilmemişse varsayılan konumu kullan
-      final String locationInfo = location ?? 'Tekirdağ/Tatarlı';
+      if (!creditValidation.isValid) {
+        logWarning(
+            'Kullanıcı kredisi kontrolü başarısız', creditValidation.message);
+        return AnalysisResponse(
+          success: false,
+          message: creditValidation.message ?? 'Analiz hakkınız bulunmuyor.',
+          needsPremium: creditValidation.needsPremium,
+        );
+      }
 
+      // 4. Konum bilgisini hazırla
+      final String locationInfo = _prepareLocationInfo(
+          location: location,
+          province: province,
+          district: district,
+          neighborhood: neighborhood);
+
+      // 5. Analizi gerçekleştir
       try {
-        // Kredi var veya premium kullanıcı - analizi yap
         logInfo('GeminiService.analyzeImage çağrılıyor',
             'Görsel boyutu: ${imageBytes.length} bayt');
 
         final result = await _geminiService.analyzeImage(
           imageBytes,
           prompt: prompt,
-          location: locationInfo, // Konum bilgisini Gemini'ye ilet
-          province: province, // İl bilgisi
-          district: district, // İlçe bilgisi
-          neighborhood: neighborhood, // Mahalle bilgisi
-          fieldName: fieldName, // Tarla adı
+          location: locationInfo,
+          province: province,
+          district: district,
+          neighborhood: neighborhood,
+          fieldName: fieldName,
         );
 
-        // Bu noktada başarılı bir cevap alındı
+        // 6. Başarılı cevap işleme
         logSuccess('GeminiService işlemi başarılı',
             'Yanıt uzunluğu: ${result.length} karakter');
 
-        // Premium değilse, krediyi azalt
-        if (!isPremium) {
-          await _firestore
-              .collection(AppConstants.usersCollection)
-              .doc(userId)
-              .update({'analysisCredits': FieldValue.increment(-1)});
+        // 7. Kredi güncelleme
+        await _updateUserCredits(userId);
 
-          // Kalan kredi sayısını log'la
-          final int remainingCredits = userCredits - 1;
-          logInfo(
-              'Kullanıcı kredisi düşürüldü', 'Kalan kredi: $remainingCredits');
-        }
-
-        logSuccess('Bitki analizi başarıyla tamamlandı', 'userId: $userId');
+        // 8. Sonucu döndür
+        logEnd('analyzePlant', 'userId: $userId');
         return AnalysisResponse(
           success: true,
           message: 'Analiz başarıyla tamamlandı.',
           result: result,
-          location: locationInfo, // Konum bilgisini yanıta ekle
-          fieldName: fieldName, // Tarla adını yanıta ekle
+          location: locationInfo,
+          fieldName: fieldName,
         );
       } catch (geminiError) {
-        logError('GeminiService hatası', 'Hata: ${geminiError.toString()}');
-
-        // Gemini API hatası daha spesifik olarak raporla
-        String errorMessage =
-            'Analiz sırasında bir hata oluştu: ${geminiError.toString()}';
-        if (geminiError.toString().contains('API anahtarı')) {
-          errorMessage =
-              'API anahtarı hatası: Lütfen daha sonra tekrar deneyin veya destek ile iletişime geçin.';
-        } else if (geminiError.toString().contains('Network')) {
-          errorMessage =
-              'Ağ hatası: İnternet bağlantınızı kontrol edin ve tekrar deneyin.';
-        } else if (geminiError.toString().contains('403')) {
-          errorMessage =
-              'Yetkilendirme hatası: Gemini API erişimi sağlanamadı.';
-        }
-
-        return AnalysisResponse(
-          success: false,
-          message: errorMessage,
-        );
+        logError('GeminiService hatası', geminiError.toString());
+        return _createErrorResponse(geminiError);
       }
     } catch (e) {
       logError('Bitki analizi genel hatası', e.toString());
@@ -163,6 +141,81 @@ class PlantAnalysisService extends BaseService {
             'Analiz sırasında bir hata oluştu: ${e.toString().substring(0, e.toString().length > 100 ? 100 : e.toString().length)}...',
       );
     }
+  }
+
+  /// Kullanıcı kredisini günceller
+  Future<void> _updateUserCredits(String userId) async {
+    try {
+      // Kullanıcı verilerini al
+      final userDocRef = await _firestore
+          .collection(AppConstants.usersCollection)
+          .doc(userId)
+          .get();
+      final userDataMap = userDocRef.data();
+      final bool isPremium = userDataMap?['isPremium'] ?? false;
+
+      // Premium değilse, krediyi azalt
+      if (!isPremium) {
+        await _firestore
+            .collection(AppConstants.usersCollection)
+            .doc(userId)
+            .update({'analysisCredits': FieldValue.increment(-1)});
+
+        // Kalan kredi sayısını log'la
+        final int userCredits = userDataMap?['analysisCredits'] ?? 0;
+        final int remainingCredits = userCredits - 1;
+        logInfo(
+            'Kullanıcı kredisi düşürüldü', 'Kalan kredi: $remainingCredits');
+      }
+    } catch (e) {
+      logWarning('Kredi güncellemesi yapılamadı', e.toString());
+      // Kredi güncellemesi yapılamazsa hata fırlatma, işleme devam et
+    }
+  }
+
+  /// Konum bilgisini hazırlar
+  String _prepareLocationInfo(
+      {String? location,
+      String? province,
+      String? district,
+      String? neighborhood}) {
+    String detailedLocation = "";
+
+    // İl, ilçe ve mahalle bilgilerinden detaylı konum oluştur
+    if (province != null && district != null) {
+      detailedLocation = "$province/$district";
+      if (neighborhood != null && neighborhood.isNotEmpty) {
+        detailedLocation += "/$neighborhood";
+      }
+    }
+
+    // Detaylı konum yoksa verilen lokasyonu kullan
+    return detailedLocation.isNotEmpty
+        ? detailedLocation
+        : (location != null && location.isNotEmpty)
+            ? location
+            : "Tekirdağ/Tatarlı";
+  }
+
+  /// API hatası için yanıt oluşturur
+  AnalysisResponse _createErrorResponse(dynamic geminiError) {
+    String errorMessage =
+        'Analiz sırasında bir hata oluştu: ${geminiError.toString()}';
+
+    if (geminiError.toString().contains('API anahtarı')) {
+      errorMessage =
+          'API anahtarı hatası: Lütfen daha sonra tekrar deneyin veya destek ile iletişime geçin.';
+    } else if (geminiError.toString().contains('Network')) {
+      errorMessage =
+          'Ağ hatası: İnternet bağlantınızı kontrol edin ve tekrar deneyin.';
+    } else if (geminiError.toString().contains('403')) {
+      errorMessage = 'Yetkilendirme hatası: Gemini API erişimi sağlanamadı.';
+    }
+
+    return AnalysisResponse(
+      success: false,
+      message: errorMessage,
+    );
   }
 
   /// Görsel olmadan hastalık önerisi alır
@@ -177,10 +230,16 @@ class PlantAnalysisService extends BaseService {
       final user = _authService.currentUser;
       if (user == null) {
         logError('Kullanıcı oturum açmamış');
-        throw Exception('Kullanıcı oturum açmamış');
+        return AnalysisResponse(
+          success: false,
+          message: 'Kullanıcı oturum açmamış',
+        );
       }
 
-      // Kullanıcının premium olup olmadığını kontrol et
+      // ValidationUtil ile premium kullanıcı kontrolü
+      final ValidationResult creditValidation =
+          await ValidationUtil.checkUserCreditsFromFirestore(
+              userId, _firestore);
       final userDocRef = await _firestore
           .collection(AppConstants.usersCollection)
           .doc(userId)
