@@ -10,7 +10,11 @@
 **/.vagrant/
 **/DerivedData/
 Icon?
-**/Pods/
+**/Pods/*
+# XCFileList dosyalarını içeren klasörü ve Pods-Runner'ı koruyalım
+!**/Pods/Target Support Files/
+!**/Pods/Target Support Files/Pods-Runner/
+!**/Pods/Target Support Files/Pods-Runner/*.xcfilelist
 **/.symlinks/
 profile
 xcuserdata
