@@ -5,9 +5,9 @@
     <key>method</key>
     <string>app-store</string>
     <key>teamID</key>
-    <string>TEAM_ID</string>
+    <string>S6UCS994KC</string>
     <key>signingStyle</key>
-    <string>manual</string>
+    <string>automatic</string>
     <key>stripSwiftSymbols</key>
     <true/>
     <key>uploadBitcode</key>
@@ -16,10 +16,5 @@
     <true/>
     <key>compileBitcode</key>
     <false/>
-    <key>provisioningProfiles</key>
-    <dict>
-        <key>YOUR_BUNDLE_ID</key>
-        <string>YOUR_PROVISIONING_PROFILE_NAME</string>
-    </dict>
 </dict>
 </plist> 
