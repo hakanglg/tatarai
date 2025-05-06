@@ -4,7 +4,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tatarai/core/base/base_state_widget.dart';
+import 'package:tatarai/core/routing/route_names.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/core/utils/loading_view.dart';
@@ -50,7 +52,7 @@ class _SplashScreenState extends BaseState<SplashScreen>
     // Kullanıcı durumunu kontrol eder ve yönlendirir
     _startInitialization();
 
-    // Timeout timer - her durumda 500ms içinde otomatik olarak geç
+    // Timeout timer - her durumda 2 saniye içinde otomatik olarak geç
     _setupTimeoutTimer();
   }
 
@@ -58,11 +60,11 @@ class _SplashScreenState extends BaseState<SplashScreen>
     // Önceki timer'ı iptal et
     _timeoutTimer?.cancel();
 
-    // Yeni timer oluştur - 500ms'ye düşürüldü
-    _timeoutTimer = Timer(const Duration(milliseconds: 500), () {
+    // Yeni timer oluştur - 2 saniye animasyondan sonra yönlendir
+    _timeoutTimer = Timer(const Duration(milliseconds: 2000), () {
       AppLogger.w('Splash ekranı timeout - uygulamaya zorla devam ediliyor');
-      // Zorla yönlendirme - geçişi garanti etmek için
-      runIfMounted(_navigateForceToLogin, 'Timeout yönlendirme hatası');
+      // Zorla yönlendirme
+      runIfMounted(_navigateToNextScreen, 'Timeout yönlendirme hatası');
     });
   }
 
@@ -74,8 +76,8 @@ class _SplashScreenState extends BaseState<SplashScreen>
     super.dispose();
   }
 
-  // Zorla login sayfasına yönlendirir - son çare olarak
-  void _navigateForceToLogin() {
+  // Sonraki ekrana yönlendir
+  void _navigateToNextScreen() async {
     if (_navigationStarted) return;
 
     setStateIfMounted(() {
@@ -83,69 +85,39 @@ class _SplashScreenState extends BaseState<SplashScreen>
     });
 
     try {
-      context.goNamed('login');
-    } catch (e) {
-      AppLogger.e('Zorla yönlendirme hatası', e);
-      try {
-        // Native navigator kullan
-        Navigator.of(context).pushReplacementNamed('/login');
-      } catch (e2) {
-        AppLogger.e('Native navigator hatası', e2);
-      }
-    }
-  }
+      // Onboarding durumunu kontrol et
+      final prefs = await SharedPreferences.getInstance();
+      final onboardingCompleted =
+          prefs.getBool('onboarding_completed') ?? false;
 
-  // Sonraki ekrana yönlendir
-  void _navigateToNextScreen() {
-    if (_navigationStarted) return;
+      if (!mounted) return;
 
-    setStateIfMounted(() {
-      _navigationStarted = true;
-    });
-
-    runFutureSafe<void>(
-      Future<void>(() async {
+      if (!onboardingCompleted) {
+        // Onboarding tamamlanmamışsa, onboarding ekranına yönlendir
+        AppLogger.i(
+            'Onboarding tamamlanmamış, onboarding ekranına yönlendiriliyor');
+        context.goNamed(RouteNames.onboarding);
+      } else {
+        // Onboarding tamamlanmışsa, oturum durumuna göre yönlendir
         final authState = context.read<AuthCubit>().state;
-
-        if (authState.status == AuthStatus.initial ||
-            authState.status == AuthStatus.error) {
-          AppLogger.w(
-            'Auth durumu hazır değil (${authState.status}), giriş sayfasına yönlendiriliyor',
-          );
-          context.goNamed('login');
-          return;
-        }
-
         if (authState.isAuthenticated) {
-          AppLogger.i('Kullanıcı oturum açmış, ana sayfaya yönlendiriliyor');
-          // Home ekranına yönlendirmeden önce NavigationManager'ı başlat
+          AppLogger.i('Kullanıcı giriş yapmış, ana sayfaya yönlendiriliyor');
+          // NavigationManager başlat
           NavigationManager.initialize(initialIndex: 0);
-
-          // NavigationManager'ın başlatıldığından emin ol
-          final navManager = NavigationManager.instance;
-          if (navManager == null) {
-            AppLogger.e('NavigationManager başlatılamadı, yeniden deneniyor');
-            // Yeniden deneme
-            NavigationManager.initialize(initialIndex: 0);
-            if (NavigationManager.instance == null) {
-              AppLogger.e('NavigationManager ikinci denemede de başlatılamadı');
-            }
-          }
-
-          context.goNamed('home');
+          context.goNamed(RouteNames.home);
         } else {
           AppLogger.i(
-            'Kullanıcı oturum açmamış, giriş sayfasına yönlendiriliyor',
-          );
-          context.goNamed('login');
+              'Kullanıcı giriş yapmamış, giriş sayfasına yönlendiriliyor');
+          context.goNamed(RouteNames.login);
         }
-      }),
-      onError: (error, stack) {
-        AppLogger.e('Yönlendirme sırasında hata', error, stack);
-        _navigateForceToLogin();
-      },
-      errorMessage: 'Yönlendirme sırasında hata',
-    );
+      }
+    } catch (e) {
+      AppLogger.e('Yönlendirme hatası', e);
+      // Herhangi bir hata durumunda login ekranına yönlendir
+      if (mounted) {
+        context.goNamed(RouteNames.login);
+      }
+    }
   }
 
   /// Uygulamayı başlatır ve kimlik doğrulama durumunu kontrol eder
@@ -168,7 +140,7 @@ class _SplashScreenState extends BaseState<SplashScreen>
           onError: (error, stack) {
             AppLogger.e('Auth durumu dinleme hatası', error, stack);
             // Hata durumunda zorla yönlendir
-            runIfMounted(_navigateForceToLogin);
+            runIfMounted(_navigateToNextScreen);
           },
         );
 
@@ -184,8 +156,8 @@ class _SplashScreenState extends BaseState<SplashScreen>
       }),
       onError: (error, stack) {
         AppLogger.e('Splash initialization error', error, stack);
-        // Splash ekranında hata - zorla giriş sayfasına yönlendir
-        _navigateForceToLogin();
+        // Splash ekranında hata - zorla yönlendir
+        _navigateToNextScreen();
       },
       errorMessage: 'Splash initialization error',
     );

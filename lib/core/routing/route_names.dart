@@ -1,28 +1,31 @@
-/// Uygulama rota isimleri
+/// Uygulama içerisindeki tüm rota isimlerini tanımlar.
 class RouteNames {
   RouteNames._();
 
-  /// Splash ekranı
+  /// Splash ekranının adı
   static const String splash = 'splash';
 
-  /// Giriş ekranı
+  /// Onboarding ekranının adı
+  static const String onboarding = 'onboarding';
+
+  /// Giriş ekranının adı
   static const String login = 'login';
 
-  /// Kayıt ekranı
+  /// Kayıt ekranının adı
   static const String register = 'register';
 
-  /// Ana ekran
+  /// Ana sayfanın adı
   static const String home = 'home';
 
-  /// Analiz ekranı
+  /// Analiz ekranının adı
   static const String analysis = 'analysis';
 
-  /// Analiz sonuç ekranı
-  static const String analysisResult = 'analysis-result';
+  /// Analiz sonuçları ekranının adı
+  static const String analysisResult = 'analysisResult';
 
-  /// Profil ekranı
+  /// Profil ekranının adı
   static const String profile = 'profile';
 
-  /// Premium ekranı
+  /// Premium ekranının adı
   static const String premium = 'premium';
 }

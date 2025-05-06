@@ -11,15 +11,18 @@ import 'package:tatarai/features/auth/views/login_screen.dart';
 import 'package:tatarai/features/auth/views/register_screen.dart';
 import 'package:tatarai/features/home/views/home_screen.dart';
 import 'package:tatarai/features/navbar/navigation_manager.dart';
+import 'package:tatarai/features/onboarding/views/onboarding_screen.dart';
 import 'package:tatarai/features/payment/views/premium_screen.dart';
 import 'package:tatarai/features/plant_analysis/views/analyses_result/analysis_result_screen.dart';
 import 'package:tatarai/features/plant_analysis/views/analysis/analysis_screen.dart';
 import 'package:tatarai/features/profile/views/profile_screen.dart';
 import 'package:tatarai/features/splash/views/splash_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Uygulama router sınıfı
 class AppRouter {
   final AuthCubit authCubit;
+  bool _isRedirecting = false;
 
   /// Constructor
   AppRouter({required this.authCubit});
@@ -39,6 +42,11 @@ class AppRouter {
           path: RoutePaths.splash,
           name: RouteNames.splash,
           builder: (context, state) => const SplashScreen(),
+        ),
+        GoRoute(
+          path: RoutePaths.onboarding,
+          name: RouteNames.onboarding,
+          builder: (context, state) => const OnboardingScreen(),
         ),
         GoRoute(
           path: RoutePaths.login,
@@ -81,10 +89,17 @@ class AppRouter {
       ];
 
   /// Yönlendirme kuralları
-  String? _handleRedirect(BuildContext context, GoRouterState state) {
+  Future<String?> _handleRedirect(
+      BuildContext context, GoRouterState state) async {
+    // Sonsuz döngüyü önlemek için yönlendirme durumunu kontrol et
+    if (_isRedirecting) {
+      return null;
+    }
+
     final authState = authCubit.state;
     final isLoggedIn = authState.isAuthenticated;
     final isSplash = state.matchedLocation == RoutePaths.splash;
+    final isOnboarding = state.matchedLocation == RoutePaths.onboarding;
     final isLoggingIn = state.matchedLocation == RoutePaths.login ||
         state.matchedLocation == RoutePaths.register;
 
@@ -93,46 +108,61 @@ class AppRouter {
       'Router - Path: ${state.matchedLocation}, Auth: ${authState.status}, Giriş: $isLoggedIn',
     );
 
-    // Splash ekranındayken, oturum durumuna bakılmaksızın gösterilir,
-    // ama sadece 1 saniye içinde otomatik yönlendirme olmazsa
+    // Splash ekranında hiçbir yönlendirme yapma, splash ekranı kendi kendine yönlendirecek
     if (isSplash) {
       return null;
     }
 
-    // Kimlik doğrulama durumu başlangıç durumundaysa ve splash ekranında değilsek
-    // kullanıcının splash ekranını görmeden direkt login'e yönlenmesine izin ver
-    if (authState.status == AuthStatus.initial && !isSplash && !isLoggingIn) {
-      return RoutePaths.login;
+    // Onboarding ekranında ve onboarding ekranına yönlendirdiysek, doğrudan yönlendirme yapma
+    if (isOnboarding) {
+      return null;
     }
 
-    // Oturum açıksa ve giriş/kayıt ekranına gitmeye çalışıyorsa, ana sayfaya yönlendir
-    if (isLoggedIn && isLoggingIn) {
-      // Home ekranına gitmeden önce NavigationManager'ı başlat
-      if (NavigationManager.instance == null) {
+    try {
+      _isRedirecting = true;
+
+      // Onboarding tamamlandı mı kontrol et (splash dışındaki durumlar için)
+      if (!isSplash && !isOnboarding) {
+        final prefs = await SharedPreferences.getInstance();
+        final onboardingCompleted =
+            prefs.getBool('onboarding_completed') ?? false;
+
+        // Onboarding tamamlanmamışsa ve onboarding ekranında değilsek, onboarding'e yönlendir
+        if (!onboardingCompleted) {
+          return RoutePaths.onboarding;
+        }
+      }
+
+      // Oturum açıksa ve giriş/kayıt ekranına gitmeye çalışıyorsa, ana sayfaya yönlendir
+      if (isLoggedIn && (isLoggingIn)) {
+        // Home ekranına gitmeden önce NavigationManager'ı başlat
+        if (NavigationManager.instance == null) {
+          AppLogger.i(
+            'Ana sayfaya yönlendirmeden önce NavigationManager başlatılıyor',
+          );
+          NavigationManager.initialize(initialIndex: 0);
+        }
+        return RoutePaths.home;
+      }
+
+      // Oturum açık değilse ve korumalı bir sayfaya gitmeye çalışıyorsa, giriş sayfasına yönlendir
+      if (!isLoggedIn && !isLoggingIn && !isSplash && !isOnboarding) {
+        return RoutePaths.login;
+      }
+
+      // Home ekranına yönlendirme varsa, NavigationManager'ı başlat
+      if (state.matchedLocation == RoutePaths.home &&
+          NavigationManager.instance == null) {
         AppLogger.i(
-          'Ana sayfaya yönlendirmeden önce NavigationManager başlatılıyor',
+          'Home ekranına yönlendirme öncesi NavigationManager başlatılıyor',
         );
         NavigationManager.initialize(initialIndex: 0);
       }
-      return RoutePaths.home;
-    }
 
-    // Oturum açık değilse ve korumalı bir sayfaya gitmeye çalışıyorsa, giriş sayfasına yönlendir
-    if (!isLoggedIn && !isLoggingIn && !isSplash) {
-      return RoutePaths.login;
+      return null;
+    } finally {
+      _isRedirecting = false;
     }
-
-    // Home ekranına yönlendirme varsa, NavigationManager'ı başlat
-    if (state.matchedLocation == RoutePaths.home &&
-        NavigationManager.instance == null) {
-      AppLogger.i(
-        'Home ekranına yönlendirme öncesi NavigationManager başlatılıyor',
-      );
-      NavigationManager.initialize(initialIndex: 0);
-    }
-
-    // Diğer durumlarda normal gezinmeye izin ver
-    return null;
   }
 }
 

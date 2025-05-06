@@ -5,6 +5,9 @@ class RoutePaths {
   /// Splash ekranının yolu
   static const String splash = '/';
 
+  /// Onboarding ekranının yolu
+  static const String onboarding = '/onboarding';
+
   /// Giriş ekranı yolu
   static const String login = '/login';
 
