@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
+import 'package:tatarai/core/theme/text_theme.dart';
+import 'package:tatarai/core/theme/dimensions.dart';
 
 /// Yazı boyutu kontrol widgetı
 ///
@@ -31,10 +33,12 @@ class FontSizeControl extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      padding: EdgeInsets.symmetric(
+          vertical: context.dimensions.spaceXS,
+          horizontal: context.dimensions.paddingM),
       decoration: BoxDecoration(
-        color: CupertinoColors.systemGrey6,
-        borderRadius: BorderRadius.circular(12),
+        color: AppColors.surfaceVariant,
+        borderRadius: BorderRadius.circular(context.dimensions.radiusM),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -42,12 +46,11 @@ class FontSizeControl extends StatelessWidget {
           if (labelText != null) ...[
             Text(
               labelText!,
-              style: const TextStyle(
-                fontSize: 14,
+              style: AppTextTheme.caption.copyWith(
                 fontWeight: FontWeight.w500,
               ),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: context.dimensions.spaceXS),
           ],
 
           // Küçültme butonu
@@ -56,17 +59,21 @@ class FontSizeControl extends StatelessWidget {
             onPressed: fontSizeLevel > 0
                 ? () => onFontSizeChanged(fontSizeLevel - 1)
                 : null,
+            context: context,
           ),
 
           // Mevcut yazı boyutu göstergesi
           Container(
-            margin: const EdgeInsets.symmetric(horizontal: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            margin:
+                EdgeInsets.symmetric(horizontal: context.dimensions.spaceXS),
+            padding: EdgeInsets.symmetric(
+                horizontal: context.dimensions.spaceXS,
+                vertical: context.dimensions.spaceXXS),
             decoration: BoxDecoration(
-              color: CupertinoColors.white,
-              borderRadius: BorderRadius.circular(8),
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(context.dimensions.radiusS),
               border: Border.all(
-                color: CupertinoColors.systemGrey5,
+                color: AppColors.border,
                 width: 1,
               ),
             ),
@@ -74,7 +81,7 @@ class FontSizeControl extends StatelessWidget {
               children: [
                 Text(
                   'A',
-                  style: TextStyle(
+                  style: AppTextTheme.caption.copyWith(
                     fontSize: 12 + (fontSizeLevel * 3),
                     fontWeight: FontWeight.bold,
                     color: AppColors.primary,
@@ -90,6 +97,7 @@ class FontSizeControl extends StatelessWidget {
             onPressed: fontSizeLevel < maxLevel
                 ? () => onFontSizeChanged(fontSizeLevel + 1)
                 : null,
+            context: context,
           ),
         ],
       ),
@@ -100,6 +108,7 @@ class FontSizeControl extends StatelessWidget {
   Widget _buildControlButton({
     required IconData icon,
     VoidCallback? onPressed,
+    required BuildContext context,
   }) {
     final bool isEnabled = onPressed != null;
 
@@ -107,18 +116,18 @@ class FontSizeControl extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onPressed,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(context.dimensions.radiusXS),
         child: Container(
-          padding: const EdgeInsets.all(6),
+          padding: EdgeInsets.all(context.dimensions.spaceXS),
           decoration: BoxDecoration(
             color: isEnabled
                 ? AppColors.primary.withOpacity(0.1)
                 : AppColors.divider,
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(context.dimensions.radiusXS),
           ),
           child: Icon(
             icon,
-            size: 16,
+            size: context.dimensions.iconSizeXS,
             color: isEnabled ? AppColors.primary : AppColors.textTertiary,
           ),
         ),

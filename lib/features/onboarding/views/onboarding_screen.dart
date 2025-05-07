@@ -6,8 +6,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sprung/sprung.dart';
 import 'package:tatarai/core/routing/route_names.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
+import 'package:tatarai/core/theme/dimensions.dart';
 import 'package:tatarai/core/theme/text_theme.dart';
 import 'package:tatarai/core/utils/logger.dart';
+import 'package:tatarai/core/widgets/app_button.dart';
 
 /// Onboarding ekranı - kullanıcıya uygulamayı tanıtır
 class OnboardingScreen extends StatefulWidget {
@@ -34,7 +36,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           'Yapay zeka ile bitkilerinizin sağlığını analiz edin ve sorunları erken aşamada tespit edin.',
       icon: CupertinoIcons.leaf_arrow_circlepath,
       backgroundOpacity: 0.2,
-      mainColor: const Color(0xFF2E7D32),
+      mainColor: AppColors.primary,
       illustrationPath: 'assets/images/onboarding_1.png',
       bgElements: const [
         DecorationItem(
@@ -66,7 +68,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           'Bitki türüne ve yetişme koşullarına göre özelleştirilmiş tarım tavsiyeleri alın.',
       icon: CupertinoIcons.light_max,
       backgroundOpacity: 0.25,
-      mainColor: const Color(0xFF33691E),
+      mainColor: AppColors.primary,
       illustrationPath: 'assets/images/onboarding_2.png',
       bgElements: const [
         DecorationItem(
@@ -98,7 +100,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           'Bitkilerinizdeki hastalıkları yapay zeka ile teşhis edin ve çözüm önerileri alın.',
       icon: CupertinoIcons.doc_text_search,
       backgroundOpacity: 0.3,
-      mainColor: const Color(0xFF1B5E20),
+      mainColor: AppColors.primary,
       illustrationPath: 'assets/images/onboarding_3.png',
       bgElements: const [
         DecorationItem(
@@ -131,15 +133,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       icon: CupertinoIcons.star_fill,
       isPremium: true,
       backgroundOpacity: 0.35,
-      mainColor: const Color(0xFF1B5E20),
+      mainColor: AppColors.primary,
       illustrationPath: 'assets/images/onboarding_4.png',
-      premiumFeatures: [
-        'Sınırsız bitki taraması ve analizi',
-        'Öncelikli destek ve hızlı yanıtlar',
-        'Gelişmiş hastalık teşhis raporları',
-        'Kişiselleştirilmiş yetiştirme tavsiyeleri',
-      ],
-      pricingInfo: 'Aylık sadece \$2.99 veya yıllık \$49.99 ödeyin',
+      pricingInfo: 'Aylık sadece \$2.99 veya yıllık \$29.99 ödeyin',
       specialOffer: 'Hemen başlayın ve %30 özel indirimden yararlanın',
       bgElements: const [
         DecorationItem(
@@ -314,7 +310,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
                   // Page indicator
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 24.0),
+                    padding: EdgeInsets.symmetric(
+                        vertical: context.dimensions.paddingL),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: List.generate(
@@ -322,10 +319,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                         (index) => AnimatedContainer(
                           duration: const Duration(milliseconds: 300),
                           width: _currentPage == index ? 24 : 8,
-                          height: 8,
-                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          height: context.dimensions.spaceXS,
+                          margin: EdgeInsets.symmetric(
+                              horizontal: context.dimensions.spaceXXS),
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(
+                                context.dimensions.radiusM),
                             color: _currentPage == index
                                 ? item.mainColor
                                 : AppColors.divider,
@@ -337,46 +336,24 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
                   // Next button
                   Padding(
-                    padding: const EdgeInsets.only(
-                      left: 24.0,
-                      right: 24.0,
-                      bottom: 40.0,
+                    padding: EdgeInsets.only(
+                      left: context.dimensions.paddingL,
+                      right: context.dimensions.paddingL,
+                      bottom: context.dimensions.paddingXL,
                     ),
-                    child: ElevatedButton(
-                      onPressed: _isCompleting ? null : _onNextPage,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: item.mainColor,
-                        foregroundColor: AppColors.white,
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 16,
-                          horizontal: 32,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        elevation: 4,
-                        shadowColor: item.mainColor.withOpacity(0.4),
-                      ),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: Center(
-                          child: _isCompleting
-                              ? const SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(
-                                    color: AppColors.white,
-                                    strokeWidth: 2.0,
-                                  ),
-                                )
-                              : Text(
-                                  _currentPage < _onboardingItems.length - 1
-                                      ? 'Devam Et'
-                                      : 'Premium\'a Geç',
-                                  style: AppTextTheme.button,
-                                ),
-                        ),
-                      ),
+                    child: AppButton(
+                      text: _currentPage < _onboardingItems.length - 1
+                          ? 'Devam Et'
+                          : 'Başla',
+                      onPressed: _isCompleting
+                          ? null
+                          : (_currentPage < _onboardingItems.length - 1
+                              ? _onNextPage
+                              : _goToPremium),
+                      isLoading: _isCompleting,
+                      isFullWidth: true,
+                      type: AppButtonType.primary,
+                      height: 54.0,
                     ),
                   ),
                 ],
@@ -414,7 +391,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   opacity: decorItem.opacity,
                   child: Icon(
                     decorItem.icon,
-                    size: decorItem.size,
+                    size: decorItem.getSize(context),
                     color: item.mainColor,
                   ),
                 ),
@@ -436,7 +413,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     final imageSize = screenSize.width * 0.75;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+      padding: EdgeInsets.symmetric(horizontal: context.dimensions.paddingL),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -451,10 +428,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 child: Container(
                   width: imageSize,
                   height: imageSize,
-                  margin: const EdgeInsets.only(bottom: 32),
+                  margin: EdgeInsets.only(bottom: context.dimensions.spaceL),
                   decoration: BoxDecoration(
                     color: Colors.transparent,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius:
+                        BorderRadius.circular(context.dimensions.radiusL),
                   ),
                   alignment: Alignment.center,
                   child: item.illustrationPath != null &&
@@ -471,7 +449,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               );
             },
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: context.dimensions.spaceM),
 
           // Title with animation
           TweenAnimationBuilder<double>(
@@ -487,7 +465,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     item.title,
                     textAlign: TextAlign.center,
                     style: AppTextTheme.headline2.copyWith(
-                      color: const Color(0xFF1B5E20),
+                      color: AppColors.primary,
                       letterSpacing: 0.5,
                     ),
                   ),
@@ -495,7 +473,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               );
             },
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: context.dimensions.spaceM),
 
           // Description with animation
           TweenAnimationBuilder<double>(
@@ -510,9 +488,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   child: Text(
                     item.description,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontFamily: 'sfpro',
-                      fontSize: 16,
+                    style: AppTextTheme.body.copyWith(
                       color: AppColors.textSecondary,
                       height: 1.5,
                     ),
@@ -530,341 +506,222 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   Widget _buildPremiumPage(OnboardingItem item, Size screenSize) {
     final imageSize = screenSize.width * 0.48;
 
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            const SizedBox(height: 16),
-
-            // Premium rozeti
-            Container(
-              margin: const EdgeInsets.only(top: 8, bottom: 12),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.indigo.shade400,
-                    Colors.indigo.shade700,
-                  ],
+    return Padding(
+      padding: EdgeInsets.all(context.dimensions.paddingS),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Premium rozeti
+          Container(
+            margin: EdgeInsets.only(top: 0, bottom: context.dimensions.spaceM),
+            padding: EdgeInsets.symmetric(
+                horizontal: context.dimensions.paddingM,
+                vertical: context.dimensions.spaceXXS + 1),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.primary,
+                  Colors.indigo.shade700,
+                ],
+              ),
+              borderRadius: BorderRadius.circular(context.dimensions.radiusL),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.indigo.withOpacity(0.4),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
                 ),
-                borderRadius: BorderRadius.circular(30),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  CupertinoIcons.sparkles,
+                  color: Colors.white,
+                  size: context.dimensions.iconSizeXS,
+                ),
+                SizedBox(width: context.dimensions.spaceXXS),
+                Text(
+                  'PREMIUM',
+                  style: AppTextTheme.captionL.copyWith(
+                    color: Colors.white,
+                    letterSpacing: 1.2,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Başlık
+          TweenAnimationBuilder<double>(
+            tween: Tween<double>(begin: 0, end: 1),
+            duration: const Duration(milliseconds: 800),
+            curve: Sprung.overDamped,
+            builder: (context, value, child) {
+              return Opacity(
+                opacity: value,
+                child: Transform.translate(
+                  offset: Offset(0, 20 * (1 - value)),
+                  child: Text(
+                    item.title,
+                    textAlign: TextAlign.center,
+                    style: AppTextTheme.headline2.copyWith(
+                      color: AppColors.primary,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          SizedBox(height: context.dimensions.spaceM),
+
+          // Açıklama
+          TweenAnimationBuilder<double>(
+            tween: Tween<double>(begin: 0, end: 1),
+            duration: const Duration(milliseconds: 1000),
+            curve: Sprung.overDamped,
+            builder: (context, value, child) {
+              return Opacity(
+                opacity: value,
+                child: Transform.translate(
+                  offset: Offset(0, 30 * (1 - value)),
+                  child: Text(
+                    item.description,
+                    textAlign: TextAlign.center,
+                    style: AppTextTheme.body.copyWith(
+                      color: AppColors.textSecondary,
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          SizedBox(height: context.dimensions.paddingL),
+
+          // Görsel
+          TweenAnimationBuilder<double>(
+            tween: Tween<double>(begin: 0.8, end: 1.0),
+            duration: const Duration(milliseconds: 800),
+            curve: Sprung.overDamped,
+            builder: (context, value, child) {
+              return Transform.scale(
+                scale: value,
+                child: Container(
+                  width: imageSize,
+                  height: imageSize,
+                  margin: EdgeInsets.only(bottom: context.dimensions.spaceL),
+                  decoration: BoxDecoration(
+                    color: Colors.transparent,
+                    borderRadius:
+                        BorderRadius.circular(context.dimensions.radiusL),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: context.dimensions.radiusL,
+                        spreadRadius: 0,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  alignment: Alignment.center,
+                  child: item.illustrationPath != null &&
+                          item.illustrationPath!.isNotEmpty
+                      ? ClipRRect(
+                          borderRadius:
+                              BorderRadius.circular(context.dimensions.radiusL),
+                          child: Image.asset(
+                            item.illustrationPath!,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) {
+                              return _buildIconFallback(item);
+                            },
+                          ),
+                        )
+                      : _buildIconFallback(item),
+                ),
+              );
+            },
+          ),
+
+          Spacer(),
+          // Fiyat kartı
+          if (item.pricingInfo.isNotEmpty) ...[
+            Container(
+              margin: EdgeInsets.only(bottom: context.dimensions.spaceM),
+              padding: EdgeInsets.symmetric(
+                  vertical: context.dimensions.paddingS,
+                  horizontal: context.dimensions.paddingL),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(context.dimensions.radiusL),
+                border: Border.all(color: AppColors.primary.withOpacity(0.2)),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.indigo.withOpacity(0.4),
+                    color: AppColors.primary.withOpacity(0.1),
                     blurRadius: 8,
                     offset: const Offset(0, 3),
                   ),
                 ],
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
+              child: Column(
                 children: [
-                  const Icon(
-                    CupertinoIcons.sparkles,
-                    color: Colors.white,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'PREMIUM',
-                    style: AppTextTheme.captionL.copyWith(
-                      color: Colors.white,
-                      letterSpacing: 1.2,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Başlık
-            TweenAnimationBuilder<double>(
-              tween: Tween<double>(begin: 0, end: 1),
-              duration: const Duration(milliseconds: 800),
-              curve: Sprung.overDamped,
-              builder: (context, value, child) {
-                return Opacity(
-                  opacity: value,
-                  child: Transform.translate(
-                    offset: Offset(0, 20 * (1 - value)),
-                    child: Text(
-                      item.title,
-                      textAlign: TextAlign.center,
-                      style: AppTextTheme.headline2.copyWith(
-                        color: const Color(0xFF1B5E20),
-                        letterSpacing: 0.5,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        CupertinoIcons.tag_fill,
+                        color: AppColors.primary,
+                        size: context.dimensions.iconSizeXS,
                       ),
-                    ),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 12),
-
-            // Açıklama
-            TweenAnimationBuilder<double>(
-              tween: Tween<double>(begin: 0, end: 1),
-              duration: const Duration(milliseconds: 1000),
-              curve: Sprung.overDamped,
-              builder: (context, value, child) {
-                return Opacity(
-                  opacity: value,
-                  child: Transform.translate(
-                    offset: Offset(0, 30 * (1 - value)),
-                    child: Text(
-                      item.description,
-                      textAlign: TextAlign.center,
-                      style: AppTextTheme.body.copyWith(
-                        color: AppColors.textSecondary,
-                        height: 1.5,
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 24),
-
-            // Görsel
-            TweenAnimationBuilder<double>(
-              tween: Tween<double>(begin: 0.8, end: 1.0),
-              duration: const Duration(milliseconds: 800),
-              curve: Sprung.overDamped,
-              builder: (context, value, child) {
-                return Transform.scale(
-                  scale: value,
-                  child: Container(
-                    width: imageSize,
-                    height: imageSize,
-                    margin: const EdgeInsets.only(bottom: 28),
-                    decoration: BoxDecoration(
-                      color: Colors.transparent,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 20,
-                          spreadRadius: 0,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    alignment: Alignment.center,
-                    child: item.illustrationPath != null &&
-                            item.illustrationPath!.isNotEmpty
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(24),
-                            child: Image.asset(
-                              item.illustrationPath!,
-                              fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) {
-                                return _buildIconFallback(item);
-                              },
-                            ),
-                          )
-                        : _buildIconFallback(item),
-                  ),
-                );
-              },
-            ),
-
-            // Premium özellikler listesi
-            if (item.premiumFeatures.isNotEmpty) ...[
-              Container(
-                margin: const EdgeInsets.only(bottom: 24),
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 15,
-                      spreadRadius: 0,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                  border: Border.all(
-                    color: Colors.grey.shade100,
-                    width: 1,
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF0F7F0),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            CupertinoIcons.checkmark_shield_fill,
-                            color: item.mainColor,
-                            size: 16,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Premium Avantajları',
-                          style: AppTextTheme.headline5,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    ...item.premiumFeatures.map((feature) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              margin: const EdgeInsets.only(top: 2),
-                              padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF00C853),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.check,
-                                color: Colors.white,
-                                size: 12,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                feature,
-                                style: AppTextTheme.body.copyWith(height: 1.4),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ],
-                ),
-              ),
-            ],
-
-            // Fiyat kartı
-            if (item.pricingInfo.isNotEmpty) ...[
-              Container(
-                margin: const EdgeInsets.only(bottom: 20),
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      const Color(0xFF1E88E5),
-                      const Color(0xFF1565C0),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF1565C0).withOpacity(0.3),
-                      blurRadius: 12,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          CupertinoIcons.tag_fill,
-                          color: Colors.white,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'ÖZEL FİYATLANDIRMA',
-                          style: AppTextTheme.captionL.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      item.pricingInfo,
-                      textAlign: TextAlign.center,
-                      style: AppTextTheme.headline3.copyWith(
-                        color: Colors.white,
-                      ),
-                    ),
-                    if (item.specialOffer.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              CupertinoIcons.gift_fill,
-                              color: const Color(0xFF1565C0),
-                              size: 18,
-                            ),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Text(
-                                item.specialOffer,
-                                textAlign: TextAlign.center,
-                                style: AppTextTheme.captionL.copyWith(
-                                  color: const Color(0xFF1565C0),
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
+                      SizedBox(width: context.dimensions.spaceXXS),
+                      Text(
+                        'ÖZEL FİYATLANDIRMA',
+                        style: AppTextTheme.captionL.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
-                  ],
-                ),
-              ),
-            ],
-
-            // Güven oluşturucu etiket
-            Container(
-              margin: const EdgeInsets.only(bottom: 30),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    CupertinoIcons.lock_shield_fill,
-                    color: Colors.grey[600],
-                    size: 16,
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(height: context.dimensions.spaceXXS),
                   Text(
-                    'Güvenli ödeme • İstediğiniz zaman iptal',
-                    style: AppTextTheme.captionL.copyWith(
-                      color: Colors.grey[600],
+                    item.pricingInfo,
+                    textAlign: TextAlign.center,
+                    style: AppTextTheme.headline4.copyWith(
+                      color: AppColors.primary,
                     ),
                   ),
                 ],
               ),
             ),
           ],
-        ),
+          Spacer(),
+          // Güven oluşturucu etiket
+          Container(
+            margin: EdgeInsets.only(bottom: context.dimensions.spaceXS),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  CupertinoIcons.lock_shield_fill,
+                  color: Colors.grey[600],
+                  size: context.dimensions.iconSizeXS,
+                ),
+                SizedBox(width: context.dimensions.spaceXS),
+                Text(
+                  'Güvenli ödeme • İstediğiniz zaman iptal',
+                  style: AppTextTheme.captionL.copyWith(
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -877,8 +734,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         boxShadow: [
           BoxShadow(
             color: item.mainColor.withOpacity(0.2),
-            blurRadius: 20,
-            spreadRadius: 5,
+            blurRadius: context.dimensions.radiusL * 2,
+            spreadRadius: context.dimensions.radiusXS,
           ),
         ],
       ),
@@ -898,7 +755,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           Icon(
             item.icon,
             color: Colors.white,
-            size: 80,
+            size: context.dimensions.iconSizeXL,
           ),
 
           // 3D Efekt
@@ -968,6 +825,8 @@ class DecorationItem {
     required this.opacity,
     required this.rotationFactor,
   });
+
+  double getSize(BuildContext context) => size;
 }
 
 /// Daire desenli özel painter

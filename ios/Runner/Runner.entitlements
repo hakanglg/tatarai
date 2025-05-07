@@ -6,7 +6,5 @@
 	<array>
 		<string>Default</string>
 	</array>
-	<key>aps-environment</key>
-	<string>production</string>
 </dict>
-</plist> 
+</plist>

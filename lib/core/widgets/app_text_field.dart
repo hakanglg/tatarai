@@ -67,14 +67,13 @@ class AppTextField extends StatefulWidget {
 class _AppTextFieldState extends State<AppTextField> {
   late FocusNode _focusNode;
   bool _focused = false;
-  bool _obscureText = false;
+  bool _isPasswordVisible = false;
 
   @override
   void initState() {
     super.initState();
     _focusNode = widget.focusNode ?? FocusNode();
     _focusNode.addListener(_onFocusChange);
-    _obscureText = widget.obscureText;
   }
 
   @override
@@ -149,28 +148,51 @@ class _AppTextFieldState extends State<AppTextField> {
                     ),
                   )
                 : null,
-            suffix: widget.suffixIcon != null
+            suffix: widget.obscureText
                 ? GestureDetector(
-                    onTap: widget.onSuffixIconTap,
+                    onTap: () {
+                      setState(() {
+                        _isPasswordVisible = !_isPasswordVisible;
+                      });
+
+                      if (widget.onSuffixIconTap != null) {
+                        widget.onSuffixIconTap!();
+                      }
+                    },
                     child: Padding(
                       padding:
                           EdgeInsets.only(right: context.dimensions.paddingM),
                       child: Icon(
-                        widget.suffixIcon,
+                        _isPasswordVisible
+                            ? CupertinoIcons.eye_slash
+                            : CupertinoIcons.eye,
                         color: AppColors.textSecondary,
                         size: context.dimensions.iconSizeM,
                       ),
                     ),
                   )
-                : null,
-            obscureText: _obscureText,
+                : widget.suffixIcon != null
+                    ? GestureDetector(
+                        onTap: widget.onSuffixIconTap,
+                        child: Padding(
+                          padding: EdgeInsets.only(
+                              right: context.dimensions.paddingM),
+                          child: Icon(
+                            widget.suffixIcon,
+                            color: AppColors.textSecondary,
+                            size: context.dimensions.iconSizeM,
+                          ),
+                        ),
+                      )
+                    : null,
+            obscureText: widget.obscureText && !_isPasswordVisible,
             keyboardType: widget.keyboardType,
             textInputAction: widget.textInputAction,
             autofocus: widget.autofocus,
             onChanged: widget.onChanged,
             onEditingComplete: widget.onEditingComplete,
             onSubmitted: widget.onSubmitted,
-            maxLines: widget.maxLines,
+            maxLines: widget.obscureText ? 1 : widget.maxLines,
             minLines: widget.minLines,
             maxLength: widget.maxLength,
             expands: widget.expands,

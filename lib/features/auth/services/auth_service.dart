@@ -9,6 +9,7 @@ import 'package:tatarai/core/services/firebase_manager.dart';
 import 'package:tatarai/features/auth/models/user_model.dart';
 import 'package:tatarai/features/auth/models/user_role.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 /// Firebase authentication servisi
 /// Firebase Auth ile ilgili temel işlemleri gerçekleştirir
@@ -55,14 +56,6 @@ class AuthService extends BaseService {
         _logger.i('Firebase Manager başlatılıyor...');
         await _firebaseManager.initialize();
         _logger.i('Firebase Manager başlatıldı');
-      }
-
-      // Firebase Auth için kalıcılık ayarı yapma
-      try {
-        await _firebaseAuth.setPersistence(firebase_auth.Persistence.LOCAL);
-        _logger.i('Firebase Auth kalıcılık LOCAL olarak ayarlandı');
-      } catch (authError) {
-        _logger.w('Firebase Auth kalıcılık ayarlanamadı: $authError');
       }
 
       // Firebase çevrimdışı kalıcılığı etkinleştir
@@ -572,30 +565,42 @@ class AuthService extends BaseService {
     }
   }
 
-  /// Hesap silme
+  /// Hesap silme - Firebase Authentication'dan kullanıcıyı siler
   Future<void> deleteAccount() async {
+    final user = _firebaseAuth.currentUser;
+    if (user == null) {
+      throw Exception('Oturum açık değil.');
+    }
+
+    final userId = user.uid;
+    _logger.i('🔄 Authentication hesabı silme işlemi başlatıldı: $userId');
+
     try {
-      final user = _firebaseAuth.currentUser;
-      if (user == null) {
-        throw Exception('Oturum açık değil.');
+      // Firebase Authentication'dan kullanıcıyı sil
+      await user.delete();
+      _logger.i('✅ Firebase Authentication hesabı silindi: $userId');
+
+      // Başarılı silme durumunda oturumu kapat
+      await _firebaseAuth.signOut();
+      _logger.i('✅ Hesap silme sonrası oturum kapatıldı');
+
+      return;
+    } on firebase_auth.FirebaseAuthException catch (e) {
+      _logger.e(
+          '❌ Firebase Authentication hesabı silinirken hata: ${e.code} - ${e.message}');
+
+      if (e.code == 'requires-recent-login') {
+        // Yeniden giriş gerektiği durumda oturumu kapat
+        await _firebaseAuth.signOut();
+        _logger.i('⚠️ Yeniden giriş gerektiği için oturum kapatıldı');
+        throw Exception('REQUIRES_REAUTH');
       }
 
-      // Önce Firestore'dan kullanıcı verilerini sil
-      await _withRetry(
-        () => _firestore.collection('users').doc(user.uid).delete(),
-        'Kullanıcı verilerini silme',
-      );
-
-      // Sonra Authentication hesabını sil
-      await user.delete();
-      _logger.i('Hesap silindi: ${user.uid}');
-    } on firebase_auth.FirebaseAuthException catch (e) {
-      _logger.w('Hesap silme hatası: ${e.code}');
-      throw _handleAuthException(e);
+      // Diğer Authentication hataları için
+      throw Exception('AUTH_DELETE_ERROR:${e.code}');
     } catch (e) {
-      _logger.e('Hesap silme hatası: $e');
-      throw Exception(
-          'Hesap silme sırasında bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
+      _logger.e('❌ Beklenmeyen hesap silme hatası: $e');
+      throw Exception('AUTH_DELETE_UNKNOWN_ERROR');
     }
   }
 
@@ -871,9 +876,7 @@ class AuthService extends BaseService {
     // Kalıcı oturum açma ayarını kontrol et
     if (persistSession) {
       try {
-        // Firebase Auth'a oturumu yerel olarak saklamasını söyle
-        await _firebaseAuth.setPersistence(firebase_auth.Persistence.LOCAL);
-        _logger.i('Kalıcı oturum açma için persistence ayarlandı: LOCAL');
+        // (Mobilde setPersistence gereksiz ve hata verir, tamamen kaldırıldı)
       } catch (e) {
         _logger.w('Kalıcı oturum açma ayarlanamadı: $e');
       }
@@ -891,6 +894,31 @@ class AuthService extends BaseService {
       email: email,
       password: password,
     );
+  }
+
+  /// E-posta ve şifre ile giriş yapar
+  Future<firebase_auth.UserCredential> signInWithEmailPassword({
+    required String email,
+    required String password,
+    bool rememberMe = false,
+  }) async {
+    return _withRetry<firebase_auth.UserCredential>(() async {
+      // Kalıcılık ayarı (Beni hatırla özelliği için)
+      if (rememberMe) {
+        // (Mobilde setPersistence gereksiz ve hata verir, tamamen kaldırıldı)
+      } else {
+        // (Mobilde setPersistence gereksiz ve hata verir, tamamen kaldırıldı)
+      }
+
+      // Giriş işlemi
+      final credential = await _firebaseAuth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      _logger.i('E-posta ile giriş başarılı: ${credential.user?.email}');
+      return credential;
+    }, 'E-posta ile giriş yapma');
   }
 }
 

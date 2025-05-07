@@ -9,10 +9,12 @@ import 'package:tatarai/core/theme/dimensions.dart';
 import 'package:tatarai/core/theme/text_theme.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/core/widgets/app_button.dart';
+import 'package:tatarai/core/widgets/app_text_field.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
 import 'package:tatarai/features/auth/cubits/auth_state.dart';
 import 'package:sprung/sprung.dart';
 import 'package:flutter_signin_button/flutter_signin_button.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 part 'login_screen_mixin.dart';
 
@@ -49,7 +51,7 @@ class _LoginScreenState extends State<LoginScreen>
                 current.errorMessage != null) ||
             previous.isAuthenticated != current.isAuthenticated;
       },
-      listener: (context, state) {
+      listener: (context, state) async {
         // Widget kaldırıldı mı kontrolü
         if (!mounted) return;
 
@@ -65,7 +67,16 @@ class _LoginScreenState extends State<LoginScreen>
         }
 
         if (state.isAuthenticated) {
-          // Başarılı giriş - hata mesajını temizle ve ana sayfaya yönlendir
+          // Başarılı girişte e-posta kaydet/sil
+          if (_rememberMe) {
+            await _saveRememberedEmail(_emailController.text.trim());
+            AppLogger.i(
+                '[Beni Hatırla] Başarılı giriş sonrası kaydedildi: \\${_emailController.text.trim()}');
+          } else {
+            await _clearRememberedEmail();
+            AppLogger.i('[Beni Hatırla] Başarılı giriş sonrası silindi');
+          }
+          // Hata mesajını temizle ve ana sayfaya yönlendir
           context.read<AuthCubit>().clearErrorMessage();
           context.goNamed(RouteNames.home);
         } else if (state.errorMessage != null &&
@@ -130,38 +141,16 @@ class _LoginScreenState extends State<LoginScreen>
                               children: [
                                 SizedBox(height: dim.spaceS),
                                 // Logo ve app ismi yan yana
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        color:
-                                            AppColors.primary.withOpacity(0.08),
-                                        borderRadius:
-                                            BorderRadius.circular(dim.radiusM),
-                                      ),
-                                      padding: EdgeInsets.all(dim.paddingS),
-                                      child: Icon(
-                                        CupertinoIcons.leaf_arrow_circlepath,
-                                        size: dim.iconSizeL,
-                                        color: AppColors.primary,
-                                      ),
-                                    ),
-                                    SizedBox(width: dim.spaceS),
-                                    Text(
-                                      'TatarAI',
-                                      style: AppTextTheme.headline3.copyWith(
-                                        color: AppColors.primary,
-                                        letterSpacing: -1.0,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                Text('Tatar AI',
+                                    style: AppTextTheme.headline4.copyWith(
+                                      color: AppColors.primary,
+                                      letterSpacing: -1.0,
+                                    )),
                                 SizedBox(height: dim.spaceS),
                                 Text(
                                   'Hesabınıza Giriş Yapın',
                                   textAlign: TextAlign.center,
-                                  style: AppTextTheme.body.copyWith(
+                                  style: AppTextTheme.bodyLarge.copyWith(
                                     fontWeight: FontWeight.w600,
                                     letterSpacing: -0.5,
                                   ),
@@ -170,7 +159,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 Text(
                                   'Yapay zeka asistanınıza hoş geldiniz',
                                   textAlign: TextAlign.center,
-                                  style: AppTextTheme.captionL.copyWith(
+                                  style: AppTextTheme.body.copyWith(
                                     color: AppColors.textSecondary,
                                     height: 1.0,
                                   ),
@@ -193,40 +182,40 @@ class _LoginScreenState extends State<LoginScreen>
                                 _buildInputField(
                                   controller: _passwordController,
                                   placeholder: 'Şifre',
-                                  obscureText: _obscurePassword,
+                                  obscureText: true,
                                   icon: CupertinoIcons.lock,
                                   dim: dim,
-                                  suffix: CupertinoButton(
-                                    padding: EdgeInsets.zero,
-                                    onPressed: () {
-                                      setState(() {
-                                        _obscurePassword = !_obscurePassword;
-                                      });
-                                    },
-                                    child: Icon(
-                                      _obscurePassword
-                                          ? CupertinoIcons.eye
-                                          : CupertinoIcons.eye_slash,
-                                      color: AppColors.textSecondary,
-                                      size: dim.iconSizeS,
-                                    ),
-                                  ),
                                 ),
                                 SizedBox(height: dim.spaceXS),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: CupertinoButton(
-                                    padding: EdgeInsets.zero,
-                                    onPressed: () {
-                                      _showResetPasswordDialog(context);
-                                    },
-                                    child: Text(
-                                      'Şifremi Unuttum',
+                                // Beni hatırla seçeneği
+                                Row(
+                                  children: [
+                                    CupertinoSwitch(
+                                      value: _rememberMe,
+                                      onChanged: onRememberMeChanged,
+                                      activeColor: AppColors.primary,
+                                    ),
+                                    SizedBox(width: dim.spaceXS),
+                                    Text(
+                                      'Beni hatırla',
                                       style: AppTextTheme.captionL.copyWith(
-                                        color: AppColors.primary,
+                                        color: AppColors.textSecondary,
                                       ),
                                     ),
-                                  ),
+                                    Spacer(),
+                                    CupertinoButton(
+                                      padding: EdgeInsets.zero,
+                                      onPressed: () {
+                                        _showResetPasswordDialog(context);
+                                      },
+                                      child: Text(
+                                        'Şifremi Unuttum',
+                                        style: AppTextTheme.captionL.copyWith(
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                                 SizedBox(height: dim.spaceXL),
                                 _buildAuthButton(
@@ -242,7 +231,7 @@ class _LoginScreenState extends State<LoginScreen>
                                   children: [
                                     Expanded(
                                       child: Divider(
-                                        color: AppColors.onSecondary,
+                                        color: AppColors.disabled,
                                         thickness: 1,
                                       ),
                                     ),
@@ -260,7 +249,7 @@ class _LoginScreenState extends State<LoginScreen>
                                     ),
                                     Expanded(
                                       child: Divider(
-                                        color: AppColors.onSecondary,
+                                        color: AppColors.disabled,
                                         thickness: 1,
                                       ),
                                     ),
@@ -284,7 +273,7 @@ class _LoginScreenState extends State<LoginScreen>
                                       child: SignInButton(
                                         Buttons.AppleDark,
                                         text: "Apple",
-                                        onPressed: () {},
+                                        onPressed: _signInWithApple,
                                         padding: EdgeInsets.zero,
                                       ),
                                     ),
@@ -366,42 +355,20 @@ class _LoginScreenState extends State<LoginScreen>
     bool obscureText = false,
     Widget? suffix,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: CupertinoColors.tertiarySystemFill,
-        borderRadius: BorderRadius.circular(dim.radiusL),
-      ),
-      child: CupertinoTextField(
-        controller: controller,
-        placeholder: placeholder,
-        keyboardType: keyboardType,
-        obscureText: obscureText,
-        prefix: Padding(
-          padding: EdgeInsets.only(left: dim.paddingM),
-          child: Icon(
-            icon,
-            color: AppColors.primary.withOpacity(0.7),
-            size: dim.iconSizeM,
-          ),
-        ),
-        suffix: suffix != null
-            ? Padding(
-                padding: EdgeInsets.only(right: dim.paddingS),
-                child: suffix,
-              )
-            : null,
-        padding: EdgeInsets.symmetric(
-          horizontal: dim.paddingM,
-          vertical: dim.paddingM,
-        ),
-        decoration: const BoxDecoration(
-          border: null,
-        ),
-        style: AppTextTheme.body,
-        placeholderStyle: AppTextTheme.body.copyWith(
-          color: AppColors.textSecondary.withOpacity(0.7),
-        ),
-      ),
+    return AppTextField(
+      controller: controller,
+      hintText: placeholder,
+      prefixIcon: icon,
+      keyboardType: keyboardType,
+      obscureText: obscureText,
+      suffixIcon: obscureText ? CupertinoIcons.eye : null,
+      onSuffixIconTap: obscureText
+          ? () {
+              setState(() {
+                _obscurePassword = !_obscurePassword;
+              });
+            }
+          : null,
     );
   }
 
@@ -417,5 +384,22 @@ class _LoginScreenState extends State<LoginScreen>
       onPressed: onPressed,
       isFullWidth: true,
     );
+  }
+
+  /// Normal e-posta/şifre giriş metodunu çağırır
+  Future<void> _signIn() async {
+    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    context.read<AuthCubit>().signInWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+          rememberMe: _rememberMe,
+        );
   }
 }

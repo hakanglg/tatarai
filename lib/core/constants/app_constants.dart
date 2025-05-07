@@ -36,18 +36,16 @@ class AppConstants {
   static const int maxImageSizeInBytes = 5 * 1024 * 1024; // 5 MB
 
   // Uygulama içi satın alma ürün ID'leri
-  static const String subscriptionMonthlyId =
-      'com.tatarai.subscription.monthly';
-  static const String subscriptionYearlyId = 'com.tatarai.subscription.yearly';
-  static const String tokenPackSmallId = 'com.tatarai.tokens.small';
-  static const String tokenPackMediumId = 'com.tatarai.tokens.medium';
-  static const String tokenPackLargeId = 'com.tatarai.tokens.large';
+  static const String subscriptionMonthlyId = 'tatarai_premium_monthly';
+  static const String subscriptionYearlyId = 'tatarai_premium_yearly';
+  static const String subscriptionLifetimeId = 'tatarai_premium_lifetime';
 
   // Varsayılan abonelik fiyatları
-  static const String defaultMonthlyPrice = "\$5.00";
-  static const String defaultYearlyPrice = "\$40.00";
-  static const String defaultMonthlyOfYearlyPrice = "\$3.33"; // 40/12
-  static const double savingsPercentage = 34; // 100 - ((40/12)/5)*100
+  static const String defaultMonthlyPrice = '₺49.99/ay';
+  static const String defaultYearlyPrice = '₺399.99/yıl';
+  static const String defaultMonthlyOfYearlyPrice = '₺33.33';
+  static const String defaultLifetimePrice = '₺799.99';
+  static const double savingsPercentage = 30;
 
   // Resim sıkıştırma kalitesi (0-100)
   static const int imageQuality = 80;
@@ -80,4 +78,8 @@ class AppConstants {
   static const int animationDurationFast = 200;
   static const int animationDurationMedium = 350;
   static const int animationDurationSlow = 500;
+
+  // RevenueCat API anahtarları ve sabitleri
+  static const String revenueApiKey = 'YOUR_REVENUECAT_API_KEY';
+  static const String premiumEntitlementId = 'premium';
 }

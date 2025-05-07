@@ -37,6 +37,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Bu uygulama, bitki analizi için fotoğraf çekmek üzere kameranıza erişim gerektirir</string>
 	<key>NSPhotoLibraryUsageDescription</key>

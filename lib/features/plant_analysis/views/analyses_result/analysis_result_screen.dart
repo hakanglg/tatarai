@@ -48,7 +48,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                 SizedBox(height: 16),
                 Text(
                   'Analiz sonucu yükleniyor...',
-                  style: TextStyle(
+                  style: AppTextTheme.bodyText2.copyWith(
                     color: CupertinoColors.systemGrey,
                   ),
                 ),

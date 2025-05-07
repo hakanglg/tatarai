@@ -242,17 +242,64 @@ class ProfileCubit extends Cubit<ProfileState> {
   /// Firebase Auth durumunu dinler
   void _listenAuthState() {
     try {
+      // Firebase doğrudan dinleme
       _authStateSubscription?.cancel();
       _authStateSubscription =
           FirebaseAuth.instance.authStateChanges().listen((user) {
         if (user != null && user.emailVerified) {
           // Eğer email doğrulanmışsa Firestore'daki kullanıcı verisini güncelle
           _updateEmailVerificationInFirestore(user.uid);
+        } else if (user == null) {
+          // Kullanıcı oturumu kapatmış veya hesabı silinmişse, state'i temizle
+          emit(ProfileState.initial());
+          AppLogger.i('Auth state değişti: Kullanıcı oturumu kapalı');
         }
       });
+
+      // AuthCubit üzerinden kullanıcı bilgilerini dinle
+      _listenToAuthCubit();
+
       AppLogger.i('Auth state dinleyicisi başlatıldı');
     } catch (e) {
       AppLogger.e('Auth state dinleyicisi başlatma hatası', e);
+    }
+  }
+
+  /// AuthCubit'i dinleyerek kullanıcı değişikliklerini algılar
+  void _listenToAuthCubit() {
+    if (_authCubit != null) {
+      // AuthCubit'teki kullanıcı değişikliklerini dinle
+      _authCubit!.stream.listen((authState) {
+        if (authState.isAuthenticated && authState.user != null) {
+          // Kullanıcı girişi olduğunda profil verilerini güncelle
+          if (state.user == null || state.user!.id != authState.user!.id) {
+            emit(state.copyWith(user: authState.user));
+            AppLogger.i(
+                'Profil: AuthCubit üzerinden kullanıcı verileri güncellendi');
+
+            // Firestore'dan tam veriyi almak için yenile
+            refreshUserData();
+          }
+        } else if (!authState.isAuthenticated || authState.user == null) {
+          // Kullanıcı çıkış yaptığında state'i temizle
+          if (state.user != null) {
+            emit(ProfileState.initial());
+            AppLogger.i(
+                'Profil: AuthCubit üzerinden kullanıcı çıkışı algılandı');
+          }
+        }
+
+        // Hesap silme durumunu kontrol et
+        if (authState.accountDeleted) {
+          emit(ProfileState.initial());
+          AppLogger.i(
+              'Profil: AuthCubit üzerinden hesap silme işlemi algılandı');
+          // accountDeleted durumunu temizle
+          _authCubit!.clearAccountDeletedState();
+        }
+      });
+
+      AppLogger.i('AuthCubit dinleyicisi başlatıldı');
     }
   }
 
@@ -359,7 +406,8 @@ class ProfileCubit extends Cubit<ProfileState> {
         await _userRepository.deleteAccount();
       }
 
-      emit(state.copyWith(isLoading: false));
+      // Hesap silindikten sonra hemen state'i sıfırla
+      emit(ProfileState.initial());
       AppLogger.i('Profil: Hesap silindi');
     } catch (e) {
       AppLogger.e('Profil: Hesap silme hatası', e);
@@ -428,6 +476,16 @@ class ProfileCubit extends Cubit<ProfileState> {
       AppLogger.e('Yükleme hazırlığı hatası', e.toString());
       setImageUploading(false);
     }
+  }
+
+  /// Hata ve bilgi mesajlarını temizler
+  void clearMessages() {
+    emit(state.copyWith(
+      errorMessage: null,
+      isProfileUpdated: false,
+      isImageUploading: false,
+      isRefreshing: false,
+    ));
   }
 
   @override

@@ -7,6 +7,7 @@ import 'package:tatarai/core/theme/dimensions.dart';
 import 'package:tatarai/core/theme/text_theme.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/core/widgets/app_button.dart';
+import 'package:tatarai/core/widgets/app_text_field.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
 import 'package:tatarai/features/auth/cubits/auth_state.dart';
 import 'package:flutter/material.dart';
@@ -162,133 +163,115 @@ class _RegisterScreenState extends State<RegisterScreen>
                             SizedBox(height: dim.spaceXL),
 
                             // Form alanları
-                            _buildInputField(
-                              controller: _displayNameController,
-                              placeholder: 'Ad Soyad',
-                              keyboardType: TextInputType.name,
-                              textCapitalization: TextCapitalization.words,
-                              icon: CupertinoIcons.person,
-                              dim: dim,
-                            ),
-                            SizedBox(height: dim.spaceM),
-
-                            _buildInputField(
-                              controller: _emailController,
-                              placeholder: 'E-posta',
-                              keyboardType: TextInputType.emailAddress,
-                              icon: CupertinoIcons.mail,
-                              dim: dim,
-                            ),
-                            SizedBox(height: dim.spaceM),
-
-                            _buildInputField(
-                              controller: _passwordController,
-                              placeholder: 'Şifre',
-                              obscureText: _obscurePassword,
-                              icon: CupertinoIcons.lock,
-                              dim: dim,
-                              suffix: CupertinoButton(
-                                padding: EdgeInsets.zero,
-                                onPressed: () {
-                                  setState(() {
-                                    _obscurePassword = !_obscurePassword;
-                                  });
-                                },
-                                child: Icon(
-                                  _obscurePassword
-                                      ? CupertinoIcons.eye
-                                      : CupertinoIcons.eye_slash,
-                                  color: AppColors.textSecondary,
-                                  size: dim.iconSizeS,
-                                ),
-                              ),
-                            ),
-                            SizedBox(height: dim.spaceM),
-
-                            _buildInputField(
-                              controller: _confirmPasswordController,
-                              placeholder: 'Şifre Tekrar',
-                              obscureText: _obscureConfirmPassword,
-                              icon: CupertinoIcons.lock,
-                              dim: dim,
-                              suffix: CupertinoButton(
-                                padding: EdgeInsets.zero,
-                                onPressed: () {
-                                  setState(() {
-                                    _obscureConfirmPassword =
-                                        !_obscureConfirmPassword;
-                                  });
-                                },
-                                child: Icon(
-                                  _obscureConfirmPassword
-                                      ? CupertinoIcons.eye
-                                      : CupertinoIcons.eye_slash,
-                                  color: AppColors.textSecondary,
-                                  size: dim.iconSizeS,
-                                ),
-                              ),
-                            ),
-                            SizedBox(height: dim.spaceM),
-
-                            // Kullanım koşulları onay
-                            Container(
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withOpacity(0.4),
-                                borderRadius:
-                                    BorderRadius.circular(dim.radiusM),
-                              ),
-                              padding: EdgeInsets.symmetric(
-                                horizontal: dim.paddingS,
-                                vertical: dim.paddingS,
-                              ),
-                              child: Row(
-                                children: [
-                                  Transform.scale(
-                                    scale: 0.9,
-                                    child: CupertinoSwitch(
-                                      value: _acceptTerms,
-                                      onChanged: (value) {
-                                        setState(() {
-                                          _acceptTerms = value;
-                                        });
-                                      },
-                                      activeColor: AppColors.primary,
+                            Expanded(
+                              child: SingleChildScrollView(
+                                child: Column(
+                                  children: [
+                                    _buildInputField(
+                                      controller: _displayNameController,
+                                      placeholder: 'Ad Soyad',
+                                      keyboardType: TextInputType.name,
+                                      textCapitalization:
+                                          TextCapitalization.words,
+                                      icon: CupertinoIcons.person,
+                                      dim: dim,
                                     ),
-                                  ),
-                                  SizedBox(width: dim.spaceXS),
-                                  Expanded(
-                                    child: GestureDetector(
-                                      onTap: () {
-                                        setState(() {
-                                          _acceptTerms = !_acceptTerms;
-                                        });
-                                      },
-                                      child: Text(
-                                        'Kullanım koşullarını ve gizlilik politikasını kabul ediyorum',
-                                        style: AppTextTheme.captionL.copyWith(
-                                          color: AppColors.textSecondary,
-                                        ),
+                                    SizedBox(height: dim.spaceM),
+
+                                    _buildInputField(
+                                      controller: _emailController,
+                                      placeholder: 'E-posta',
+                                      keyboardType: TextInputType.emailAddress,
+                                      icon: CupertinoIcons.mail,
+                                      dim: dim,
+                                    ),
+                                    SizedBox(height: dim.spaceM),
+
+                                    // Şifre ve şifre tekrar alanları
+                                    _buildPasswordField(
+                                      controller: _passwordController,
+                                      placeholder: 'Şifre',
+                                      icon: CupertinoIcons.lock,
+                                      dim: dim,
+                                    ),
+                                    SizedBox(height: dim.spaceM),
+
+                                    _buildPasswordField(
+                                      controller: _confirmPasswordController,
+                                      placeholder: 'Şifre Tekrar',
+                                      icon: CupertinoIcons.lock,
+                                      dim: dim,
+                                      showToggle: true, // İkonu göster
+                                    ),
+                                    SizedBox(height: dim.spaceM),
+
+                                    // Kullanım koşulları onay
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        color:
+                                            AppColors.primary.withOpacity(0.1),
+                                        borderRadius:
+                                            BorderRadius.circular(dim.radiusM),
+                                      ),
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: dim.paddingS,
+                                        vertical: dim.paddingS,
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Transform.scale(
+                                            scale: 0.9,
+                                            child: CupertinoSwitch(
+                                              value: _acceptTerms,
+                                              onChanged: (value) {
+                                                setState(() {
+                                                  _acceptTerms = value;
+                                                });
+                                              },
+                                              activeColor: AppColors.primary,
+                                            ),
+                                          ),
+                                          SizedBox(width: dim.spaceXS),
+                                          Expanded(
+                                            child: GestureDetector(
+                                              onTap: () {
+                                                setState(() {
+                                                  _acceptTerms = !_acceptTerms;
+                                                });
+                                              },
+                                              child: Text(
+                                                'Kullanım koşullarını ve gizlilik politikasını kabul ediyorum',
+                                                style: AppTextTheme.captionL
+                                                    .copyWith(
+                                                  color:
+                                                      AppColors.textSecondary,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
 
-                            SizedBox(height: dim.spaceXL),
+                            SizedBox(height: dim.spaceL),
 
                             // Kayıt ol butonu
-                            _buildAuthButton(
+                            AppButton(
                               text: 'Kayıt Ol',
                               isLoading: state.isLoading || _isSubmitting,
                               onPressed: (state.isLoading || _isSubmitting)
                                   ? null
                                   : _signUp,
                               icon: CupertinoIcons.person_add,
-                              dim: dim,
+                              isFullWidth: true,
+                              type: AppButtonType.primary,
                             ),
 
-                            SizedBox(height: dim.spaceXL),
+                            SizedBox(height: dim.spaceL),
 
                             // Giriş yönlendirmesi
                             Row(
@@ -332,7 +315,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
   }
 
-  /// Daha güzel input alan widget'ı oluşturur
+  /// Normal text input alanları için widget oluşturur
   Widget _buildInputField({
     required TextEditingController controller,
     required String placeholder,
@@ -341,117 +324,44 @@ class _RegisterScreenState extends State<RegisterScreen>
     TextInputType keyboardType = TextInputType.text,
     TextCapitalization textCapitalization = TextCapitalization.none,
     bool obscureText = false,
-    Widget? suffix,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: CupertinoColors.tertiarySystemFill,
-        borderRadius: BorderRadius.circular(dim.radiusL),
-      ),
-      child: CupertinoTextField(
-        controller: controller,
-        placeholder: placeholder,
-        keyboardType: keyboardType,
-        textCapitalization: textCapitalization,
-        obscureText: obscureText,
-        prefix: Padding(
-          padding: EdgeInsets.only(left: dim.paddingM),
-          child: Icon(
-            icon,
-            color: AppColors.primary.withOpacity(0.7),
-            size: dim.iconSizeM,
-          ),
-        ),
-        suffix: suffix != null
-            ? Padding(
-                padding: EdgeInsets.only(right: dim.paddingS),
-                child: suffix,
-              )
-            : null,
-        padding: EdgeInsets.symmetric(
-          horizontal: dim.paddingM,
-          vertical: dim.paddingM,
-        ),
-        decoration: const BoxDecoration(
-          border: null,
-        ),
-        style: AppTextTheme.body,
-        placeholderStyle: AppTextTheme.body.copyWith(
-          color: AppColors.textSecondary.withOpacity(0.7),
-        ),
-      ),
+    return AppTextField(
+      controller: controller,
+      hintText: placeholder,
+      prefixIcon: icon,
+      keyboardType: keyboardType,
+      textCapitalization: textCapitalization,
+      obscureText: obscureText,
     );
   }
 
-  /// Özel Auth button widget'ı oluşturur
-  Widget _buildAuthButton({
-    required String text,
-    required bool isLoading,
-    required VoidCallback? onPressed,
+  /// Şifre alanları için özel widget oluşturur
+  Widget _buildPasswordField({
+    required TextEditingController controller,
+    required String placeholder,
     required IconData icon,
     required AppDimensions dim,
+    bool showToggle = true, // İkonu gösterme seçeneği
   }) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      curve: Sprung.custom(
-        mass: 1.0,
-        stiffness: 400.0,
-        damping: 15.0,
-      ),
-      height: dim.buttonHeight * 1.2,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(dim.radiusL),
-        gradient: LinearGradient(
-          colors: [
-            AppColors.primary,
-            AppColors.primary.withOpacity(0.9),
-          ],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withOpacity(0.3),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-            spreadRadius: 0,
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(dim.radiusL),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onPressed,
-            splashColor: AppColors.white.withOpacity(0.1),
-            highlightColor: AppColors.white.withOpacity(0.05),
-            child: Center(
-              child: isLoading
-                  ? const CupertinoActivityIndicator(color: AppColors.white)
-                  : Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          text,
-                          style: AppTextTheme.body.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.white,
-                            letterSpacing: 0.3,
-                          ),
-                        ),
-                        SizedBox(width: dim.spaceXS),
-                        Icon(
-                          icon,
-                          color: AppColors.white,
-                          size: dim.iconSizeS,
-                        ),
-                      ],
-                    ),
-            ),
-          ),
-        ),
-      ),
+    return AppTextField(
+      controller: controller,
+      hintText: placeholder,
+      prefixIcon: icon,
+      keyboardType: TextInputType.text,
+      obscureText: _obscurePassword,
+      suffixIcon: showToggle
+          ? (_obscurePassword ? CupertinoIcons.eye : CupertinoIcons.eye_slash)
+          : null,
+      onSuffixIconTap: showToggle
+          ? () {
+              setState(() {
+                // Her iki şifre alanı için görünürlüğü birlikte değiştir
+                _obscurePassword = !_obscurePassword;
+                _obscureConfirmPassword =
+                    _obscurePassword; // Her iki şifre için aynı durumu kullan
+              });
+            }
+          : null,
     );
   }
 }

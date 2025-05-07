@@ -7,6 +7,7 @@ mixin _LoginScreenMixin on State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isSubmitting = false;
+  bool _rememberMe = false;
 
   // Animasyon kontrolcüleri
   late AnimationController _animationController;
@@ -14,10 +15,14 @@ mixin _LoginScreenMixin on State<LoginScreen> {
   late Animation<double> _scaleAnimation;
   late Animation<Offset> _slideAnimation;
 
+  // SharedPreferences anahtarı
+  static const String _rememberedEmailKey = 'remembered_email';
+
   @override
   void initState() {
     super.initState();
     _setupAnimations();
+    _loadRememberedEmail(); // E-posta otomatik doldurulsun
   }
 
   @override
@@ -63,6 +68,34 @@ mixin _LoginScreenMixin on State<LoginScreen> {
     _animationController.forward();
   }
 
+  /// SharedPreferences'tan e-posta adresini yükler ve input'a yazar
+  Future<void> _loadRememberedEmail() async {
+    final prefs = await SharedPreferences.getInstance();
+    final rememberedEmail = prefs.getString(_rememberedEmailKey);
+    AppLogger.i('[Beni Hatırla] Yüklendi: $rememberedEmail');
+    if (rememberedEmail != null && rememberedEmail.isNotEmpty) {
+      setState(() {
+        _emailController.text = rememberedEmail;
+        _rememberMe = true;
+      });
+      AppLogger.i('[Beni Hatırla] E-posta inputa yazıldı ve toggle açıldı');
+    }
+  }
+
+  /// E-posta adresini SharedPreferences'a kaydeder
+  Future<void> _saveRememberedEmail(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_rememberedEmailKey, email);
+    AppLogger.i('[Beni Hatırla] Kaydedildi: $email');
+  }
+
+  /// SharedPreferences'tan e-posta adresini siler
+  Future<void> _clearRememberedEmail() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_rememberedEmailKey);
+    AppLogger.i('[Beni Hatırla] E-posta silindi');
+  }
+
   /// Normal e-posta/şifre giriş metodunu çağırır
   Future<void> _signIn() async {
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
@@ -73,10 +106,40 @@ mixin _LoginScreenMixin on State<LoginScreen> {
       _isSubmitting = true;
     });
 
+    // Beni hatırla seçiliyse e-posta kaydet, değilse sil
+    if (_rememberMe) {
+      await _saveRememberedEmail(_emailController.text.trim());
+    } else {
+      await _clearRememberedEmail();
+    }
+    AppLogger.i(
+        '[Beni Hatırla] Girişte işlem tamamlandı. rememberMe: $_rememberMe, email: ${_emailController.text.trim()}');
+
     context.read<AuthCubit>().signInWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text,
+          rememberMe: _rememberMe,
         );
+  }
+
+  /// Apple ile giriş yapar
+  Future<void> _signInWithApple() async {
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      await context.read<AuthCubit>().signInWithApple();
+    } catch (e) {
+      // Hata işleme AuthCubit içinde yapılıyor, error state'e düşecek
+      AppLogger.e('Apple ile giriş sırasında hata: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
   }
 
   /// Google ile giriş yapar
@@ -327,5 +390,16 @@ mixin _LoginScreenMixin on State<LoginScreen> {
         ],
       ),
     );
+  }
+
+  // Beni hatırla toggle'ı değiştiğinde e-posta kaydını yönet
+  void onRememberMeChanged(bool value) async {
+    AppLogger.i('[Beni Hatırla] Toggle değişti: $value');
+    setState(() {
+      _rememberMe = value;
+    });
+    if (!value) {
+      await _clearRememberedEmail();
+    }
   }
 }

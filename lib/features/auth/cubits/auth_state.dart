@@ -9,6 +9,7 @@ class AuthState extends BaseState {
   final String? successMessage;
   final String? pendingOperationMessage;
   final String? retryOperation;
+  final bool accountDeleted;
 
   const AuthState({
     this.status = AuthStatus.initial,
@@ -19,11 +20,13 @@ class AuthState extends BaseState {
     this.successMessage,
     this.pendingOperationMessage,
     this.retryOperation,
+    this.accountDeleted = false,
   });
 
   /// İlk durum
   factory AuthState.initial() {
-    return const AuthState(status: AuthStatus.initial, isLoading: false);
+    return const AuthState(
+        status: AuthStatus.initial, isLoading: false, accountDeleted: false);
   }
 
   /// Kullanıcı giriş yapmış
@@ -74,6 +77,7 @@ class AuthState extends BaseState {
     bool clearSuccessMessage = false,
     bool clearPendingOperation = false,
     bool clearRetryOperation = false,
+    bool? accountDeleted,
   }) {
     return AuthState(
       status: status ?? this.status,
@@ -88,6 +92,7 @@ class AuthState extends BaseState {
           : (pendingOperationMessage ?? this.pendingOperationMessage),
       retryOperation:
           clearRetryOperation ? null : (retryOperation ?? this.retryOperation),
+      accountDeleted: accountDeleted ?? this.accountDeleted,
     );
   }
 
@@ -123,7 +128,8 @@ class AuthState extends BaseState {
         showRetryButton,
         successMessage,
         pendingOperationMessage,
-        retryOperation
+        retryOperation,
+        accountDeleted
       ];
 
   /// State'in durumunu kontrol eden kolaylık metodları

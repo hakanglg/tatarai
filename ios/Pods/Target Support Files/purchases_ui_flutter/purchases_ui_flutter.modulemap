@@ -1,0 +1,6 @@
+framework module purchases_ui_flutter {
+  umbrella header "purchases_ui_flutter-umbrella.h"
+
+  export *
+  module * { export * }
+}

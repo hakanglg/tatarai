@@ -1010,11 +1010,80 @@ class UserRepository extends BaseRepository with CacheableMixin {
     );
   }
 
+  /// Kullanıcı veri koleksiyonunu siler
+  Future<bool> _deleteUserCollection(String userId, String collectionPath,
+      {String userIdField = 'userId'}) async {
+    try {
+      final snapshot = await _firestore
+          .collection(collectionPath)
+          .where(userIdField, isEqualTo: userId)
+          .get();
+
+      if (snapshot.docs.isEmpty) {
+        return true; // Silecek bir şey yoktu, başarılı kabul et
+      }
+
+      final batch = _firestore.batch();
+      for (var doc in snapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+
+      AppLogger.i(
+          '✅ $collectionPath koleksiyonundan ${snapshot.docs.length} belge silindi');
+      return true;
+    } catch (e) {
+      AppLogger.e('❌ $collectionPath silme hatası: $e');
+      return false;
+    }
+  }
+
+  /// Kullanıcıya ait tüm Firestore verilerini sil
+  Future<bool> _deleteAllUserData(String userId) async {
+    bool success = true;
+
+    // Kullanıcı ana belgesini sil
+    try {
+      await _firestore.collection(_userCollection).doc(userId).delete();
+      AppLogger.i('✅ Kullanıcı ana belgesi silindi: $userId');
+    } catch (e) {
+      AppLogger.e('❌ Kullanıcı ana belgesi silinirken hata: $e');
+      success = false;
+    }
+
+    // Koleksiyon listesi - her birini sil
+    final collections = [
+      'analyses',
+      'favorites',
+      'history',
+      'user_settings',
+      // İhtiyaç duyulan diğer koleksiyonlar
+    ];
+
+    for (var collection in collections) {
+      bool collectionSuccess = await _deleteUserCollection(userId, collection);
+      if (!collectionSuccess) {
+        success = false;
+      }
+    }
+
+    // Önbelleği temizle
+    try {
+      await removeCachedData(_userCachePrefix + userId);
+      AppLogger.i('✅ Kullanıcı önbelleği temizlendi');
+    } catch (e) {
+      AppLogger.e('❌ Önbellek temizleme hatası: $e');
+      success = false;
+    }
+
+    return success;
+  }
+
   /// Kullanıcı hesabını siler (hem Firebase Auth hem de Firestore)
   Future<void> deleteAccount() async {
     await _ensureInitialized();
 
-    await apiCall<void>(
+    return await apiCall<void>(
       operationName: 'Hesap silme',
       apiCall: () async {
         final currentUser = await getCurrentUser();
@@ -1022,29 +1091,63 @@ class UserRepository extends BaseRepository with CacheableMixin {
           throw Exception('Oturum açık değil.');
         }
 
+        final userId = currentUser.id;
+        AppLogger.i('🔄 Hesap silme işlemi başlatıldı: $userId');
+
+        // 1. Firestore verilerini sil
+        bool firestoreSuccess = await _deleteAllUserData(userId);
+        if (firestoreSuccess) {
+          AppLogger.i('✅ Firestore verileri başarıyla silindi');
+        } else {
+          AppLogger.w('⚠️ Bazı Firestore verileri silinemedi, devam ediliyor');
+        }
+
+        // 2. Authentication hesabını silmeye çalış
         try {
-          // Önce Firestore'dan kullanıcıyı sil
-          await _firestore
-              .collection(_userCollection)
-              .doc(currentUser.id)
-              .delete();
-
-          // Önbellekten kullanıcı verisini sil
-          await removeCachedData(_userCachePrefix + currentUser.id);
-
-          // Sonra Firebase Auth'dan kullanıcıyı sil
           await _authService.deleteAccount();
+          AppLogger.i('✅ Authentication hesabı silindi');
 
-          logSuccess('Hesap silindi', 'Kullanıcı ID: ${currentUser.id}');
+          // 3. Başarılı olursa oturumu kapat ve bitir
+          await signOut();
+          AppLogger.i('✅ İşlem tamamlandı: Hesap silindi ve oturum kapatıldı');
+
+          logSuccess('Hesap başarıyla silindi', 'Kullanıcı: $userId');
+          return;
         } catch (e) {
-          if (_isNetworkOrFirestoreError(e)) {
-            throw FirebaseException(
-                plugin: 'UserRepository',
-                code: 'network-unavailable',
-                message:
-                    'Hesap silinirken bağlantı hatası oluştu. Lütfen bağlantınızı kontrol edip tekrar deneyin.');
+          // Yeniden giriş gerektiren özel durum
+          if (e.toString().contains('REQUIRES_REAUTH')) {
+            await signOut();
+            AppLogger.i('⚠️ Yeniden giriş gerekli');
+            throw Exception(
+                'Güvenlik nedeniyle hesabınızı silmek için yeniden giriş yapmanız gerekiyor.');
           }
-          rethrow;
+
+          // Diğer authentication hataları
+          if (e.toString().contains('AUTH_DELETE_ERROR')) {
+            await signOut();
+
+            // Firestore verileri silindiyse kısmi başarı mesajı
+            if (firestoreSuccess) {
+              AppLogger.w('⚠️ Veriler silindi ama hesap silinemedi');
+              throw Exception(
+                  'Hesap verileriniz silindi ancak kimlik hesabınız silinemedi. Lütfen daha sonra tekrar deneyin.');
+            } else {
+              AppLogger.e('❌ Hesap silme işlemi tamamen başarısız');
+              throw Exception(
+                  'Hesap silme işlemi sırasında bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
+            }
+          }
+
+          // Beklenmeyen hatalar
+          try {
+            await signOut();
+          } catch (signOutError) {
+            AppLogger.e('❌ Oturum kapatma hatası: $signOutError');
+          }
+
+          AppLogger.e('❌ Beklenmeyen hesap silme hatası: $e');
+          throw Exception(
+              'Hesap silme işlemi sırasında beklenmeyen bir hata oluştu.');
         }
       },
       ignoreConnectionCheck: false,

@@ -1,12 +1,10 @@
 import 'dart:async';
-
 import 'package:flutter/cupertino.dart';
 import 'package:go_router/go_router.dart';
 import 'package:tatarai/core/routing/route_names.dart';
 import 'package:tatarai/core/routing/route_paths.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
-import 'package:tatarai/features/auth/cubits/auth_state.dart';
 import 'package:tatarai/features/auth/views/login_screen.dart';
 import 'package:tatarai/features/auth/views/register_screen.dart';
 import 'package:tatarai/features/home/views/home_screen.dart';
@@ -102,6 +100,8 @@ class AppRouter {
     final isOnboarding = state.matchedLocation == RoutePaths.onboarding;
     final isLoggingIn = state.matchedLocation == RoutePaths.login ||
         state.matchedLocation == RoutePaths.register;
+    // Premium sayfası mı kontrol et - Premium sayfası için özel işlem yapacağız
+    final isPremium = state.matchedLocation == RoutePaths.premium;
 
     // Uygulama başlangıcında durumu logla
     AppLogger.i(
@@ -146,7 +146,12 @@ class AppRouter {
       }
 
       // Oturum açık değilse ve korumalı bir sayfaya gitmeye çalışıyorsa, giriş sayfasına yönlendir
-      if (!isLoggedIn && !isLoggingIn && !isSplash && !isOnboarding) {
+      // NOT: Premium sayfası için istisna tanımlıyoruz - login olmadan da erişilebilir
+      if (!isLoggedIn &&
+          !isLoggingIn &&
+          !isSplash &&
+          !isOnboarding &&
+          !isPremium) {
         return RoutePaths.login;
       }
 

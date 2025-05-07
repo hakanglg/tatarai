@@ -25,6 +25,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:tatarai/core/utils/network_util.dart';
 import 'package:tatarai/core/utils/firebase_test_utils.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
 
 /// Uygulama başlangıç noktası
 Future<void> main() async {
@@ -165,6 +166,9 @@ Future<void> main() async {
         }
       };
     }
+
+    // RevenueCat'i başlat
+    await initRevenueCat();
 
     // Uygulamayı başlat
     runApp(TatarAI(firebaseInitialized: firebaseInitialized));
@@ -309,6 +313,7 @@ class _TatarAIState extends State<TatarAI> {
         BlocProvider<ProfileCubit>(
           create: (context) => ProfileCubit(
             userRepository: userRepository,
+            authCubit: context.read<AuthCubit>(),
           ),
         ),
         BlocProvider<HomeCubit>(
@@ -333,5 +338,20 @@ class _TatarAIState extends State<TatarAI> {
         ),
       ),
     );
+  }
+}
+
+// RevenueCat'i başlat
+Future<void> initRevenueCat() async {
+  try {
+    // RevenueCat API anahtarı
+    final apiKey = dotenv.env['REVENUECAT_API_KEY'] ?? '';
+
+    await Purchases.setLogLevel(LogLevel.debug);
+    await Purchases.configure(PurchasesConfiguration(apiKey));
+
+    AppLogger.i('RevenueCat başarıyla yapılandırıldı');
+  } catch (e) {
+    AppLogger.e('RevenueCat yapılandırma hatası: $e');
   }
 }

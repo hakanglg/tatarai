@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tatarai/core/base/base_state_widget.dart';
 import 'package:tatarai/core/routing/route_names.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
+import 'package:tatarai/core/theme/text_theme.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/core/utils/loading_view.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
@@ -210,22 +211,13 @@ class _SplashScreenState extends BaseState<SplashScreen>
                         const Text(
                           'TatarAI',
                           textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontFamily: 'sfpro',
-                            fontSize: 36,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
-                          ),
+                          style: AppTextTheme.headline1,
                         ),
                         const SizedBox(height: 8),
                         const Text(
                           'Yapay Zeka ile Tarım Asistanı',
                           textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontFamily: 'sfpro',
-                            fontSize: 16,
-                            color: CupertinoColors.systemGrey,
-                          ),
+                          style: AppTextTheme.body,
                         ),
                         const SizedBox(height: 48),
 

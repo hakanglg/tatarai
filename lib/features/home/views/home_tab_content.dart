@@ -133,7 +133,9 @@ class _HomeTabContentState extends State<HomeTabContent>
       ),
       child: BlocBuilder<AuthCubit, AuthState>(
         builder: (context, state) {
-          final userName = state.user?.displayName ?? 'Misafir';
+          final userName = state.user?.displayName ??
+              state.user?.email?.split('@').first ??
+              'Misafir';
 
           return AnimatedBuilder(
             animation: _animationController,

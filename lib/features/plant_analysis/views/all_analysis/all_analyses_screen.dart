@@ -32,12 +32,14 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen> {
     return Scaffold(
       body: CupertinoPageScaffold(
         navigationBar: CupertinoNavigationBar(
-          middle: Text('Tüm Analizler', style: TextStyle(color: Colors.black)),
+          middle: Text('Tüm Analizler',
+              style: AppTextTheme.headline5
+                  .copyWith(color: AppColors.textPrimary)),
           leading: GestureDetector(
             onTap: () => Navigator.of(context).maybePop(),
             child: Icon(
               CupertinoIcons.back,
-              color: Colors.black, // Ok simgesinin rengi burada
+              color: AppColors.textPrimary, // Ok simgesinin rengi güncellendi
             ),
           ),
         ),
@@ -193,9 +195,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen> {
             // Başlık
             Text(
               'Henüz Hiç Analiz Yok',
-              style: TextStyle(
-                fontFamily: 'sfpro',
-                fontSize: dim.fontSizeXL,
+              style: AppTextTheme.headline2.copyWith(
                 fontWeight: FontWeight.bold,
                 color: CupertinoColors.label,
                 letterSpacing: -0.5,
@@ -207,9 +207,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen> {
             // Açıklama
             Text(
               'Bitki fotoğrafı yükleyerek ilk analizinizi yapabilirsiniz. Analizleriniz burada listelenecek.',
-              style: TextStyle(
-                fontFamily: 'sfpro',
-                fontSize: dim.fontSizeM,
+              style: AppTextTheme.body.copyWith(
                 color: CupertinoColors.secondaryLabel,
                 height: 1.4,
               ),

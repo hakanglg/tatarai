@@ -1494,7 +1494,21 @@ PODS:
   - PromisesObjC (2.4.0)
   - PromisesSwift (2.4.0):
     - PromisesObjC (= 2.4.0)
+  - purchases_flutter (8.8.0):
+    - Flutter
+    - PurchasesHybridCommon (= 13.29.1)
+  - purchases_ui_flutter (8.8.0):
+    - Flutter
+    - PurchasesHybridCommonUI (= 13.29.1)
+  - PurchasesHybridCommon (13.29.1):
+    - RevenueCat (= 5.22.2)
+  - PurchasesHybridCommonUI (13.29.1):
+    - PurchasesHybridCommon (= 13.29.1)
+    - RevenueCatUI (= 5.22.2)
   - RecaptchaInterop (101.0.0)
+  - RevenueCat (5.22.2)
+  - RevenueCatUI (5.22.2):
+    - RevenueCat (= 5.22.2)
   - SDWebImage (5.21.0):
     - SDWebImage/Core (= 5.21.0)
   - SDWebImage/Core (5.21.0)
@@ -1506,6 +1520,8 @@ PODS:
   - shared_preferences_foundation (0.0.1):
     - Flutter
     - FlutterMacOS
+  - sign_in_with_apple (0.0.1):
+    - Flutter
   - sqflite_darwin (0.0.4):
     - Flutter
     - FlutterMacOS
@@ -1529,8 +1545,11 @@ DEPENDENCIES:
   - in_app_purchase_storekit (from `.symlinks/plugins/in_app_purchase_storekit/darwin`)
   - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
   - permission_handler_apple (from `.symlinks/plugins/permission_handler_apple/ios`)
+  - purchases_flutter (from `.symlinks/plugins/purchases_flutter/ios`)
+  - purchases_ui_flutter (from `.symlinks/plugins/purchases_ui_flutter/ios`)
   - share_plus (from `.symlinks/plugins/share_plus/ios`)
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
+  - sign_in_with_apple (from `.symlinks/plugins/sign_in_with_apple/ios`)
   - sqflite_darwin (from `.symlinks/plugins/sqflite_darwin/darwin`)
   - url_launcher_ios (from `.symlinks/plugins/url_launcher_ios/ios`)
 
@@ -1568,7 +1587,11 @@ SPEC REPOS:
     - nanopb
     - PromisesObjC
     - PromisesSwift
+    - PurchasesHybridCommon
+    - PurchasesHybridCommonUI
     - RecaptchaInterop
+    - RevenueCat
+    - RevenueCatUI
     - SDWebImage
     - SDWebImageWebPCoder
 
@@ -1605,10 +1628,16 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/path_provider_foundation/darwin"
   permission_handler_apple:
     :path: ".symlinks/plugins/permission_handler_apple/ios"
+  purchases_flutter:
+    :path: ".symlinks/plugins/purchases_flutter/ios"
+  purchases_ui_flutter:
+    :path: ".symlinks/plugins/purchases_ui_flutter/ios"
   share_plus:
     :path: ".symlinks/plugins/share_plus/ios"
   shared_preferences_foundation:
     :path: ".symlinks/plugins/shared_preferences_foundation/darwin"
+  sign_in_with_apple:
+    :path: ".symlinks/plugins/sign_in_with_apple/ios"
   sqflite_darwin:
     :path: ".symlinks/plugins/sqflite_darwin/darwin"
   url_launcher_ios:
@@ -1663,11 +1692,18 @@ SPEC CHECKSUMS:
   permission_handler_apple: 4ed2196e43d0651e8ff7ca3483a069d469701f2d
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
   PromisesSwift: 9d77319bbe72ebf6d872900551f7eeba9bce2851
+  purchases_flutter: 437a2d875b16ea37f1847b2f88604fc13a18646b
+  purchases_ui_flutter: 0e63afa7c5a6088088ac1fcd06f653c2260cdc9e
+  PurchasesHybridCommon: 1728ff834821ecfc85e987a565d51eda36213958
+  PurchasesHybridCommonUI: 1541272f8adcb7d809f7178cecced3eafd6f5fc8
   RecaptchaInterop: 11e0b637842dfb48308d242afc3f448062325aba
+  RevenueCat: 234d2361e453ce1282cee7e18449d01aba45ebbf
+  RevenueCatUI: 24f46287ce3185fc9816f0128c09342ab1c76d66
   SDWebImage: f84b0feeb08d2d11e6a9b843cb06d75ebf5b8868
   SDWebImageWebPCoder: e38c0a70396191361d60c092933e22c20d5b1380
   share_plus: de6030e33b4e106470e09322d87cf2a4258d2d1d
   shared_preferences_foundation: 9e1978ff2562383bd5676f64ec4e9aa8fa06a6f7
+  sign_in_with_apple: c5dcc141574c8c54d5ac99dd2163c0c72ad22418
   sqflite_darwin: 20b2a3a3b70e43edae938624ce550a3cbf66a3d0
   url_launcher_ios: 694010445543906933d732453a59da0a173ae33d
 
