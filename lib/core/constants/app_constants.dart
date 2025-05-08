@@ -13,6 +13,10 @@ class AppConstants {
   // Gemini API
   static String get geminiApiKey => dotenv.env['GEMINI_API_KEY'] ?? '';
 
+  // RevenueCat API anahtarları ve sabitleri
+  static String get revenueApiKey => dotenv.env['REVENUECAT_API_KEY'] ?? '';
+  static const String entitlementId = 'premium';
+
   // Ücretsiz kullanıcı için analiz kredisi
   static const int FREE_ANALYSIS_CREDITS = 1;
 
@@ -78,8 +82,4 @@ class AppConstants {
   static const int animationDurationFast = 200;
   static const int animationDurationMedium = 350;
   static const int animationDurationSlow = 500;
-
-  // RevenueCat API anahtarları ve sabitleri
-  static const String revenueApiKey = 'YOUR_REVENUECAT_API_KEY';
-  static const String premiumEntitlementId = 'premium';
 }

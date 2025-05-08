@@ -344,11 +344,20 @@ class _TatarAIState extends State<TatarAI> {
 // RevenueCat'i başlat
 Future<void> initRevenueCat() async {
   try {
-    // RevenueCat API anahtarı
-    final apiKey = dotenv.env['REVENUECAT_API_KEY'] ?? '';
+    // .env dosyasından API anahtarını alabilirsek kullan, yoksa sabit değeri kullan
+    // Paketlerin doğru yüklenmesi için doğru API anahtarı eklenmeli
+    final revenueApiKey = AppConstants.revenueApiKey;
 
+    // Debug modda daha fazla log göster
     await Purchases.setLogLevel(LogLevel.debug);
-    await Purchases.configure(PurchasesConfiguration(apiKey));
+    await Purchases.configure(PurchasesConfiguration(revenueApiKey));
+
+    // Eğer kullanıcı giriş yapmışsa, RevenueCat'te de tanımla
+    if (FirebaseManager().auth?.currentUser != null) {
+      final uid = FirebaseManager().auth!.currentUser!.uid;
+      await Purchases.logIn(uid);
+      AppLogger.i('RevenueCat kullanıcı girişi yapıldı: $uid');
+    }
 
     AppLogger.i('RevenueCat başarıyla yapılandırıldı');
   } catch (e) {

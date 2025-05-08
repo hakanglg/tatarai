@@ -35,8 +35,44 @@ class PaymentCubit extends Cubit<PaymentState> {
     try {
       emit(state.copyWith(isLoading: true, hasError: false));
 
-      final offerings = await Purchases.getOfferings();
-      final customerInfo = await Purchases.getCustomerInfo();
+      AppLogger.i('PaymentCubit: Paketler getiriliyor...');
+
+      // Daha sağlam hata yakalama ile paketleri getir
+      Offerings? offerings;
+      CustomerInfo? customerInfo;
+
+      try {
+        // Paketleri getir
+        offerings = await Purchases.getOfferings();
+        AppLogger.i('PaymentCubit: Paketler alındı: ${offerings.all.keys}');
+
+        if (offerings.current == null) {
+          AppLogger.w('PaymentCubit: Geçerli paket (current) bulunamadı');
+        } else {
+          AppLogger.i(
+              'PaymentCubit: Geçerli paket ID: ${offerings.current!.identifier}');
+          AppLogger.i(
+              'PaymentCubit: Paket içeriği: ${offerings.current!.availablePackages.length} adet paket var');
+
+          // Paketleri logla
+          for (final package in offerings.current!.availablePackages) {
+            AppLogger.i(
+                'PaymentCubit: Paket: ${package.identifier}, ${package.storeProduct.title}, ${package.storeProduct.priceString}');
+          }
+        }
+      } catch (e) {
+        AppLogger.e('PaymentCubit: Paketleri getirme hatası: $e');
+        rethrow;
+      }
+
+      try {
+        // Kullanıcı bilgilerini getir
+        customerInfo = await Purchases.getCustomerInfo();
+        AppLogger.i('PaymentCubit: Kullanıcı bilgileri alındı');
+      } catch (e) {
+        AppLogger.e('PaymentCubit: Kullanıcı bilgilerini getirme hatası: $e');
+        rethrow;
+      }
 
       // Kullanıcının premium olup olmadığını kontrol et
       final isPremium = _checkIfUserIsPremium(customerInfo);
@@ -52,10 +88,17 @@ class PaymentCubit extends Cubit<PaymentState> {
           'Paketler başarıyla alındı: ${offerings.current?.identifier}');
     } catch (e) {
       AppLogger.e('Paketleri alma hatası: $e');
+      // Hataya rağmen UI güncellenebilsin
       emit(state.copyWith(
         isLoading: false,
         hasError: true,
       ));
+
+      // Tekrar denemeyi öner
+      Future.delayed(const Duration(seconds: 2), () {
+        AppLogger.i('Paketleri yeniden getirme denemesi...');
+        fetchOfferings();
+      });
     }
   }
 
