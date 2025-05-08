@@ -8,6 +8,7 @@ class PaymentState extends Equatable {
   final Offerings? offerings;
   final CustomerInfo? customerInfo;
   final int remainingFreeAnalyses;
+  final String? errorMessage;
 
   const PaymentState({
     this.isLoading = false,
@@ -17,6 +18,7 @@ class PaymentState extends Equatable {
     this.offerings,
     this.customerInfo,
     this.remainingFreeAnalyses = 3, // Varsayılan olarak 3 analiz hakkı
+    this.errorMessage,
   });
 
   PaymentState copyWith({
@@ -27,6 +29,7 @@ class PaymentState extends Equatable {
     Offerings? offerings,
     CustomerInfo? customerInfo,
     int? remainingFreeAnalyses,
+    String? errorMessage,
   }) {
     return PaymentState(
       isLoading: isLoading ?? this.isLoading,
@@ -37,6 +40,7 @@ class PaymentState extends Equatable {
       customerInfo: customerInfo ?? this.customerInfo,
       remainingFreeAnalyses:
           remainingFreeAnalyses ?? this.remainingFreeAnalyses,
+      errorMessage: errorMessage ?? this.errorMessage,
     );
   }
 
@@ -49,5 +53,6 @@ class PaymentState extends Equatable {
         offerings,
         customerInfo,
         remainingFreeAnalyses,
+        errorMessage,
       ];
 }

@@ -18,12 +18,14 @@ import 'package:tatarai/core/widgets/app_button.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
 import 'package:tatarai/features/auth/cubits/auth_state.dart';
 import 'package:tatarai/features/auth/models/user_model.dart';
+import 'package:tatarai/features/payment/cubits/payment_cubit.dart';
 import 'package:tatarai/features/payment/views/premium_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:tatarai/features/profile/cubits/profile_cubit.dart';
 import 'package:sprung/sprung.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:tatarai/core/utils/permission_manager.dart';
+import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
 
 /// Kullanıcı profil bilgilerini gösteren ve düzenleyen ekran
 /// Apple Human Interface Guidelines'a uygun modern tasarım
@@ -84,7 +86,10 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   @override
   Widget build(BuildContext context) {
-    return _buildScreenContent(context);
+    return BlocProvider(
+      create: (context) => PaymentCubit()..fetchOfferings(),
+      child: _buildScreenContent(context),
+    );
   }
 
   Widget _buildScreenContent(BuildContext context) {
@@ -452,13 +457,58 @@ class _ProfileScreenState extends State<ProfileScreen>
                         ? () {
                             HapticFeedback.selectionClick();
                           }
-                        : () {
+                        : () async {
                             HapticFeedback.mediumImpact();
-                            Navigator.of(context).push(
-                              CupertinoPageRoute(
-                                builder: (context) => const PremiumScreen(),
-                              ),
-                            );
+                            // Direk PremiumScreen açmak yerine paywall gösteriyoruz
+                            try {
+                              AppLogger.i(
+                                  'Premium paywall açılıyor... (Settings Item)');
+
+                              // Context'ten PaymentCubit'i al
+                              final paymentCubit = context.read<PaymentCubit>();
+                              final offerings =
+                                  await paymentCubit.fetchOfferings();
+
+                              if (offerings?.current != null) {
+                                AppLogger.i(
+                                    'Paywall için offerings kullanılıyor: ${offerings!.current!.identifier}');
+                                RevenueCatUI.presentPaywall(
+                                  offering: offerings.current!,
+                                  displayCloseButton: true,
+                                ).then((result) {
+                                  AppLogger.i(
+                                      'Paywall kapatıldı. Result: $result');
+                                  // Paywall kapandıktan sonra kullanıcı bilgilerini yenile
+                                  context
+                                      .read<ProfileCubit>()
+                                      .refreshUserData();
+                                }).catchError((e) {
+                                  AppLogger.e('Paywall future hatası: $e');
+                                });
+                              } else {
+                                AppLogger.w(
+                                    'Offerings bulunamadı, varsayılan paywall gösteriliyor');
+                                RevenueCatUI.presentPaywall(
+                                  displayCloseButton: true,
+                                ).then((result) {
+                                  AppLogger.i(
+                                      'Varsayılan paywall kapatıldı. Result: $result');
+                                  context
+                                      .read<ProfileCubit>()
+                                      .refreshUserData();
+                                }).catchError((e) {
+                                  AppLogger.e('Paywall future hatası: $e');
+                                });
+                              }
+                            } catch (e) {
+                              AppLogger.e('Premium ekranı açılırken hata: $e');
+                              // Hata durumunda eski yönteme geri dön
+                              Navigator.of(context).push(
+                                CupertinoPageRoute(
+                                  builder: (context) => const PremiumScreen(),
+                                ),
+                              );
+                            }
                           },
                   ),
                   _buildSettingsItem(
@@ -1087,11 +1137,44 @@ class _ProfileScreenState extends State<ProfileScreen>
               padding: EdgeInsets.zero,
               onPressed: () {
                 HapticFeedback.mediumImpact();
-                Navigator.of(context).push(
-                  CupertinoPageRoute(
-                    builder: (context) => const PremiumScreen(),
-                  ),
-                );
+                try {
+                  AppLogger.i('Premium paywall açılıyor... (Membership Card)');
+
+                  // Context'ten PaymentCubit'i al
+                  final paymentCubit = context.read<PaymentCubit>();
+
+                  // Asenkron şekilde fetchOfferings çağır ve offerings ile devam et
+                  paymentCubit.fetchOfferings().then((offerings) {
+                    if (offerings?.current != null) {
+                      AppLogger.i(
+                          'Paywall için offerings kullanılıyor: ${offerings!.current!.identifier}');
+                      return RevenueCatUI.presentPaywall(
+                        offering: offerings.current!,
+                        displayCloseButton: true,
+                      );
+                    } else {
+                      AppLogger.w(
+                          'Offerings bulunamadı, varsayılan paywall gösteriliyor');
+                      return RevenueCatUI.presentPaywall(
+                        displayCloseButton: true,
+                      );
+                    }
+                  }).then((result) {
+                    AppLogger.i('Paywall kapatıldı. Result: $result');
+                    // Paywall kapandıktan sonra kullanıcı bilgilerini yenile
+                    context.read<ProfileCubit>().refreshUserData();
+                  }).catchError((e) {
+                    AppLogger.e('Paywall future hatası: $e');
+                  });
+                } catch (e) {
+                  AppLogger.e('Premium ekranı açılırken hata: $e');
+                  // Hata durumunda eski yönteme geri dön
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (context) => const PremiumScreen(),
+                    ),
+                  );
+                }
               },
               child: Container(
                 width: double.infinity,

@@ -14,7 +14,9 @@ class AppConstants {
   static String get geminiApiKey => dotenv.env['GEMINI_API_KEY'] ?? '';
 
   // RevenueCat API anahtarları ve sabitleri
-  static String get revenueApiKey => dotenv.env['REVENUECAT_API_KEY'] ?? '';
+  static String get revenueiOSApiKey =>
+      dotenv.env['REVENUECAT_IOS_API_KEY'] ?? '';
+  // static String get revenueAndroidApiKey => dotenv.env['REVENUECAT_API_KEY'] ?? '';
   static const String entitlementId = 'premium';
 
   // Ücretsiz kullanıcı için analiz kredisi

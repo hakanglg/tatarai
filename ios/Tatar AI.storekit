@@ -1,0 +1,145 @@
+{
+  "appPolicies" : {
+    "eula" : "",
+    "policies" : [
+      {
+        "locale" : "en_US",
+        "policyText" : "",
+        "policyURL" : ""
+      }
+    ]
+  },
+  "identifier" : "206C5A89",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_applicationInternalID" : "6745120919",
+    "_developerTeamID" : "S6UCS994KC",
+    "_failTransactionsEnabled" : false,
+    "_lastSynchronizedDate" : 768394537.60184705,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Verification"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Store Sync"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Subscription Status"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Transaction"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Manage Subscriptions Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Refund Request Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Offer Code Redeem Sheet"
+      }
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21681335",
+      "localizations" : [
+
+      ],
+      "name" : "Tatar AI Premium",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "4.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "6745511009",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Sınırsız Bitki Analizi",
+              "displayName" : "TatarAI Premium",
+              "locale" : "tr"
+            }
+          ],
+          "productID" : "rc_499_1m_1wf",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Monthly $4.99, 1-week free",
+          "subscriptionGroupID" : "21681335",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "29.99",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "6745571784",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Yıl boyunca sınırsız analiz hakkı",
+              "displayName" : "TatarAI Premium",
+              "locale" : "tr"
+            }
+          ],
+          "productID" : "rc_30_1y",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Yearly $29.99",
+          "subscriptionGroupID" : "21681335",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

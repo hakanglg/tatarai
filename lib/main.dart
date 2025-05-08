@@ -1,12 +1,14 @@
 import 'dart:async';
-
+import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
 import 'package:tatarai/core/constants/app_constants.dart';
+import 'package:tatarai/core/init/store_config.dart' as store;
 import 'package:tatarai/core/repositories/plant_analysis_repository.dart';
 import 'package:tatarai/core/routing/app_router.dart';
 import 'package:tatarai/core/services/firebase_manager.dart';
@@ -47,7 +49,17 @@ Future<void> main() async {
       await dotenv.load(fileName: ".env");
       AppLogger.i('Çevre değişkenleri yüklendi');
     } catch (e) {
-      AppLogger.e('Çevre değişkenleri yükleme hatası', e);
+      AppLogger.e('Çevre değişkenleri yükleme hatası: $e');
+
+      // .env dosyası yoksa veya yüklenemezse kullanıcıyı bilgilendir
+      if (kDebugMode) {
+        print('-------------------------------------------------------');
+        print('⚠️ .env DOSYASI BULUNAMADI VEYA YÜKLENEMEDİ! ⚠️');
+        print(
+            'Ödeme işlemleri çalışmayacak. .env dosyasını oluşturup aşağıdaki değeri eklediğinizden emin olun:');
+        print('REVENUECAT_IOS_API_KEY=your_api_key_here');
+        print('-------------------------------------------------------');
+      }
     }
 
     // Firebase başlatma - daha sağlam hata yakalama ile
@@ -184,6 +196,95 @@ Future<void> main() async {
       AppLogger.e('Crashlytics\'e hata bildirilemedi', e);
     }
   });
+}
+
+/// RevenueCat yapılandırmasını başlatır
+Future<bool> initRevenueCat() async {
+  try {
+    AppLogger.i('RevenueCat başlatılıyor...');
+
+    // Log seviyesini ayarla (Debug için faydalı)
+    await Purchases.setLogLevel(LogLevel.debug);
+    AppLogger.i('RevenueCat: Log seviyesi ayarlandı');
+
+    // API anahtarını al ve kontrol et
+    String apiKey = '';
+
+    if (Platform.isIOS) {
+      apiKey = AppConstants.revenueiOSApiKey;
+      if (apiKey.isEmpty) {
+        AppLogger.e(
+            'RevenueCat: iOS API anahtarı boş! .env dosyasında REVENUECAT_IOS_API_KEY tanımlanmamış.');
+        _showDevelopmentModeMissingKeyMessage('iOS');
+        return false;
+      }
+    } else if (Platform.isAndroid) {
+      // Şu an için iOS anahtarını kullanıyoruz, daha sonra Android için ayrı anahtar eklenebilir
+      apiKey = AppConstants.revenueiOSApiKey;
+      if (apiKey.isEmpty) {
+        AppLogger.e(
+            'RevenueCat: Android API anahtarı boş! .env dosyasında REVENUECAT_IOS_API_KEY tanımlanmamış.');
+        _showDevelopmentModeMissingKeyMessage('Android');
+        return false;
+      }
+    } else {
+      AppLogger.e(
+          'RevenueCat: Desteklenmeyen platform! (${Platform.operatingSystem})');
+      return false;
+    }
+
+    // RevenueCat'i yapılandır
+    PurchasesConfiguration configuration = PurchasesConfiguration(apiKey);
+    await Purchases.configure(configuration);
+    AppLogger.i('RevenueCat: Yapılandırma başarılı');
+
+    // Oturum açmış kullanıcı varsa RevenueCat'e bildir
+    _syncUserWithRevenueCat();
+
+    return true;
+  } catch (e) {
+    AppLogger.e('RevenueCat başlatma hatası: $e');
+    return false;
+  }
+}
+
+/// Kullanıcıyı RevenueCat ile senkronize eder
+Future<void> _syncUserWithRevenueCat() async {
+  try {
+    final auth = FirebaseManager().auth;
+    final currentUser = auth?.currentUser;
+
+    if (currentUser != null) {
+      final uid = currentUser.uid;
+      AppLogger.i(
+          'RevenueCat: Kullanıcı senkronizasyonu başlatılıyor (uid: $uid)');
+
+      try {
+        await Purchases.logIn(uid);
+        AppLogger.i('RevenueCat: Kullanıcı senkronizasyonu başarılı');
+      } catch (e) {
+        AppLogger.e('RevenueCat: Kullanıcı senkronizasyonu hatası: $e');
+      }
+    } else {
+      AppLogger.i(
+          'RevenueCat: Oturum açmış kullanıcı bulunmadığı için senkronizasyon atlanıyor');
+    }
+  } catch (e) {
+    AppLogger.w('RevenueCat: Kullanıcı kontrolü sırasında hata: $e');
+  }
+}
+
+/// Geliştirme modunda RevenueCat API anahtarı eksikliği için mesaj gösterir
+void _showDevelopmentModeMissingKeyMessage(String platform) {
+  if (kDebugMode) {
+    print('-------------------------------------------------------');
+    print('⚠️ REVENUECAT API ANAHTARI BULUNAMADI! ⚠️');
+    print('$platform için RevenueCat API anahtarı bulunamadı veya boş.');
+    print(
+        'Ödeme işlemleri çalışmayacak. .env dosyasını oluşturup aşağıdaki değeri eklediğinizden emin olun:');
+    print('REVENUECAT_IOS_API_KEY=your_api_key_here');
+    print('-------------------------------------------------------');
+  }
 }
 
 /// TatarAI uygulama kök widget'ı
@@ -341,26 +442,14 @@ class _TatarAIState extends State<TatarAI> {
   }
 }
 
-// RevenueCat'i başlat
-Future<void> initRevenueCat() async {
+// Premium ekranını açmak için kullanılabilecek yardımcı fonksiyon
+Future<PaywallResult?> openPremiumPaywall(BuildContext context) async {
   try {
-    // .env dosyasından API anahtarını alabilirsek kullan, yoksa sabit değeri kullan
-    // Paketlerin doğru yüklenmesi için doğru API anahtarı eklenmeli
-    final revenueApiKey = AppConstants.revenueApiKey;
-
-    // Debug modda daha fazla log göster
-    await Purchases.setLogLevel(LogLevel.debug);
-    await Purchases.configure(PurchasesConfiguration(revenueApiKey));
-
-    // Eğer kullanıcı giriş yapmışsa, RevenueCat'te de tanımla
-    if (FirebaseManager().auth?.currentUser != null) {
-      final uid = FirebaseManager().auth!.currentUser!.uid;
-      await Purchases.logIn(uid);
-      AppLogger.i('RevenueCat kullanıcı girişi yapıldı: $uid');
-    }
-
-    AppLogger.i('RevenueCat başarıyla yapılandırıldı');
+    final paywallResult =
+        await RevenueCatUI.presentPaywallIfNeeded(AppConstants.entitlementId);
+    return paywallResult;
   } catch (e) {
-    AppLogger.e('RevenueCat yapılandırma hatası: $e');
+    AppLogger.e('Premium ekranı açılırken hata oluştu: $e');
+    return null;
   }
 }
