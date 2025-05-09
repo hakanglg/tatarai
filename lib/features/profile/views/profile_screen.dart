@@ -503,11 +503,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                             } catch (e) {
                               AppLogger.e('Premium ekranı açılırken hata: $e');
                               // Hata durumunda eski yönteme geri dön
-                              Navigator.of(context).push(
-                                CupertinoPageRoute(
-                                  builder: (context) => const PremiumScreen(),
-                                ),
-                              );
+                              // Navigator.of(context).push(
+                              //   CupertinoPageRoute(
+                              //     builder: (context) => const PremiumScreen(),
+                              //   ),
+                              // );
                             }
                           },
                   ),

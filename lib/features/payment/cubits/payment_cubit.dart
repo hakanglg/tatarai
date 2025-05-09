@@ -36,7 +36,11 @@ class PaymentCubit extends Cubit<PaymentState> {
         }
 
         // Paketleri getir
+        // offerings = await Purchases.getOfferings();
+
         offerings = await Purchases.getOfferings();
+        AppLogger.i('TEST Offerings: ${offerings.all}');
+        AppLogger.i('TEST Current offering: ${offerings.current?.identifier}');
 
         if (offerings.all.isEmpty) {
           AppLogger.w('PaymentCubit: Hiç paket bulunamadı!');
