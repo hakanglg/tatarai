@@ -1,12 +1,13 @@
 import 'dart:io';
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:sprung/sprung.dart';
 import 'package:tatarai/core/utils/permission_manager.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:tatarai/core/constants/app_constants.dart';
+import 'package:tatarai/core/extensions/string_extension.dart';
 import 'package:tatarai/core/widgets/app_dialog_manager.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
 import 'package:tatarai/core/theme/dimensions.dart';
@@ -32,19 +33,39 @@ class AnalysisScreen extends StatefulWidget {
 }
 
 class _AnalysisScreenState extends State<AnalysisScreen>
-    with SingleTickerProviderStateMixin, _AnalysisScreenMixin {
+    with _AnalysisScreenMixin, TickerProviderStateMixin {
+  @override
+  void initState() {
+    AppLogger.i('AnalysisScreen - initState başladı');
+    super.initState();
+
+    try {
+      _initializeAnimations();
+      _checkEmulator();
+      _loadProvinces();
+      AppLogger.i('AnalysisScreen - initState tamamlandı');
+    } catch (e) {
+      AppLogger.e('AnalysisScreen - initState hatası: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    AppLogger.i('AnalysisScreen - build başladı');
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text('Bitki Analizi'),
-        border: Border(
+      backgroundColor: AppColors.background,
+      navigationBar: CupertinoNavigationBar(
+        backgroundColor: AppColors.background,
+        middle: Text('plant_analysis'.locale(context)),
+        border: const Border(
           bottom: BorderSide(color: CupertinoColors.separator, width: 0.5),
         ),
       ),
       child: SafeArea(
         child: BlocConsumer<PlantAnalysisCubit, PlantAnalysisState>(
           listener: (context, state) async {
+            AppLogger.i(
+                'AnalysisScreen - BlocConsumer listener tetiklendi: ${state.status}');
             if (state.status == AnalysisStatus.success &&
                 state.selectedAnalysisResult != null) {
               // Analiz başarılı olduğunda sonuç ekranına geçiş
@@ -59,19 +80,24 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                   'Analiz sonuç ekranına geçiş - ID: $resultId, Uzunluk: ${resultId.length}',
                 );
 
-                Navigator.of(context)
-                    .push(
-                  CupertinoPageRoute(
-                    builder: (context) =>
-                        AnalysisResultScreen(analysisId: resultId),
-                  ),
-                )
-                    .then((_) {
-                  // Sonuç ekranından dönüldüğünde state'i sıfırla
-                  context.read<PlantAnalysisCubit>().reset();
-                  // Navigation ID'sini temizle
-                  _lastNavigatedAnalysisId = null;
-                });
+                // Navigator'ın mount durumunu kontrol et
+                if (mounted && Navigator.of(context).canPop()) {
+                  await Navigator.of(context)
+                      .push(
+                    CupertinoPageRoute(
+                      builder: (context) =>
+                          AnalysisResultScreen(analysisId: resultId),
+                    ),
+                  )
+                      .then((_) {
+                    // Sonuç ekranından dönüldüğünde state'i sıfırla
+                    if (mounted) {
+                      context.read<PlantAnalysisCubit>().reset();
+                      // Navigation ID'sini temizle
+                      _lastNavigatedAnalysisId = null;
+                    }
+                  });
+                }
               }
             } else if (state.errorMessage != null) {
               // Hata durumunda kullanıcıya bilgi ver
@@ -81,6 +107,8 @@ class _AnalysisScreenState extends State<AnalysisScreen>
             }
           },
           builder: (context, state) {
+            AppLogger.i(
+                'AnalysisScreen - BlocConsumer builder tetiklendi: ${state.status}');
             final bool isAnalyzing = state.isLoading;
 
             return SingleChildScrollView(
@@ -88,6 +116,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
               child: AnimatedBuilder(
                 animation: _animationController,
                 builder: (context, child) {
+                  AppLogger.i('AnalysisScreen - AnimatedBuilder tetiklendi');
                   return FadeTransition(
                     opacity: _fadeAnimation,
                     child: ScaleTransition(
@@ -106,12 +135,12 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Bitkiniz Hakkında Bilgi Alın',
+                            'plant_analysis_title'.locale(context),
                             style: AppTextTheme.headlineSmall,
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Bitkinin net bir fotoğrafını çekin veya yükleyin. Yapay zeka, hastalık durumunu ve öneriler sunacak.',
+                            'plant_analysis_desc'.locale(context),
                             style: AppTextTheme.body.copyWith(
                               color: AppColors.textSecondary,
                             ),
@@ -223,7 +252,8 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                                                             .dimensions
                                                             .spaceXXS),
                                                     Text(
-                                                      'Değiştir',
+                                                      'change_photo'
+                                                          .locale(context),
                                                       style: AppTextTheme
                                                           .captionL
                                                           .copyWith(
@@ -275,8 +305,9 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                                     ],
                                   )
                                 : GestureDetector(
-                                    onTap:
-                                        isAnalyzing ? null : _showPhotoOptions,
+                                    onTap: isAnalyzing
+                                        ? null
+                                        : _showPhotoSourceDialog,
                                     child: Container(
                                       decoration: BoxDecoration(
                                         color: CupertinoColors.systemBackground,
@@ -344,7 +375,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                                                     height: context
                                                         .dimensions.spaceM),
                                                 Text(
-                                                  'Fotoğraf Ekleyin',
+                                                  'add_photo'.locale(context),
                                                   style: AppTextTheme.bodyLarge
                                                       .copyWith(
                                                     fontWeight: FontWeight.bold,
@@ -419,7 +450,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Konum Bilgileri',
+                            'location_info'.locale(context),
                             style: AppTextTheme.captionL.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
@@ -428,7 +459,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
 
                           // İl seçimi
                           GestureDetector(
-                            onTap: _showProvinceSelector,
+                            onTap: _showProvinceSelection,
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 12, vertical: 12),
@@ -454,14 +485,15 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          'İl',
+                                          'province'.locale(context),
                                           style: AppTextTheme.caption.copyWith(
                                             color: CupertinoColors.systemGrey,
                                           ),
                                         ),
                                         const SizedBox(height: 2),
                                         Text(
-                                          _selectedProvince?.name ?? "İl seçin",
+                                          _selectedProvince?.name ??
+                                              'select_province'.locale(context),
                                           style:
                                               AppTextTheme.bodyText2.copyWith(
                                             color: _selectedProvince == null
@@ -488,7 +520,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
 
                           // İlçe seçimi
                           GestureDetector(
-                            onTap: _showDistrictSelector,
+                            onTap: _showDistrictSelection,
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 12, vertical: 12),
@@ -514,7 +546,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          'İlçe',
+                                          'district'.locale(context),
                                           style: AppTextTheme.caption.copyWith(
                                             color: CupertinoColors.systemGrey,
                                           ),
@@ -522,7 +554,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                                         const SizedBox(height: 2),
                                         Text(
                                           _selectedDistrict?.name ??
-                                              "İlçe seçin",
+                                              'select_district'.locale(context),
                                           style:
                                               AppTextTheme.bodyText2.copyWith(
                                             color: _selectedDistrict == null
@@ -549,7 +581,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
 
                           // Mahalle seçimi
                           GestureDetector(
-                            onTap: _showNeighborhoodSelector,
+                            onTap: _showNeighborhoodSelection,
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 12, vertical: 12),
@@ -575,7 +607,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          'Mahalle',
+                                          'neighborhood'.locale(context),
                                           style: AppTextTheme.caption.copyWith(
                                             color: CupertinoColors.systemGrey,
                                           ),
@@ -583,7 +615,8 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                                         const SizedBox(height: 2),
                                         Text(
                                           _selectedNeighborhood?.name ??
-                                              "Mahalle seçin",
+                                              'select_neighborhood'
+                                                  .locale(context),
                                           style:
                                               AppTextTheme.bodyText2.copyWith(
                                             color: _selectedNeighborhood == null
@@ -618,7 +651,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Tarla Bilgileri',
+                            'field_info'.locale(context),
                             style: AppTextTheme.captionL.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
@@ -627,7 +660,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
 
                           // Tarla seçimi
                           GestureDetector(
-                            onTap: _showFieldNameInput,
+                            onTap: _showFieldNameDialog,
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 12, vertical: 12),
@@ -653,7 +686,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          'Tarla Adı',
+                                          'field_name'.locale(context),
                                           style: AppTextTheme.caption.copyWith(
                                             color: CupertinoColors.systemGrey,
                                           ),
@@ -661,7 +694,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                                         const SizedBox(height: 2),
                                         Text(
                                           _fieldNameController.text.isEmpty
-                                              ? "Tarla adı girin"
+                                              ? 'field_name'.locale(context)
                                               : _fieldNameController.text,
                                           style:
                                               AppTextTheme.bodyText2.copyWith(
@@ -693,7 +726,9 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
                       child: AppButton(
-                        text: isAnalyzing ? 'Analiz Ediliyor...' : 'Analiz Et',
+                        text: isAnalyzing
+                            ? 'analyzing'.locale(context)
+                            : 'analyze'.locale(context),
                         isLoading: isAnalyzing,
                         onPressed: _selectedImage != null && !isAnalyzing
                             ? _startAnalysis
@@ -747,7 +782,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                                     ),
                                     const SizedBox(width: 12),
                                     Text(
-                                      'Analiz İpuçları',
+                                      'analysis_tips'.locale(context),
                                       style: AppTextTheme.captionL.copyWith(
                                         fontWeight: FontWeight.w500,
                                         color: AppColors.info,
@@ -767,7 +802,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Text(
-                                        'Bitkinizin yaprak ve gövdesini net şekilde gösteren fotoğraflar kullanın',
+                                        'tip_clear_photo'.locale(context),
                                         style: AppTextTheme.bodyText2,
                                       ),
                                     ),
@@ -785,7 +820,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Text(
-                                        'Gün ışığında veya iyi aydınlatma altında çekim yapın',
+                                        'tip_good_lighting'.locale(context),
                                         style: AppTextTheme.bodyText2,
                                       ),
                                     ),
@@ -803,7 +838,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Text(
-                                        'Hastalık belirtileri varsa, bu bölgelere odaklanın',
+                                        'tip_focus_disease'.locale(context),
                                         style: AppTextTheme.bodyText2,
                                       ),
                                     ),

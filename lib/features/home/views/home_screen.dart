@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:tatarai/core/extensions/string_extension.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/features/home/views/home_tab_content.dart';
 import 'package:tatarai/features/navbar/navigation_manager.dart';
@@ -62,7 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   AppLogger.i('Tab seçildi: $index');
                   navManager.switchToTab(index);
                 },
-                items: NavigationItems.allTabs,
+                items: NavigationItems.getAllTabs(context),
               ),
               tabBuilder: (context, index) {
                 return CupertinoTabView(
@@ -89,7 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case 2:
         return const ProfileScreen();
       default:
-        return const Center(child: Text('Sayfa bulunamadı'));
+        return Center(child: Text('page_not_found'.locale(context)));
     }
   }
 }

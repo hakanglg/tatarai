@@ -1,7 +1,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:tatarai/core/extensions/string_extension.dart';
+import 'package:tatarai/core/theme/app_theme.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
 import 'package:tatarai/core/theme/text_theme.dart';
+import 'package:tatarai/features/payment/views/premium_screen.dart';
 
 /// Uygulama genelinde tüm diyalogları yönetmek için kullanılan yardımcı sınıf
 class AppDialogManager {
@@ -12,7 +15,7 @@ class AppDialogManager {
     required BuildContext context,
     required String title,
     required String message,
-    String buttonText = 'Tamam',
+    String? buttonText,
     VoidCallback? onPressed,
   }) async {
     return showCupertinoDialog(
@@ -29,7 +32,7 @@ class AppDialogManager {
         actions: [
           CupertinoDialogAction(
             isDefaultAction: true,
-            child: Text(buttonText),
+            child: Text(buttonText ?? 'ok'.locale(context)),
             onPressed: onPressed ?? () => Navigator.pop(context),
           ),
         ],
@@ -42,8 +45,8 @@ class AppDialogManager {
     required BuildContext context,
     required String title,
     required String message,
-    String confirmText = 'Evet',
-    String cancelText = 'Hayır',
+    String? confirmText,
+    String? cancelText,
     VoidCallback? onConfirmPressed,
     VoidCallback? onCancelPressed,
   }) async {
@@ -60,7 +63,7 @@ class AppDialogManager {
         ),
         actions: [
           CupertinoDialogAction(
-            child: Text(cancelText),
+            child: Text(cancelText ?? 'no'.locale(context)),
             onPressed: onCancelPressed ??
                 () {
                   Navigator.pop(context, false);
@@ -68,7 +71,7 @@ class AppDialogManager {
           ),
           CupertinoDialogAction(
             isDefaultAction: true,
-            child: Text(confirmText),
+            child: Text(confirmText ?? 'yes'.locale(context)),
             onPressed: onConfirmPressed ??
                 () {
                   Navigator.pop(context, true);
@@ -86,7 +89,7 @@ class AppDialogManager {
     required BuildContext context,
     required String title,
     required String message,
-    String buttonText = 'Tamam',
+    String? buttonText,
     VoidCallback? onPressed,
   }) async {
     return showCupertinoDialog(
@@ -114,7 +117,7 @@ class AppDialogManager {
         actions: [
           CupertinoDialogAction(
             isDefaultAction: true,
-            child: Text(buttonText),
+            child: Text(buttonText ?? 'ok'.locale(context)),
             onPressed: onPressed ?? () => Navigator.pop(context),
           ),
         ],
@@ -127,15 +130,15 @@ class AppDialogManager {
     required BuildContext context,
     required String message,
     required VoidCallback onPremiumButtonPressed,
-    String title = 'Premium Gerekiyor',
-    String premiumButtonText = 'Premium Satın Al',
-    String cancelText = 'Vazgeç',
+    String? title,
+    String? premiumButtonText,
+    String? cancelText,
   }) async {
     final result = await showCupertinoDialog<bool>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: Text(
-          title,
+          title ?? 'premium_required_title'.locale(context),
           style: AppTextTheme.headline4,
         ),
         content: Column(
@@ -162,7 +165,7 @@ class AppDialogManager {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Premium üyelikle sınırsız bitki analizi yapabilirsiniz!',
+                      'unlimited_analysis'.locale(context),
                       style: AppTextTheme.captionL.copyWith(
                         color: AppColors.black,
                       ),
@@ -175,13 +178,13 @@ class AppDialogManager {
         ),
         actions: <Widget>[
           CupertinoDialogAction(
-            child: Text(cancelText),
+            child: Text(cancelText ?? 'cancel'.locale(context)),
             onPressed: () => Navigator.of(context).pop(false),
           ),
           CupertinoDialogAction(
             isDefaultAction: true,
             child: Text(
-              premiumButtonText,
+              premiumButtonText ?? 'get_premium'.locale(context),
               style: AppTextTheme.body.copyWith(
                 color: AppColors.success,
                 fontWeight: FontWeight.bold,
@@ -204,8 +207,8 @@ class AppDialogManager {
     required BuildContext context,
     required String title,
     required String message,
-    String settingsText = 'Ayarlara Git',
-    String cancelText = 'İptal',
+    String? settingsText,
+    String? cancelText,
     VoidCallback? onSettingsPressed,
     VoidCallback? onCancelPressed,
   }) async {
@@ -233,7 +236,7 @@ class AppDialogManager {
         ),
         actions: [
           CupertinoDialogAction(
-            child: Text(cancelText),
+            child: Text(cancelText ?? 'cancel'.locale(context)),
             onPressed: onCancelPressed ??
                 () {
                   Navigator.pop(context, false);
@@ -241,7 +244,7 @@ class AppDialogManager {
           ),
           CupertinoDialogAction(
             isDefaultAction: true,
-            child: Text(settingsText),
+            child: Text(settingsText ?? 'button_settings'.locale(context)),
             onPressed: onSettingsPressed ??
                 () {
                   Navigator.pop(context, true);
@@ -257,24 +260,27 @@ class AppDialogManager {
   /// Yükleniyor diyaloğu - işlem sırasında gösterilir
   static Future<void> showLoadingDialog({
     required BuildContext context,
-    String message = 'Lütfen bekleyin...',
+    String? message,
+    String? buttonText,
   }) async {
-    return showCupertinoDialog(
+    await showCupertinoDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => CupertinoAlertDialog(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CupertinoActivityIndicator(),
-            SizedBox(height: 16),
-            Text(
-              message,
-              style: AppTextTheme.body,
+      builder: (context) {
+        return CupertinoAlertDialog(
+          title: const CupertinoActivityIndicator(radius: 12),
+          content: Padding(
+            padding: const EdgeInsets.only(top: 12.0),
+            child: Text(message ?? 'loading'.locale(context)),
+          ),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(buttonText ?? 'ok'.locale(context)),
             ),
           ],
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -285,7 +291,7 @@ class AppDialogManager {
     required String message,
     required IconData icon,
     Color iconColor = CupertinoColors.activeBlue,
-    String buttonText = 'Tamam',
+    String? buttonText,
     VoidCallback? onPressed,
   }) async {
     return showCupertinoDialog(
@@ -313,7 +319,7 @@ class AppDialogManager {
         actions: [
           CupertinoDialogAction(
             isDefaultAction: true,
-            child: Text(buttonText),
+            child: Text(buttonText ?? 'ok'.locale(context)),
             onPressed: onPressed ?? () => Navigator.pop(context),
           ),
         ],
@@ -323,8 +329,6 @@ class AppDialogManager {
 
   /// Diyalog'u kapat
   static void dismissDialog(BuildContext context) {
-    if (Navigator.canPop(context)) {
-      Navigator.pop(context);
-    }
+    Navigator.of(context, rootNavigator: true).pop();
   }
 }

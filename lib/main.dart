@@ -6,8 +6,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
 import 'package:tatarai/core/constants/app_constants.dart';
+import 'package:tatarai/core/constants/locale_constants.dart';
+import 'package:tatarai/core/extensions/string_extension.dart';
+import 'package:tatarai/core/init/localization/language_manager.dart';
+import 'package:tatarai/core/init/localization/localization_manager.dart';
 import 'package:tatarai/core/init/store_config.dart' as store;
 import 'package:tatarai/core/repositories/plant_analysis_repository.dart';
 import 'package:tatarai/core/routing/app_router.dart';
@@ -61,6 +66,10 @@ Future<void> main() async {
         print('-------------------------------------------------------');
       }
     }
+
+    // Localization Manager'ı başlat
+    await LocalizationManager.init();
+    AppLogger.i('Localization Manager başlatıldı');
 
     // Firebase başlatma - daha sağlam hata yakalama ile
     bool firebaseInitialized = false;
@@ -183,7 +192,7 @@ Future<void> main() async {
     await initRevenueCat();
 
     // Uygulamayı başlat
-    runApp(TatarAI(firebaseInitialized: firebaseInitialized));
+    runApp(const TatarAI());
   }, (error, stack) {
     AppLogger.e('Yakalanmamış hata', error, stack);
 
@@ -287,22 +296,18 @@ void _showDevelopmentModeMissingKeyMessage(String platform) {
   }
 }
 
-/// TatarAI uygulama kök widget'ı
+/// TatarAI uygulaması
 class TatarAI extends StatefulWidget {
-  final bool firebaseInitialized;
-
-  const TatarAI({super.key, this.firebaseInitialized = false});
+  /// Constructor
+  const TatarAI({Key? key}) : super(key: key);
 
   @override
   State<TatarAI> createState() => _TatarAIState();
 }
 
 class _TatarAIState extends State<TatarAI> {
-  bool _firebaseManagerInitialized = false;
-  String? _firebaseError;
-
-  // FirebaseManager'i State içinde referans tutuyoruz
   final FirebaseManager _firebaseManager = FirebaseManager();
+  String? _firebaseError;
 
   @override
   void initState() {
@@ -311,133 +316,126 @@ class _TatarAIState extends State<TatarAI> {
   }
 
   Future<void> _initializeFirebaseManager() async {
-    if (!widget.firebaseInitialized) {
-      setState(() {
-        _firebaseError = 'Firebase başlatılamadı';
-        _firebaseManagerInitialized = false;
-      });
-      return;
-    }
-
     try {
-      // Firebase Manager'ı arka planda başlat
       await _firebaseManager.initialize();
-
-      // Eğer başarılıysa, UI'ı güncelle
-      if (mounted) {
-        setState(() {
-          _firebaseManagerInitialized = true;
-          _firebaseError = null;
-        });
-      }
-
-      AppLogger.i('FirebaseManager başarıyla başlatıldı');
-    } catch (e, stack) {
-      AppLogger.e('FirebaseManager başlatma hatası', e, stack);
-
-      if (mounted) {
-        setState(() {
-          _firebaseError = 'Firebase servisleri başlatılamadı: ${e.toString()}';
-          _firebaseManagerInitialized = false;
-        });
-      }
+    } catch (e) {
+      setState(() {
+        _firebaseError = e.toString();
+      });
+      AppLogger.e('Firebase Manager başlatma hatası', e);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Hata varsa veya Firebase henüz başlatılmamışsa kullanılacak widget
-    if (!widget.firebaseInitialized || _firebaseError != null) {
-      return MaterialApp(
-        title: AppConstants.appName,
-        theme: ThemeData(useMaterial3: true),
-        debugShowCheckedModeBanner: false,
-        home: Scaffold(
-          body: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const CircularProgressIndicator(),
-                const SizedBox(height: 20),
-                Text(_firebaseError ?? 'Uygulama başlatılıyor...'),
-                if (_firebaseError != null) ...[
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: _initializeFirebaseManager,
-                    child: const Text('Tekrar Dene'),
+    return ValueListenableBuilder<Locale>(
+      valueListenable: LocalizationManager.instance.currentLocaleNotifier,
+      builder: (context, locale, child) {
+        // Normal Firebase başlatılmış durum için uygulama UI'ı
+        // Bağımlılıklar - State içindeki _firebaseManager referansını kullan
+        final authService = AuthService(firebaseManager: _firebaseManager);
+        final userRepository = UserRepository(authService: authService);
+
+        // Gemini servisi
+        final geminiService = GeminiService();
+
+        // Bitki analiz servisi
+        final plantAnalysisService = PlantAnalysisService(
+          geminiService: geminiService,
+          firestore: _firebaseManager.firestore,
+          storage: _firebaseManager.storage,
+          authService: authService,
+        );
+
+        final plantAnalysisRepository = PlantAnalysisRepository(
+          geminiService: geminiService,
+          plantAnalysisService: plantAnalysisService,
+          authService: authService,
+        );
+
+        // Önce AppLocalizations'ı yükleyip oluşturalım
+        final appLocalizations = AppLocalizations(locale);
+
+        return FutureBuilder<bool>(
+          // AppLocalizations yüklenmesini bekleyelim
+          future: appLocalizations.load(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              // Yüklenirken gösterilecek ekran
+              return const Material(
+                child: Center(
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            }
+
+            return MultiBlocProvider(
+              providers: [
+                BlocProvider<AuthCubit>(
+                  create: (context) => AuthCubit(
+                    userRepository: userRepository,
+                    authService: authService,
                   ),
-                ],
+                ),
+                BlocProvider<PlantAnalysisCubit>(
+                  create: (context) => PlantAnalysisCubit(
+                    repository: plantAnalysisRepository,
+                    authCubit: BlocProvider.of<AuthCubit>(context),
+                    userRepository: userRepository,
+                  ),
+                ),
+                BlocProvider<ProfileCubit>(
+                  create: (context) => ProfileCubit(
+                    userRepository: userRepository,
+                    authCubit: BlocProvider.of<AuthCubit>(context),
+                  ),
+                ),
+                BlocProvider<HomeCubit>(
+                  create: (context) => HomeCubit(
+                    userRepository: userRepository,
+                    plantAnalysisRepository: plantAnalysisRepository,
+                  ),
+                ),
               ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    // Normal Firebase başlatılmış durum için uygulama UI'ı
-    // Bağımlılıklar - State içindeki _firebaseManager referansını kullan
-    final authService = AuthService(firebaseManager: _firebaseManager);
-    final userRepository = UserRepository(authService: authService);
-
-    // Gemini servisi
-    final geminiService = GeminiService();
-
-    // Bitki analiz servisi
-    final plantAnalysisService = PlantAnalysisService(
-      geminiService: geminiService,
-      firestore: _firebaseManager.firestore,
-      storage: _firebaseManager.storage,
-      authService: authService,
-    );
-
-    final plantAnalysisRepository = PlantAnalysisRepository(
-      geminiService: geminiService,
-      plantAnalysisService: plantAnalysisService,
-      authService: authService,
-    );
-
-    return MultiBlocProvider(
-      providers: [
-        BlocProvider<AuthCubit>(
-          create: (context) => AuthCubit(
-            userRepository: userRepository,
-            authService: authService,
-          ),
-        ),
-        BlocProvider<PlantAnalysisCubit>(
-          create: (context) => PlantAnalysisCubit(
-            repository: plantAnalysisRepository,
-            authCubit: context.read<AuthCubit>(),
-            userRepository: userRepository,
-          ),
-        ),
-        BlocProvider<ProfileCubit>(
-          create: (context) => ProfileCubit(
-            userRepository: userRepository,
-            authCubit: context.read<AuthCubit>(),
-          ),
-        ),
-        BlocProvider<HomeCubit>(
-          create: (context) => HomeCubit(
-            userRepository: userRepository,
-            plantAnalysisRepository: plantAnalysisRepository,
-          ),
-        ),
-      ],
-      child: Builder(
-        builder: (context) => MaterialApp.router(
-          title: AppConstants.appName,
-          theme: AppTheme.materialTheme,
-          darkTheme: AppTheme.materialTheme.copyWith(
-            brightness: Brightness.dark,
-          ),
-          themeMode: ThemeMode.system,
-          debugShowCheckedModeBanner: false,
-          routerConfig: AppRouter(
-            authCubit: context.read<AuthCubit>(),
-          ).router,
-        ),
-      ),
+              child: Builder(builder: (context) {
+                // Buradan artık BlocProvider üzerinden AuthCubit'e erişebiliriz
+                return MaterialApp.router(
+                  title: AppConstants.appName,
+                  debugShowCheckedModeBanner: false,
+                  theme: AppTheme.materialTheme,
+                  darkTheme: AppTheme.materialTheme.copyWith(
+                    colorScheme: AppTheme.darkColorScheme,
+                    brightness: Brightness.dark,
+                  ),
+                  themeMode: ThemeMode.light,
+                  routerConfig: AppRouter(
+                    authCubit: BlocProvider.of<AuthCubit>(context),
+                  ).router,
+                  // Localization desteği ekle
+                  locale: locale,
+                  supportedLocales: LocaleConstants.supportedLocales,
+                  localizationsDelegates: const [
+                    AppLocalizations.delegate,
+                    GlobalMaterialLocalizations.delegate,
+                    GlobalWidgetsLocalizations.delegate,
+                    GlobalCupertinoLocalizations.delegate,
+                  ],
+                  localeResolutionCallback: (deviceLocale, supportedLocales) {
+                    // Cihaz dilini kontrol et
+                    for (var locale in supportedLocales) {
+                      if (locale.languageCode == deviceLocale?.languageCode) {
+                        return locale;
+                      }
+                    }
+                    // Desteklenmeyen dil ise varsayılan dil
+                    return LocaleConstants.fallbackLocale;
+                  },
+                );
+              }),
+            );
+          },
+        );
+      },
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:tatarai/core/extensions/string_extension.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/features/home/views/home_tab_content.dart';
 import 'package:tatarai/features/plant_analysis/views/analysis/analysis_screen.dart';
@@ -6,32 +7,54 @@ import 'package:tatarai/features/profile/views/profile_screen.dart';
 
 /// Navigasyon öğeleri için varsayılan ikonlar ve başlıklar
 class NavigationItems {
-  /// Home tab item - iOS stil ev ikonu
-  static const BottomNavigationBarItem homeTab = BottomNavigationBarItem(
-    icon: Icon(CupertinoIcons.house),
-    activeIcon: Icon(CupertinoIcons.house_fill),
-    label: 'Ana Sayfa',
-  );
+  /// Home tab itemları oluştur
+  static BottomNavigationBarItem homeTab(BuildContext context) =>
+      BottomNavigationBarItem(
+        icon: const Icon(CupertinoIcons.house),
+        activeIcon: const Icon(CupertinoIcons.house_fill),
+        label: 'nav_home'.locale(context),
+      );
 
-  /// Analysis tab item - iOS stil kamera ikonu
-  static const BottomNavigationBarItem analysisTab = BottomNavigationBarItem(
-    icon: Icon(CupertinoIcons.camera),
-    activeIcon: Icon(CupertinoIcons.camera_fill),
-    label: 'Analiz',
-  );
+  /// Analysis tab itemları oluştur
+  static BottomNavigationBarItem analysisTab(BuildContext context) =>
+      BottomNavigationBarItem(
+        icon: const Icon(CupertinoIcons.camera),
+        activeIcon: const Icon(CupertinoIcons.camera_fill),
+        label: 'nav_analysis'.locale(context),
+      );
 
-  /// Profile tab item - iOS stil profil ikonu
-  static const BottomNavigationBarItem profileTab = BottomNavigationBarItem(
-    icon: Icon(CupertinoIcons.person),
-    activeIcon: Icon(CupertinoIcons.person_fill),
-    label: 'Profil',
-  );
+  /// Profile tab itemları oluştur
+  static BottomNavigationBarItem profileTab(BuildContext context) =>
+      BottomNavigationBarItem(
+        icon: const Icon(CupertinoIcons.person),
+        activeIcon: const Icon(CupertinoIcons.person_fill),
+        label: 'nav_profile'.locale(context),
+      );
 
-  /// Tüm tab itemlarını içeren liste
+  /// Tüm tab itemlarını içeren liste oluştur (localize)
+  static List<BottomNavigationBarItem> getAllTabs(BuildContext context) => [
+        homeTab(context),
+        analysisTab(context),
+        profileTab(context),
+      ];
+
+  /// Varsayılan tab itemları (localize edilmemiş, sadece internal kullanım için)
   static const List<BottomNavigationBarItem> allTabs = [
-    homeTab,
-    analysisTab,
-    profileTab,
+    BottomNavigationBarItem(
+      icon: Icon(CupertinoIcons.house),
+      activeIcon: Icon(CupertinoIcons.house_fill),
+      label: 'Ana Sayfa',
+    ),
+    BottomNavigationBarItem(
+      icon: Icon(CupertinoIcons.camera),
+      activeIcon: Icon(CupertinoIcons.camera_fill),
+      label: 'Analiz',
+    ),
+    BottomNavigationBarItem(
+      icon: Icon(CupertinoIcons.person),
+      activeIcon: Icon(CupertinoIcons.person_fill),
+      label: 'Profil',
+    ),
   ];
 }
 

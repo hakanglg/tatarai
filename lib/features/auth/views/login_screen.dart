@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:tatarai/core/extensions/string_extension.dart';
 import 'package:tatarai/core/routing/route_names.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
 import 'package:tatarai/core/theme/dimensions.dart';
@@ -141,14 +142,14 @@ class _LoginScreenState extends State<LoginScreen>
                               children: [
                                 SizedBox(height: dim.spaceS),
                                 // Logo ve app ismi yan yana
-                                Text('Tatar AI',
+                                Text('app_name'.locale(context),
                                     style: AppTextTheme.headline4.copyWith(
                                       color: AppColors.primary,
                                       letterSpacing: -1.0,
                                     )),
                                 SizedBox(height: dim.spaceS),
                                 Text(
-                                  'Hesabınıza Giriş Yapın',
+                                  'login_title'.locale(context),
                                   textAlign: TextAlign.center,
                                   style: AppTextTheme.bodyLarge.copyWith(
                                     fontWeight: FontWeight.w600,
@@ -157,7 +158,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 ),
                                 SizedBox(height: dim.spaceXS),
                                 Text(
-                                  'Yapay zeka asistanınıza hoş geldiniz',
+                                  'login_subtitle'.locale(context),
                                   textAlign: TextAlign.center,
                                   style: AppTextTheme.body.copyWith(
                                     color: AppColors.textSecondary,
@@ -173,7 +174,7 @@ class _LoginScreenState extends State<LoginScreen>
                               children: [
                                 _buildInputField(
                                   controller: _emailController,
-                                  placeholder: 'E-posta',
+                                  placeholder: 'email'.locale(context),
                                   keyboardType: TextInputType.emailAddress,
                                   icon: CupertinoIcons.mail,
                                   dim: dim,
@@ -181,7 +182,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 SizedBox(height: dim.spaceM),
                                 _buildInputField(
                                   controller: _passwordController,
-                                  placeholder: 'Şifre',
+                                  placeholder: 'password'.locale(context),
                                   obscureText: true,
                                   icon: CupertinoIcons.lock,
                                   dim: dim,
@@ -197,7 +198,7 @@ class _LoginScreenState extends State<LoginScreen>
                                     ),
                                     SizedBox(width: dim.spaceXS),
                                     Text(
-                                      'Beni hatırla',
+                                      'remember_me'.locale(context),
                                       style: AppTextTheme.captionL.copyWith(
                                         color: AppColors.textSecondary,
                                       ),
@@ -209,7 +210,7 @@ class _LoginScreenState extends State<LoginScreen>
                                         _showResetPasswordDialog(context);
                                       },
                                       child: Text(
-                                        'Şifremi Unuttum',
+                                        'forgot_password'.locale(context),
                                         style: AppTextTheme.captionL.copyWith(
                                           color: AppColors.primary,
                                         ),
@@ -239,7 +240,7 @@ class _LoginScreenState extends State<LoginScreen>
                                       padding: EdgeInsets.symmetric(
                                           horizontal: dim.spaceM),
                                       child: Text(
-                                        'VEYA',
+                                        'or'.locale(context),
                                         style:
                                             AppTextTheme.smallCaption.copyWith(
                                           color: AppColors.textSecondary,
@@ -263,7 +264,8 @@ class _LoginScreenState extends State<LoginScreen>
                                     Expanded(
                                       child: SignInButton(
                                         Buttons.GoogleDark,
-                                        text: "Google",
+                                        text:
+                                            'login_with_google'.locale(context),
                                         onPressed: _signInWithGoogle,
                                         padding: EdgeInsets.zero,
                                       ),
@@ -272,7 +274,8 @@ class _LoginScreenState extends State<LoginScreen>
                                     Expanded(
                                       child: SignInButton(
                                         Buttons.AppleDark,
-                                        text: "Apple",
+                                        text:
+                                            'login_with_apple'.locale(context),
                                         onPressed: _signInWithApple,
                                         padding: EdgeInsets.zero,
                                       ),
@@ -287,14 +290,14 @@ class _LoginScreenState extends State<LoginScreen>
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
-                                  'Hesabınız yok mu?',
+                                  'no_account'.locale(context),
                                   style: AppTextTheme.captionL.copyWith(
                                     color: AppColors.textSecondary,
                                   ),
                                 ),
                                 AppButton(
                                   type: AppButtonType.text,
-                                  text: 'Kayıt Ol',
+                                  text: 'signup'.locale(context),
                                   onPressed: state.isLoading
                                       ? null
                                       : () =>
@@ -335,7 +338,7 @@ class _LoginScreenState extends State<LoginScreen>
         ),
         SizedBox(height: dim.spaceM),
         Text(
-          'TatarAI',
+          'app_name'.locale(context),
           style: AppTextTheme.headline1.copyWith(
             color: AppColors.primary,
             letterSpacing: -1.0,
@@ -379,7 +382,7 @@ class _LoginScreenState extends State<LoginScreen>
     required VoidCallback? onPressed,
   }) {
     return AppButton(
-      text: 'Giriş Yap',
+      text: 'login'.locale(context),
       isLoading: isLoading,
       onPressed: onPressed,
       isFullWidth: true,

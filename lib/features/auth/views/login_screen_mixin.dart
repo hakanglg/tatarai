@@ -225,7 +225,7 @@ mixin _LoginScreenMixin on State<LoginScreen> {
     );
   }
 
-  // Password reset dialog
+  /// Password reset dialog
   Future<void> _showResetPasswordDialog(BuildContext context) async {
     final formKey = GlobalKey<FormState>();
     final TextEditingController emailController = TextEditingController();
@@ -247,7 +247,7 @@ mixin _LoginScreenMixin on State<LoginScreen> {
                   ),
                   SizedBox(width: 8),
                   Text(
-                    'Şifre Sıfırlama',
+                    'password_reset'.locale(context),
                     style: AppTextTheme.body.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
@@ -259,7 +259,7 @@ mixin _LoginScreenMixin on State<LoginScreen> {
                 children: [
                   const SizedBox(height: 8),
                   Text(
-                    'Şifre sıfırlama bağlantısı gönderilecek e-posta adresinizi giriniz:',
+                    'password_reset_desc'.locale(context),
                     style: AppTextTheme.captionL,
                     textAlign: TextAlign.center,
                   ),
@@ -268,7 +268,7 @@ mixin _LoginScreenMixin on State<LoginScreen> {
                     key: formKey,
                     child: CupertinoTextField(
                       controller: emailController,
-                      placeholder: 'E-posta',
+                      placeholder: 'email'.locale(context),
                       keyboardType: TextInputType.emailAddress,
                       autocorrect: false,
                       padding: const EdgeInsets.symmetric(
@@ -300,7 +300,7 @@ mixin _LoginScreenMixin on State<LoginScreen> {
               actions: [
                 CupertinoDialogAction(
                   child: Text(
-                    'İptal',
+                    'cancel'.locale(context),
                     style: AppTextTheme.body,
                   ),
                   onPressed: () => Navigator.of(context).pop(),
@@ -308,7 +308,7 @@ mixin _LoginScreenMixin on State<LoginScreen> {
                 CupertinoDialogAction(
                   isDefaultAction: true,
                   child: Text(
-                    'Gönder',
+                    'send'.locale(context),
                     style: AppTextTheme.body.copyWith(
                       fontWeight: FontWeight.w600,
                       color: AppColors.primary,
@@ -318,7 +318,7 @@ mixin _LoginScreenMixin on State<LoginScreen> {
                     final email = emailController.text.trim();
                     if (email.isEmpty) {
                       setState(() {
-                        errorText = 'E-posta adresini giriniz';
+                        errorText = 'enter_email'.locale(context);
                       });
                       return;
                     }
@@ -327,7 +327,7 @@ mixin _LoginScreenMixin on State<LoginScreen> {
                       r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
                     ).hasMatch(email)) {
                       setState(() {
-                        errorText = 'Geçerli bir e-posta adresi giriniz';
+                        errorText = 'enter_valid_email'.locale(context);
                       });
                       return;
                     }
@@ -344,7 +344,7 @@ mixin _LoginScreenMixin on State<LoginScreen> {
                       setState(() {
                         errorText = e is FirebaseAuthException
                             ? context.read<AuthCubit>().getErrorMessage(e)
-                            : 'Şifre sıfırlama işlemi sırasında bir hata oluştu.';
+                            : 'password_reset_error'.locale(context);
                       });
                     }
                   },
@@ -371,20 +371,19 @@ mixin _LoginScreenMixin on State<LoginScreen> {
               size: 20,
             ),
             SizedBox(width: 8),
-            Text('Bağlantı Gönderildi'),
+            Text('connection_sent'.locale(context)),
           ],
         ),
-        content: const Padding(
+        content: Padding(
           padding: EdgeInsets.only(top: 8.0),
           child: Text(
-            'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi. '
-            'Lütfen e-postanızı kontrol edin ve bağlantıya tıklayarak şifrenizi sıfırlayın.',
+            'password_reset_link_sent'.locale(context),
           ),
         ),
         actions: [
           CupertinoDialogAction(
             isDefaultAction: true,
-            child: const Text('Tamam'),
+            child: Text('ok'.locale(context)),
             onPressed: () => Navigator.of(context).pop(),
           ),
         ],

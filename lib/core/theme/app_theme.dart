@@ -21,35 +21,56 @@ class AppTheme {
     );
   }
 
+  /// Açık tema için ColorScheme
+  static final ColorScheme lightColorScheme = AppColors.colorScheme;
+
+  /// Koyu tema için ColorScheme
+  static final ColorScheme darkColorScheme = AppColors.colorScheme.copyWith(
+    brightness: Brightness.dark,
+    background: Colors.grey[900]!,
+    surface: Colors.grey[850]!,
+    onBackground: Colors.white,
+    onSurface: Colors.white,
+  );
+
   /// Material temasını döndürür (gerekli olması durumunda)
   static ThemeData get materialTheme {
     return ThemeData(
       useMaterial3: true,
-      colorScheme: AppColors.colorScheme,
-      scaffoldBackgroundColor: AppColors.white,
-      appBarTheme: AppBarTheme(
-        backgroundColor: AppColors.white,
-        elevation: 0,
+      colorScheme: lightColorScheme,
+      fontFamily: 'sfpro',
+      appBarTheme: const AppBarTheme(
         centerTitle: true,
-        iconTheme: const IconThemeData(color: AppColors.primary),
-        titleTextStyle: AppTextTheme.headlineMedium,
-      ),
-      cardTheme: CardTheme(
-        elevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        elevation: 0,
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+          foregroundColor: lightColorScheme.onPrimary,
+          backgroundColor: lightColorScheme.primary,
+          minimumSize: const Size(88, 48),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(8),
           ),
-          foregroundColor: AppColors.white,
-          backgroundColor: AppColors.primary,
         ),
       ),
-      textTheme: AppTextTheme.materialTextTheme,
-      iconTheme: const IconThemeData(color: AppColors.primary, size: 24),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: lightColorScheme.primary,
+          minimumSize: const Size(88, 48),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      ),
+      inputDecorationTheme: const InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(),
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
+      ),
     );
   }
 }

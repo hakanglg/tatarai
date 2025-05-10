@@ -9,6 +9,9 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:tatarai/core/constants/locale_constants.dart';
+import 'package:tatarai/core/extensions/string_extension.dart';
+import 'package:tatarai/core/init/localization/localization_manager.dart';
 import 'package:tatarai/core/routing/route_names.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
 import 'package:tatarai/core/theme/dimensions.dart';
@@ -100,7 +103,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           opacity: _showTitle ? 1.0 : 0.0,
           duration: const Duration(milliseconds: 200),
           child: Text(
-            'Profilim',
+            'my_profile'.locale(context),
             style: AppTextTheme.headline6.copyWith(
               fontWeight: FontWeight.w600,
             ),
@@ -124,7 +127,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     const CupertinoActivityIndicator(radius: 14),
                     SizedBox(height: context.dimensions.spaceM),
                     Text(
-                      'Yükleniyor...',
+                      'loading_text'.locale(context),
                       style: AppTextTheme.caption.copyWith(
                         color: CupertinoColors.systemGrey,
                       ),
@@ -149,7 +152,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                       ),
                       SizedBox(height: context.dimensions.spaceM),
                       Text(
-                        'Hata Oluştu',
+                        'error_occurred'.locale(context),
                         style: AppTextTheme.headline5.copyWith(
                           color: CupertinoColors.systemRed,
                           fontWeight: FontWeight.w600,
@@ -172,7 +175,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         color: CupertinoColors.systemRed,
                         borderRadius:
                             BorderRadius.circular(context.dimensions.radiusL),
-                        child: const Text('Tekrar Dene'),
+                        child: Text('retry'.locale(context)),
                         onPressed: () {
                           context.read<ProfileCubit>().refreshUserData();
                         },
@@ -231,13 +234,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                         ),
                         SizedBox(height: context.dimensions.spaceM),
                         Text(
-                          'Oturum açık değil',
+                          'not_logged_in'.locale(context),
                           style: AppTextTheme.headline6
                               .copyWith(color: CupertinoColors.systemGrey),
                         ),
                         SizedBox(height: context.dimensions.spaceS),
                         Text(
-                          'Profil bilgilerini görmek için giriş yapın',
+                          'login_to_see_profile'.locale(context),
                           style: AppTextTheme.captionL
                               .copyWith(color: CupertinoColors.systemGrey),
                           textAlign: TextAlign.center,
@@ -356,7 +359,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                               ),
                               SizedBox(width: 5),
                               Text(
-                                'E-posta doğrulanmadı',
+                                'email_not_verified'.locale(context),
                                 style: AppTextTheme.caption.copyWith(
                                   color: CupertinoColors.black,
                                   fontWeight: FontWeight.w600,
@@ -385,18 +388,17 @@ class _ProfileScreenState extends State<ProfileScreen>
               // Email Doğrulama Ayarları
               if (!user.isEmailVerified)
                 _buildSettingsGroup(
-                  header: 'Hesap Doğrulama',
+                  header: 'account_verification'.locale(context),
                   items: [
                     _buildSettingsItem(
                       icon: CupertinoIcons.mail_solid,
                       iconColor: CupertinoColors.systemIndigo,
-                      title: 'E-posta Doğrulama',
-                      subtitle:
-                          'E-posta adresini doğrula ve daha fazla özelliğe eriş',
+                      title: 'email_verification'.locale(context),
+                      subtitle: 'verify_email'.locale(context),
                       trailing: CupertinoButton(
                         padding: EdgeInsets.zero,
                         child: Text(
-                          'Gönder',
+                          'send'.locale(context),
                           style: AppTextTheme.button.copyWith(
                             color: CupertinoColors.activeBlue,
                             fontWeight: FontWeight.w600,
@@ -405,12 +407,12 @@ class _ProfileScreenState extends State<ProfileScreen>
                         onPressed: () {
                           HapticFeedback.mediumImpact();
                           context.read<ProfileCubit>().sendEmailVerification();
-                          _showVerificationDialog(context);
+                          _checkEmailVerification(context);
                         },
                       ),
                       onTap: () {
                         HapticFeedback.selectionClick();
-                        _showVerificationDialog(context);
+                        _checkEmailVerification(context);
                       },
                     ),
                   ],
@@ -418,17 +420,17 @@ class _ProfileScreenState extends State<ProfileScreen>
 
               // Satın Alma Ayarları
               _buildSettingsGroup(
-                header: 'Abonelik ve Satın Alma',
+                header: 'subscription'.locale(context),
                 items: [
                   _buildSettingsItem(
                     icon: CupertinoIcons.star_circle_fill,
                     iconColor: CupertinoColors.systemYellow,
                     title: user.isPremium
-                        ? 'Premium Üyelik'
-                        : 'Premium\'a Yükselt',
+                        ? 'premium_membership'.locale(context)
+                        : 'upgrade_to_premium'.locale(context),
                     subtitle: user.isPremium
-                        ? 'Premium aboneliğin aktif'
-                        : 'Sınırsız analiz ve daha fazla özellik',
+                        ? 'unlimited_analysis'.locale(context)
+                        : 'premium_features'.locale(context),
                     trailing: user.isPremium
                         ? Container(
                             padding: EdgeInsets.symmetric(
@@ -441,7 +443,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Text(
-                              'Aktif',
+                              'active'.locale(context),
                               style: AppTextTheme.caption.copyWith(
                                 color: CupertinoColors.systemGreen,
                                 fontWeight: FontWeight.w600,
@@ -514,12 +516,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                   _buildSettingsItem(
                     icon: CupertinoIcons.creditcard_fill,
                     iconColor: CupertinoColors.systemTeal,
-                    title: 'Kredi Satın Al',
+                    title: 'buy_credits'.locale(context),
                     subtitle: user.isPremium
-                        ? 'Yakında...'
-                        // ? 'Premium üyelikle sınırsız analiz yapabilirsin'
-                        : 'Yakında...',
-                    //: 'Tek seferlik analiz kredileri al',
+                        ? 'coming_soon'.locale(context)
+                        : 'coming_soon'.locale(context),
                     onTap: () {
                       HapticFeedback.selectionClick();
                       // TODO: Kredi satın alma ekranı
@@ -530,33 +530,25 @@ class _ProfileScreenState extends State<ProfileScreen>
 
               // Uygulama Ayarları
               _buildSettingsGroup(
-                header: 'Uygulama',
+                header: 'app_settings'.locale(context),
                 items: [
-                  // _buildSettingsItem(
-                  //   icon: CupertinoIcons.question_circle_fill,
-                  //   iconColor: CupertinoColors.systemBlue,
-                  //   title: 'Yardım ve Destek',
-                  //   subtitle: 'Sorular, geri bildirim ve destek',
-                  //   onTap: () {
-                  //     HapticFeedback.selectionClick();
-                  //     // TODO: Yardım ekranı
-                  //   },
-                  // ),
-                  // _buildSettingsItem(
-                  //   icon: CupertinoIcons.info_circle_fill,
-                  //   iconColor: CupertinoColors.systemGrey,
-                  //   title: 'Hakkında',
-                  //   subtitle: 'Uygulama bilgileri ve lisanslar',
-                  //   onTap: () {
-                  //     HapticFeedback.selectionClick();
-                  //     // TODO: Hakkında ekranı
-                  //   },
-                  // ),
+                  // Dil seçimi ayarı
+                  _buildSettingsItem(
+                    icon: CupertinoIcons.globe,
+                    iconColor: CupertinoColors.activeBlue,
+                    title: 'language'.locale(context),
+                    subtitle: _getCurrentLanguageName(context),
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      _showLanguageSelectionDialog(context);
+                    },
+                  ),
+
                   _buildSettingsItem(
                     icon: CupertinoIcons.delete,
                     iconColor: CupertinoColors.systemRed,
-                    title: 'Hesabı Sil',
-                    subtitle: 'Hesabını ve tüm verilerini kalıcı olarak sil',
+                    title: 'delete_account_title'.locale(context),
+                    subtitle: 'delete_account_subtitle'.locale(context),
                     onTap: () {
                       HapticFeedback.heavyImpact();
                       _showDeleteAccountDialog();
@@ -587,7 +579,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                       ),
                       SizedBox(width: 6),
                       Text(
-                        'Çıkış Yap',
+                        'logout_button'.locale(context),
                         style: AppTextTheme.button.copyWith(
                           color: CupertinoColors.white,
                           fontWeight: FontWeight.w600,
@@ -935,7 +927,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        user.isPremium ? 'Premium Üye' : 'Standart Üye',
+                        user.isPremium
+                            ? 'premium_account'.locale(context)
+                            : 'standard_member'.locale(context),
                         style: AppTextTheme.headline6.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.w600,
@@ -946,8 +940,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                       SizedBox(height: context.dimensions.spaceXXS),
                       Text(
                         user.isPremium
-                            ? 'Sınırsız analiz hakkınız var'
-                            : 'Sınırlı erişim',
+                            ? 'unlimited_analysis'.locale(context)
+                            : 'limited_access'.locale(context),
                         style: AppTextTheme.caption.copyWith(
                           color: Colors.white.withOpacity(0.85),
                         ),
@@ -993,7 +987,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                       ),
                       SizedBox(width: context.dimensions.spaceXXS),
                       Text(
-                        'PREMIUM',
+                        'premium_tag'.locale(context),
                         style: AppTextTheme.caption.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.w700,
@@ -1025,7 +1019,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                       ),
                       SizedBox(width: context.dimensions.spaceXXS + 2),
                       Text(
-                        'Kalan Analiz',
+                        'remaining_analysis'.locale(context),
                         style: AppTextTheme.bodyText2.copyWith(
                           color: Colors.white.withOpacity(0.9),
                           fontWeight: FontWeight.w500,
@@ -1210,7 +1204,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     ),
                     SizedBox(width: context.dimensions.spaceXS),
                     Text(
-                      'Premium\'a Yükselt',
+                      'upgrade_to_premium'.locale(context),
                       style: AppTextTheme.headline5.copyWith(
                         color: const Color(0xFF0A8D48),
                         fontWeight: FontWeight.w700,
@@ -1232,15 +1226,13 @@ class _ProfileScreenState extends State<ProfileScreen>
     showCupertinoDialog(
       context: context,
       builder: (context) => CupertinoAlertDialog(
-        title: const Text('Çıkış Yap'),
-        content: const Text(
-          'Hesabınızdan çıkış yapmak istediğinize emin misiniz?',
-        ),
+        title: Text('logout_title'.locale(context)),
+        content: Text('logout_confirmation'.locale(context)),
         actions: [
           CupertinoDialogAction(
             isDefaultAction: true,
             onPressed: () => Navigator.pop(context),
-            child: const Text('İptal'),
+            child: Text('cancel'.locale(context)),
           ),
           CupertinoDialogAction(
             isDestructiveAction: true,
@@ -1249,16 +1241,11 @@ class _ProfileScreenState extends State<ProfileScreen>
               context.read<ProfileCubit>().signOut();
               context.goNamed(RouteNames.login);
             },
-            child: const Text('Çıkış Yap'),
+            child: Text('logout_button'.locale(context)),
           ),
         ],
       ),
     );
-  }
-
-  void _showVerificationDialog(BuildContext context) {
-    // Doğrulama e-postası gönderildiğini göster
-    _showVerificationEmailSentDialog(context);
   }
 
   void _checkEmailVerification(BuildContext context) async {
@@ -1268,14 +1255,14 @@ class _ProfileScreenState extends State<ProfileScreen>
     showCupertinoDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const CupertinoAlertDialog(
+      builder: (context) => CupertinoAlertDialog(
         title: Center(
           child: CupertinoActivityIndicator(),
         ),
         content: Padding(
           padding: EdgeInsets.symmetric(vertical: 12.0),
           child: Text(
-            'E-posta doğrulama durumu kontrol ediliyor...',
+            'checking_verification'.locale(context),
             textAlign: TextAlign.center,
           ),
         ),
@@ -1314,13 +1301,13 @@ class _ProfileScreenState extends State<ProfileScreen>
               size: 20,
             ),
             SizedBox(width: 8),
-            Text('E-posta Doğrulandı'),
+            Text('email_verified'.locale(context)),
           ],
         ),
         content: Padding(
           padding: const EdgeInsets.only(top: 8.0),
           child: Text(
-            'E-posta adresiniz başarıyla doğrulandı. Artık tüm özellikleri kullanabilirsiniz.',
+            'email_verification_success'.locale(context),
             style: TextStyle(fontSize: 14),
             textAlign: TextAlign.center,
           ),
@@ -1328,7 +1315,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         actions: [
           CupertinoDialogAction(
             isDefaultAction: true,
-            child: Text('Tamam'),
+            child: Text('done'.locale(context)),
             onPressed: () {
               Navigator.of(context).pop();
               // State'i yenile
@@ -1354,25 +1341,25 @@ class _ProfileScreenState extends State<ProfileScreen>
               size: 20,
             ),
             SizedBox(width: 8),
-            Text('Doğrulanmadı'),
+            Text('not_verified'.locale(context)),
           ],
         ),
         content: Padding(
           padding: const EdgeInsets.only(top: 8.0),
           child: Text(
-            'E-posta adresiniz henüz doğrulanmadı. Lütfen e-postanızdaki doğrulama bağlantısına tıklayın.',
+            'email_not_verified_message'.locale(context),
             style: TextStyle(fontSize: 14),
             textAlign: TextAlign.center,
           ),
         ),
         actions: [
           CupertinoDialogAction(
-            child: Text('Tamam'),
+            child: Text('cancel'.locale(context)),
             onPressed: () => Navigator.of(context).pop(),
           ),
           CupertinoDialogAction(
             isDefaultAction: true,
-            child: Text('Yeniden Gönder'),
+            child: Text('resend'.locale(context)),
             onPressed: () {
               Navigator.of(context).pop();
               // Yeni doğrulama e-postası gönder
@@ -1399,7 +1386,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               size: 20,
             ),
             SizedBox(width: 8),
-            Text('E-posta Gönderildi'),
+            Text('email_sent'.locale(context)),
           ],
         ),
         content: Padding(
@@ -1407,13 +1394,13 @@ class _ProfileScreenState extends State<ProfileScreen>
           child: Column(
             children: [
               Text(
-                'E-posta adresinize doğrulama bağlantısı gönderildi.',
+                'verification_email_sent'.locale(context),
                 style: TextStyle(fontSize: 14),
                 textAlign: TextAlign.center,
               ),
               SizedBox(height: 8),
               Text(
-                'Lütfen e-postanızı kontrol edin ve doğrulama bağlantısına tıklayın.',
+                'check_email'.locale(context),
                 style: TextStyle(fontSize: 14),
                 textAlign: TextAlign.center,
               ),
@@ -1422,12 +1409,12 @@ class _ProfileScreenState extends State<ProfileScreen>
         ),
         actions: [
           CupertinoDialogAction(
-            child: Text('Tamam'),
-            onPressed: () => Navigator.of(context).pop(),
+            child: Text('done'.locale(context)),
+            onPressed: () => Navigator.pop(context),
           ),
           CupertinoDialogAction(
             isDefaultAction: true,
-            child: Text('Durumu Kontrol Et'),
+            child: Text('check_status'.locale(context)),
             onPressed: () {
               Navigator.of(context).pop();
               _checkEmailVerification(context);
@@ -1452,13 +1439,13 @@ class _ProfileScreenState extends State<ProfileScreen>
               size: 20,
             ),
             SizedBox(width: 8),
-            Text('Hata'),
+            Text('error'.locale(context)),
           ],
         ),
         content: Padding(
           padding: const EdgeInsets.only(top: 8.0),
           child: Text(
-            'E-posta doğrulama durumu kontrol edilirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.',
+            'verification_error'.locale(context),
             style: TextStyle(fontSize: 14),
             textAlign: TextAlign.center,
           ),
@@ -1466,7 +1453,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         actions: [
           CupertinoDialogAction(
             isDefaultAction: true,
-            child: Text('Tamam'),
+            child: Text('done'.locale(context)),
             onPressed: () => Navigator.of(context).pop(),
           ),
         ],
@@ -1489,14 +1476,14 @@ class _ProfileScreenState extends State<ProfileScreen>
               size: 20,
             ),
             SizedBox(width: 8),
-            Text('Hesabı Sil'),
+            Text('delete_account_title'.locale(context)),
           ],
         ),
         content: Column(
           children: [
             SizedBox(height: 12),
             Text(
-              'Hesabınızı silmek üzeresiniz. Bu işlem geri alınamaz ve tüm verileriniz kalıcı olarak silinecektir.',
+              'delete_account_warning'.locale(context),
               style: TextStyle(
                 fontWeight: FontWeight.w400,
                 fontSize: 14,
@@ -1513,7 +1500,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Silinecek veriler:',
+                    'data_to_be_deleted'.locale(context),
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
@@ -1522,7 +1509,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ),
                   SizedBox(height: 6),
                   Text(
-                    '• Tüm kullanıcı bilgileriniz\n• Analiz geçmişiniz\n• Satın alınan krediler ve abonelikler',
+                    'user_data'.locale(context) +
+                        '\n' +
+                        'analysis_history'.locale(context) +
+                        '\n' +
+                        'purchased_credits'.locale(context),
                     style: TextStyle(
                       fontSize: 13,
                       color: CupertinoColors.black,
@@ -1537,7 +1528,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           CupertinoDialogAction(
             isDefaultAction: true,
             onPressed: () => Navigator.pop(context),
-            child: const Text('İptal'),
+            child: Text('cancel'.locale(context)),
           ),
           CupertinoDialogAction(
             isDestructiveAction: true,
@@ -1545,7 +1536,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               Navigator.pop(context);
               context.read<ProfileCubit>().deleteAccount();
             },
-            child: const Text('Hesabı Sil'),
+            child: Text('delete_account_title'.locale(context)),
           ),
         ],
       ),
@@ -1559,9 +1550,8 @@ class _ProfileScreenState extends State<ProfileScreen>
       showCupertinoModalPopup(
         context: context,
         builder: (context) => CupertinoActionSheet(
-          title: const Text('Profil Fotoğrafı'),
-          message:
-              const Text('Profil fotoğrafınızı nereden seçmek istersiniz?'),
+          title: Text('choose_profile_photo'.locale(context)),
+          message: Text('photo_source'.locale(context)),
           actions: [
             CupertinoActionSheetAction(
               onPressed: () {
@@ -1569,7 +1559,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 _pickImageFromSource(ImageSource.camera);
               },
               child: Text(
-                'Kamera',
+                'camera'.locale(context),
                 style: AppTextTheme.largeBody.copyWith(
                   color: AppColors.primary,
                 ),
@@ -1581,7 +1571,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 _pickImageFromSource(ImageSource.gallery);
               },
               child: Text(
-                'Galeri',
+                'gallery'.locale(context),
                 style: AppTextTheme.largeBody.copyWith(
                   color: AppColors.primary,
                 ),
@@ -1591,7 +1581,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           cancelButton: CupertinoActionSheetAction(
             isDestructiveAction: true,
             onPressed: () => Navigator.pop(context),
-            child: const Text('İptal'),
+            child: Text('cancel'.locale(context)),
           ),
         ),
       );
@@ -1642,7 +1632,8 @@ class _ProfileScreenState extends State<ProfileScreen>
       if (!imageFile.existsSync()) {
         AppLogger.e('Seçilen dosya bulunamadı: ${image.path}');
         if (mounted) {
-          _showSnackBar(context, 'Seçilen dosya bulunamadı veya erişilemiyor');
+          _showSnackBar(
+              context, 'file_not_found_or_accessible'.locale(context));
         }
         return;
       }
@@ -1655,8 +1646,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       // 5MB'dan büyükse kullanıcıya hata mesajı gösterelim
       if (fileSize > 5 * 1024 * 1024) {
         if (mounted) {
-          _showSnackBar(context,
-              'Seçilen fotoğraf çok büyük (${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB). Lütfen 5MB\'dan küçük bir fotoğraf seçin.');
+          _showSnackBar(context, 'file_too_large'.locale(context));
         }
         return;
       }
@@ -1681,7 +1671,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
           // Başarılı mesajı göster
           if (mounted) {
-            _showSnackBar(context, 'Profil fotoğrafınız başarıyla güncellendi');
+            _showSnackBar(context, 'photo_updated'.locale(context));
           }
         } catch (e) {
           AppLogger.e('Profil fotoğrafı yükleme hatası', e.toString());
@@ -1734,23 +1724,21 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   // Hata mesajlarını kullanıcı dostu hale getir
   String _getErrorMessage(dynamic error) {
-    String errorMsg = 'Fotoğraf yüklenirken bir hata oluştu';
+    String errorMsg = 'upload_error'.locale(context);
 
     // Hata mesajını kullanıcı dostu hale getirelim
     if (error.toString().contains('storage/unauthorized')) {
-      errorMsg = 'Yetki hatası: Lütfen tekrar giriş yapın ve tekrar deneyin';
+      errorMsg = 'auth_error'.locale(context);
     } else if (error.toString().contains('storage/quota-exceeded')) {
-      errorMsg = 'Depolama alanı doldu. Lütfen daha sonra tekrar deneyin';
+      errorMsg = 'storage_full'.locale(context);
     } else if (error.toString().contains('storage/retry-limit-exceeded')) {
-      errorMsg =
-          'Bağlantı hatası: Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin';
+      errorMsg = 'connection_error'.locale(context);
     } else if (error.toString().contains('dosya bulunamadı')) {
-      errorMsg = 'Seçilen dosya artık mevcut değil veya erişilemiyor';
+      errorMsg = 'file_not_found'.locale(context);
     } else if (error.toString().contains('dosya boyutu')) {
-      errorMsg =
-          'Dosya boyutu 5MB sınırını aşıyor, lütfen daha küçük bir fotoğraf seçin';
+      errorMsg = 'file_size_error'.locale(context);
     } else if (error.toString().contains('network')) {
-      errorMsg = 'İnternet bağlantı hatası. Lütfen bağlantınızı kontrol edin';
+      errorMsg = 'network_error'.locale(context);
     }
 
     return errorMsg;
@@ -1762,18 +1750,18 @@ class _ProfileScreenState extends State<ProfileScreen>
       switch (error.code) {
         case 'photo_access_denied':
         case 'camera_access_denied':
-          return 'Erişim izni verilmedi. Lütfen uygulama ayarlarından izinleri kontrol edin.';
+          return 'access_denied'.locale(context);
         case 'camera_not_available':
-          return 'Kamera şu anda kullanılamıyor.';
+          return 'camera_not_available'.locale(context);
         case 'camera_in_use':
-          return 'Kamera başka bir uygulama tarafından kullanılıyor.';
+          return 'camera_in_use'.locale(context);
         case 'invalid_image':
-          return 'Seçilen resim geçersiz veya desteklenmeyen bir formatta.';
+          return 'invalid_image'.locale(context);
         default:
-          return 'Bir hata oluştu: ${error.message}';
+          return 'error'.locale(context) + ': ${error.message}';
       }
     } else {
-      return 'Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.';
+      return 'unexpected_error'.locale(context);
     }
   }
 
@@ -1942,10 +1930,10 @@ class _ProfileScreenState extends State<ProfileScreen>
           child: Row(
             children: [
               Icon(
-                message.contains('başarı')
+                message.contains('success') || message.contains('başarı')
                     ? CupertinoIcons.check_mark_circled_solid
                     : CupertinoIcons.info_circle_fill,
-                color: message.contains('başarı')
+                color: message.contains('success') || message.contains('başarı')
                     ? CupertinoColors.activeGreen
                     : CupertinoColors.activeBlue,
                 size: 20,
@@ -1974,6 +1962,114 @@ class _ProfileScreenState extends State<ProfileScreen>
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildLanguageSelectionTile(BuildContext context) {
+    return InkWell(
+      onTap: () => _showLanguageSelectionDialog(context),
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: context.dimensions.paddingM,
+          vertical: context.dimensions.paddingM,
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.language_rounded,
+              color: AppColors.primary,
+            ),
+            SizedBox(width: context.dimensions.spaceM),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'language'.locale(context),
+                  style: AppTextTheme.headline5.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                SizedBox(height: context.dimensions.spaceXS),
+                Text(
+                  _getCurrentLanguageName(context),
+                  style: AppTextTheme.caption.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+            const Spacer(),
+            const Icon(
+              Icons.arrow_forward_ios,
+              size: 16,
+              color: AppColors.textSecondary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getCurrentLanguageName(BuildContext context) {
+    final currentLocale = LocalizationManager.instance.currentLocale;
+
+    if (currentLocale.languageCode == 'tr') {
+      return 'language_tr'.locale(context);
+    } else {
+      return 'language_en'.locale(context);
+    }
+  }
+
+  void _showLanguageSelectionDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('select_language'.locale(context)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildLanguageOption(
+              context,
+              'language_tr'.locale(context),
+              LocaleConstants.trLocale,
+            ),
+            const SizedBox(height: 8),
+            _buildLanguageOption(
+              context,
+              'language_en'.locale(context),
+              LocaleConstants.enLocale,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('cancel'.locale(context)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLanguageOption(
+      BuildContext context, String languageName, Locale locale) {
+    final isSelected =
+        LocalizationManager.instance.currentLocale.languageCode ==
+            locale.languageCode;
+
+    return ListTile(
+      title: Text(languageName),
+      leading: isSelected
+          ? const Icon(Icons.check_circle, color: AppColors.primary)
+          : const Icon(Icons.circle_outlined),
+      tileColor: isSelected ? AppColors.surfaceVariant : null,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+      ),
+      onTap: () {
+        LocalizationManager.instance.changeLocale(locale);
+        Navigator.pop(context);
+      },
     );
   }
 }

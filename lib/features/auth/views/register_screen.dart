@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:tatarai/core/extensions/string_extension.dart';
 import 'package:tatarai/core/routing/route_names.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
 import 'package:tatarai/core/theme/dimensions.dart';
@@ -135,7 +136,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                       ),
                                       SizedBox(width: dim.spaceXXS),
                                       Text(
-                                        'Giriş',
+                                        'login'.locale(context),
                                         style: AppTextTheme.captionL.copyWith(
                                           color: AppColors.primary,
                                         ),
@@ -150,12 +151,12 @@ class _RegisterScreenState extends State<RegisterScreen>
 
                             // Başlık ve açıklama
                             Text(
-                              'Hesap Oluştur',
+                              'signup_title'.locale(context),
                               style: AppTextTheme.headline3,
                             ),
                             SizedBox(height: dim.spaceS),
                             Text(
-                              'TatarAI yapay zeka tarım asistanını kullanmak için hesap oluşturun',
+                              'signup_subtitle'.locale(context),
                               style: AppTextTheme.captionL.copyWith(
                                 color: AppColors.textSecondary,
                               ),
@@ -169,7 +170,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                   children: [
                                     _buildInputField(
                                       controller: _displayNameController,
-                                      placeholder: 'Ad Soyad',
+                                      placeholder: 'username'.locale(context),
                                       keyboardType: TextInputType.name,
                                       textCapitalization:
                                           TextCapitalization.words,
@@ -180,7 +181,7 @@ class _RegisterScreenState extends State<RegisterScreen>
 
                                     _buildInputField(
                                       controller: _emailController,
-                                      placeholder: 'E-posta',
+                                      placeholder: 'email'.locale(context),
                                       keyboardType: TextInputType.emailAddress,
                                       icon: CupertinoIcons.mail,
                                       dim: dim,
@@ -190,7 +191,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                     // Şifre ve şifre tekrar alanları
                                     _buildPasswordField(
                                       controller: _passwordController,
-                                      placeholder: 'Şifre',
+                                      placeholder: 'password'.locale(context),
                                       icon: CupertinoIcons.lock,
                                       dim: dim,
                                     ),
@@ -198,7 +199,8 @@ class _RegisterScreenState extends State<RegisterScreen>
 
                                     _buildPasswordField(
                                       controller: _confirmPasswordController,
-                                      placeholder: 'Şifre Tekrar',
+                                      placeholder:
+                                          'confirm_password'.locale(context),
                                       icon: CupertinoIcons.lock,
                                       dim: dim,
                                       showToggle: true, // İkonu göster
@@ -240,7 +242,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                                 });
                                               },
                                               child: Text(
-                                                'Kullanım koşullarını ve gizlilik politikasını kabul ediyorum',
+                                                'accept_terms'.locale(context),
                                                 style: AppTextTheme.captionL
                                                     .copyWith(
                                                   color:
@@ -261,7 +263,7 @@ class _RegisterScreenState extends State<RegisterScreen>
 
                             // Kayıt ol butonu
                             AppButton(
-                              text: 'Kayıt Ol',
+                              text: 'signup'.locale(context),
                               isLoading: state.isLoading || _isSubmitting,
                               onPressed: (state.isLoading || _isSubmitting)
                                   ? null
@@ -278,7 +280,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Text(
-                                  'Zaten bir hesabınız var mı?',
+                                  'have_account'.locale(context),
                                   style: AppTextTheme.captionL.copyWith(
                                     color: AppColors.textSecondary,
                                   ),
@@ -292,7 +294,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                           context.goNamed(RouteNames.login);
                                         },
                                   child: Text(
-                                    'Giriş Yap',
+                                    'login'.locale(context),
                                     style: AppTextTheme.captionL.copyWith(
                                       fontWeight: FontWeight.w600,
                                       color: AppColors.primary,

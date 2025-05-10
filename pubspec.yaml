@@ -30,6 +30,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   dio: ^5.3.2
   flutter_dotenv: ^5.1.0
   google_fonts: ^6.1.0
@@ -149,6 +151,7 @@ flutter:
     - assets/icons/
     - assets/animations/
     - assets/fonts/
+    - assets/translations/
     
   fonts:
     - family: sfpro

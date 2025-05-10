@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:tatarai/core/constants/app_constants.dart';
+import 'package:tatarai/core/extensions/string_extension.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
 import 'package:tatarai/core/theme/text_theme.dart';
 import 'package:tatarai/core/utils/logger.dart';
@@ -135,7 +136,7 @@ class _HomeTabContentState extends State<HomeTabContent>
         builder: (context, state) {
           final userName = state.user?.displayName ??
               state.user?.email?.split('@').first ??
-              'Misafir';
+              'welcome'.locale(context);
 
           return AnimatedBuilder(
             animation: _animationController,
@@ -149,7 +150,7 @@ class _HomeTabContentState extends State<HomeTabContent>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Merhaba,',
+                  'welcome'.locale(context),
                   style: AppTextTheme.largeBody.copyWith(
                     color: AppColors.white.withOpacity(0.9),
                     fontWeight: FontWeight.w500,
@@ -173,7 +174,7 @@ class _HomeTabContentState extends State<HomeTabContent>
                 ),
                 SizedBox(height: context.dimensions.spaceS),
                 Text(
-                  'Bitkilerinin sağlığını kontrol etmeye hazır mısın?',
+                  'plant_analysis_desc'.locale(context),
                   style: AppTextTheme.body.copyWith(
                     color: AppColors.white.withOpacity(0.9),
                     fontWeight: FontWeight.w400,
@@ -202,7 +203,7 @@ class _HomeTabContentState extends State<HomeTabContent>
               bottom: context.dimensions.paddingXS,
             ),
             child: Text(
-              'Hızlı İşlemler',
+              'quick_actions'.locale(context),
               style: AppTextTheme.headline5.copyWith(
                 color: AppColors.textPrimary,
                 fontWeight: FontWeight.w600,
@@ -228,8 +229,8 @@ class _HomeTabContentState extends State<HomeTabContent>
             },
             child: _buildActionCard(
               context,
-              title: 'Yeni Analiz',
-              subtitle: 'Bir fotoğraf çekerek bitkini analiz et',
+              title: 'new_analysis'.locale(context),
+              subtitle: 'plant_analysis_desc'.locale(context),
               iconData: CupertinoIcons.camera,
               color: AppColors.primary,
               onTap: _navigateToAnalysis,
@@ -254,8 +255,8 @@ class _HomeTabContentState extends State<HomeTabContent>
             },
             child: _buildActionCard(
               context,
-              title: 'Tüm Analizler',
-              subtitle: 'Geçmiş analiz sonuçlarına göz at',
+              title: 'all_analyses'.locale(context),
+              subtitle: 'plant_history'.locale(context),
               iconData: CupertinoIcons.doc_chart,
               color: AppColors.primary,
               onTap: () {
@@ -390,7 +391,7 @@ class _HomeTabContentState extends State<HomeTabContent>
                       bottom: context.dimensions.paddingS,
                     ),
                     child: Text(
-                      'Son Analizler',
+                      'recent_analyses'.locale(context),
                       style: AppTextTheme.headline6.copyWith(
                         color: AppColors.textPrimary,
                         fontWeight: FontWeight.w600,
@@ -419,7 +420,7 @@ class _HomeTabContentState extends State<HomeTabContent>
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Son Analizler',
+                      'recent_analyses'.locale(context),
                       style: AppTextTheme.headline6.copyWith(
                         color: AppColors.textPrimary,
                         fontWeight: FontWeight.w600,
@@ -427,7 +428,7 @@ class _HomeTabContentState extends State<HomeTabContent>
                       ),
                     ),
                     AppButton(
-                      text: "Tümünü Gör",
+                      text: 'all_analyses'.locale(context),
                       type: AppButtonType.text,
                       onPressed: () {
                         Navigator.of(context).push(
@@ -504,7 +505,7 @@ class _HomeTabContentState extends State<HomeTabContent>
             ),
             SizedBox(height: context.dimensions.spaceM),
             Text(
-              'Henüz analiz yok',
+              'no_analysis_yet'.locale(context),
               style: AppTextTheme.headline6.copyWith(
                 fontSize: context.dimensions.fontSizeL,
                 fontWeight: FontWeight.w600,
@@ -513,7 +514,7 @@ class _HomeTabContentState extends State<HomeTabContent>
             ),
             SizedBox(height: context.dimensions.spaceS),
             Text(
-              'İlk bitki analizini yapmak için Yeni Analiz kartına dokunabilirsin',
+              'no_analysis_desc'.locale(context),
               textAlign: TextAlign.center,
               style: AppTextTheme.bodyText2.copyWith(
                 color: AppColors.textSecondary,
@@ -529,7 +530,7 @@ class _HomeTabContentState extends State<HomeTabContent>
                 borderRadius: BorderRadius.circular(context.dimensions.radiusM),
                 onPressed: _navigateToAnalysis,
                 child: Text(
-                  'Analiz Yap',
+                  'analyze'.locale(context),
                   style: AppTextTheme.button.copyWith(
                     fontWeight: FontWeight.w600,
                     letterSpacing: -0.3,

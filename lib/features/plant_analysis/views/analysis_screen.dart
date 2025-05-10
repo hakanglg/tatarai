@@ -93,10 +93,15 @@ class _AnalysisScreenState extends State<AnalysisScreen>
 
     // Emülatör kontrolü yap
     _checkIfEmulator().then((_) {
+      // Widget hala ağaçta mı kontrol et
+      if (!mounted) return;
+
       // Uygulama başlangıcında izinleri kontrol et (emülatör değilse)
       if (!_isEmulator) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          _requestPermissions();
+          if (mounted) {
+            _requestPermissions();
+          }
         });
       } else {
         AppLogger.i('Emülatör tespit edildi, izin kontrolleri atlanıyor');
@@ -120,11 +125,18 @@ class _AnalysisScreenState extends State<AnalysisScreen>
 
     try {
       final provinces = await _locationService.getProvinces();
+
+      // Widget hala ağaçta mı kontrol et
+      if (!mounted) return;
+
       setState(() {
         _provinces = provinces;
         _loadingProvinces = false;
       });
     } catch (e) {
+      // Widget hala ağaçta mı kontrol et
+      if (!mounted) return;
+
       AppLogger.e('İller yüklenirken hata: $e');
       setState(() {
         _loadingProvinces = false;
@@ -147,11 +159,18 @@ class _AnalysisScreenState extends State<AnalysisScreen>
 
     try {
       final districts = await _locationService.getDistricts(province.name);
+
+      // Widget hala ağaçta mı kontrol et
+      if (!mounted) return;
+
       setState(() {
         _districts = districts;
         _loadingDistricts = false;
       });
     } catch (e) {
+      // Widget hala ağaçta mı kontrol et
+      if (!mounted) return;
+
       AppLogger.e('İlçeler yüklenirken hata: $e');
       setState(() {
         _loadingDistricts = false;
@@ -173,11 +192,18 @@ class _AnalysisScreenState extends State<AnalysisScreen>
     try {
       final neighborhoods =
           await _locationService.getNeighborhoods(province.name, district.name);
+
+      // Widget hala ağaçta mı kontrol et
+      if (!mounted) return;
+
       setState(() {
         _neighborhoods = neighborhoods;
         _loadingNeighborhoods = false;
       });
     } catch (e) {
+      // Widget hala ağaçta mı kontrol et
+      if (!mounted) return;
+
       AppLogger.e('Mahalleler yüklenirken hata: $e');
       setState(() {
         _loadingNeighborhoods = false;
@@ -473,6 +499,9 @@ class _AnalysisScreenState extends State<AnalysisScreen>
 
   // Yükleniyor diyaloğunu göster
   void _showLoadingDialog(String message) {
+    // Widget hala ağaçta mı kontrol et
+    if (!mounted) return;
+
     AppDialogManager.showLoadingDialog(
       context: context,
       message: message,
@@ -480,6 +509,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
 
     // 2 saniye sonra otomatik kapat
     Future.delayed(const Duration(seconds: 2), () {
+      if (!mounted) return;
       AppDialogManager.dismissDialog(context);
     });
   }
@@ -506,6 +536,9 @@ class _AnalysisScreenState extends State<AnalysisScreen>
         maxHeight: 1080,
       );
 
+      // Widget hala ağaçta mı kontrol et
+      if (!mounted) return;
+
       // Kullanıcı kamera erişimini iptal ederse null dönebilir
       if (image != null) {
         setState(() {
@@ -513,14 +546,19 @@ class _AnalysisScreenState extends State<AnalysisScreen>
         });
 
         // Resim eklendiğinde animasyon yap
-        _animationController.reset();
-        _animationController.forward();
+        if (mounted) {
+          _animationController.reset();
+          _animationController.forward();
+        }
 
         AppLogger.i('Fotoğraf çekildi: ${image.path}');
       } else {
         AppLogger.i('Kamera kullanımı iptal edildi');
       }
     } catch (e) {
+      // Widget hala ağaçta mı kontrol et
+      if (!mounted) return;
+
       AppLogger.e('Fotoğraf çekilirken hata oluştu: $e');
 
       // Emülatörde ise farklı mesaj göster
@@ -535,6 +573,9 @@ class _AnalysisScreenState extends State<AnalysisScreen>
 
   // Bu metod artık PermissionManager tarafından yönetiliyor
   Future<void> _showPermissionSettingsDialog() async {
+    // Widget hala ağaçta mı kontrol et
+    if (!mounted) return;
+
     // İzin isteği için PermissionManager kullan
     await PermissionManager.requestPermission(
       AppPermissionType.camera,
@@ -544,6 +585,9 @@ class _AnalysisScreenState extends State<AnalysisScreen>
 
   // Bilgi diyaloğu göster
   void _showInfoDialog(String title, String message) {
+    // Widget hala ağaçta mı kontrol et
+    if (!mounted) return;
+
     AppDialogManager.showInfoDialog(
       context: context,
       title: title,
@@ -568,20 +612,28 @@ class _AnalysisScreenState extends State<AnalysisScreen>
         maxHeight: 1080,
       );
 
+      // Widget hala ağaçta mı kontrol et
+      if (!mounted) return;
+
       if (image != null) {
         setState(() {
           _selectedImage = File(image.path);
         });
 
         // Resim eklendiğinde animasyon yap
-        _animationController.reset();
-        _animationController.forward();
+        if (mounted) {
+          _animationController.reset();
+          _animationController.forward();
+        }
 
         AppLogger.i('Galeriden fotoğraf seçildi: ${image.path}');
       } else {
         AppLogger.i('Galeri kullanımı iptal edildi');
       }
     } catch (e) {
+      // Widget hala ağaçta mı kontrol et
+      if (!mounted) return;
+
       AppLogger.e('Galeriden fotoğraf seçilirken hata oluştu: $e');
 
       // Emülatörde ise farklı mesaj göster
@@ -634,6 +686,9 @@ class _AnalysisScreenState extends State<AnalysisScreen>
   // Hata mesajı gösterme
   Future<void> _showErrorDialog(String message,
       {bool needsPremium = false}) async {
+    // Widget hala ağaçta mı kontrol et
+    if (!mounted) return;
+
     if (needsPremium) {
       // Premium satın alma diyaloğunu göster
       final result = await AppDialogManager.showPremiumRequiredDialog(
@@ -701,6 +756,10 @@ class _AnalysisScreenState extends State<AnalysisScreen>
     try {
       if (Platform.isAndroid) {
         final androidInfo = await _deviceInfoPlugin.androidInfo;
+
+        // Widget hala ağaçta mı kontrol et
+        if (!mounted) return;
+
         // Android emülatör kontrolü
         _isEmulator = androidInfo.isPhysicalDevice == false ||
             androidInfo.model.contains('sdk') ||
@@ -711,6 +770,10 @@ class _AnalysisScreenState extends State<AnalysisScreen>
             'Android cihaz: ${androidInfo.model}, Emülatör: $_isEmulator');
       } else if (Platform.isIOS) {
         final iosInfo = await _deviceInfoPlugin.iosInfo;
+
+        // Widget hala ağaçta mı kontrol et
+        if (!mounted) return;
+
         // iOS simülatör kontrolü
         _isEmulator = iosInfo.isPhysicalDevice == false ||
             iosInfo.model.toLowerCase().contains('simulator');
@@ -725,6 +788,9 @@ class _AnalysisScreenState extends State<AnalysisScreen>
 
   // Resim seçenekleri menüsünü göster
   void _showImageOptionsMenu() {
+    // Widget hala ağaçta mı kontrol et
+    if (!mounted) return;
+
     // Haptic feedback ekle
     HapticFeedback.mediumImpact();
 
@@ -750,12 +816,16 @@ class _AnalysisScreenState extends State<AnalysisScreen>
           CupertinoActionSheetAction(
             onPressed: () {
               Navigator.pop(context);
-              setState(() {
-                _selectedImage = null; // Fotoğrafı sil
-              });
-              // Fotoğraf silindiğinde animasyon yap
-              _animationController.reset();
-              _animationController.forward();
+
+              // Widget hala ağaçta mı kontrol et
+              if (mounted) {
+                setState(() {
+                  _selectedImage = null; // Fotoğrafı sil
+                });
+                // Fotoğraf silindiğinde animasyon yap
+                _animationController.reset();
+                _animationController.forward();
+              }
             },
             isDestructiveAction: true,
             child: const Text('Fotoğrafı Sil'),
@@ -795,19 +865,43 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                   'Analiz sonuç ekranına geçiş - ID: $resultId, Uzunluk: ${resultId.length}',
                 );
 
-                Navigator.of(context)
-                    .push(
-                  CupertinoPageRoute(
-                    builder: (context) =>
-                        AnalysisResultScreen(analysisId: resultId),
-                  ),
-                )
-                    .then((_) {
-                  // Sonuç ekranından dönüldüğünde state'i sıfırla
-                  context.read<PlantAnalysisCubit>().reset();
-                  // Navigation ID'sini temizle
-                  _lastNavigatedAnalysisId = null;
-                });
+                // Navigator'ın mount durumunu kontrol et
+                if (mounted && Navigator.of(context).canPop()) {
+                  await Navigator.of(context)
+                      .push(
+                    CupertinoPageRoute(
+                      builder: (context) =>
+                          AnalysisResultScreen(analysisId: resultId),
+                    ),
+                  )
+                      .then((_) {
+                    // Sonuç ekranından dönüldüğünde state'i sıfırla
+                    if (mounted) {
+                      context.read<PlantAnalysisCubit>().reset();
+                      // Navigation ID'sini temizle
+                      _lastNavigatedAnalysisId = null;
+                    }
+                  });
+                } else {
+                  // Güvenli navigasyon için alternatif yaklaşım
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) {
+                      Navigator.of(context, rootNavigator: true)
+                          .push(
+                        CupertinoPageRoute(
+                          builder: (context) =>
+                              AnalysisResultScreen(analysisId: resultId),
+                        ),
+                      )
+                          .then((_) {
+                        if (mounted) {
+                          context.read<PlantAnalysisCubit>().reset();
+                          _lastNavigatedAnalysisId = null;
+                        }
+                      });
+                    }
+                  });
+                }
               }
             } else if (state.errorMessage != null) {
               // Hata durumunda kullanıcıya bilgi ver
