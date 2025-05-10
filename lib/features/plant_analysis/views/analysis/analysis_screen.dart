@@ -80,8 +80,8 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                   'Analiz sonuç ekranına geçiş - ID: $resultId, Uzunluk: ${resultId.length}',
                 );
 
-                // Navigator'ın mount durumunu kontrol et
-                if (mounted && Navigator.of(context).canPop()) {
+                // Sadece mounted durumunu kontrol et, canPop kontrolünü kaldır
+                if (mounted) {
                   await Navigator.of(context)
                       .push(
                     CupertinoPageRoute(
