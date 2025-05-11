@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:tatarai/core/utils/logger.dart';
 
 /// Bitki analiz sonuçları modeli
 /// Plant.id API'den dönen yanıtları modelleme
@@ -26,6 +27,11 @@ class PlantAnalysisResult extends Equatable {
     this.growthStage,
     this.growthScore,
     this.timestamp,
+    this.interventionMethods,
+    this.agriculturalTips,
+    this.regionalInfo,
+    this.growthComment,
+    this.rawResponse,
   });
 
   /// Analiz benzersiz tanımlayıcısı
@@ -91,8 +97,23 @@ class PlantAnalysisResult extends Equatable {
   /// Gelişim skoru (0-100 arası)
   final int? growthScore;
 
+  /// Gelişim yorumu
+  final String? growthComment;
+
   /// Zaman damgası
   final int? timestamp;
+
+  /// Müdahale yöntemleri
+  final List<String>? interventionMethods;
+
+  /// Tarımsal öneriler
+  final List<String>? agriculturalTips;
+
+  /// Bölgesel bilgiler
+  final List<String>? regionalInfo;
+
+  /// Görüntü analizinin tam metni
+  final Map<String, dynamic>? rawResponse;
 
   /// Sınıfın mevcut değerlerini koruyarak yeni bir örnek oluşturur
   PlantAnalysisResult copyWith({
@@ -118,6 +139,11 @@ class PlantAnalysisResult extends Equatable {
     String? growthStage,
     int? growthScore,
     int? timestamp,
+    List<String>? interventionMethods,
+    List<String>? agriculturalTips,
+    List<String>? regionalInfo,
+    String? growthComment,
+    Map<String, dynamic>? rawResponse,
   }) {
     return PlantAnalysisResult(
       id: id ?? this.id,
@@ -142,6 +168,11 @@ class PlantAnalysisResult extends Equatable {
       growthStage: growthStage ?? this.growthStage,
       growthScore: growthScore ?? this.growthScore,
       timestamp: timestamp ?? this.timestamp,
+      interventionMethods: interventionMethods ?? this.interventionMethods,
+      agriculturalTips: agriculturalTips ?? this.agriculturalTips,
+      regionalInfo: regionalInfo ?? this.regionalInfo,
+      growthComment: growthComment ?? this.growthComment,
+      rawResponse: rawResponse ?? this.rawResponse,
     );
   }
 
@@ -152,18 +183,20 @@ class PlantAnalysisResult extends Equatable {
       final suggestions = json['suggestions'] as List<dynamic>;
       final firstMatch = suggestions.isNotEmpty ? suggestions[0] : null;
 
-      if (firstMatch != null) {
+      if (firstMatch != null && firstMatch is Map<String, dynamic>) {
         // Hastalık tespiti
         List<Disease> diseases = [];
         bool isHealthy = true;
 
-        if (json.containsKey('health_assessment')) {
-          final health = json['health_assessment'];
+        if (json.containsKey('health_assessment') &&
+            json['health_assessment'] is Map<String, dynamic>) {
+          final health = json['health_assessment'] as Map<String, dynamic>;
           isHealthy = health['is_healthy'] ?? true;
 
-          if (health.containsKey('diseases')) {
+          if (health.containsKey('diseases') && health['diseases'] is List) {
             diseases = (health['diseases'] as List<dynamic>)
-                .map((disease) => Disease.fromJson(disease))
+                .map((disease) =>
+                    Disease.fromJson(disease as Map<String, dynamic>))
                 .toList();
           }
         }
@@ -172,61 +205,103 @@ class PlantAnalysisResult extends Equatable {
         String? growthStage;
         int? growthScore;
 
-        if (json.containsKey('growth_assessment')) {
-          final growth = json['growth_assessment'];
-          growthStage = growth['stage'];
-          growthScore = growth['score'];
-        } else if (firstMatch.containsKey('plant_details') &&
-            firstMatch['plant_details'].containsKey('growth_assessment')) {
-          final growth = firstMatch['plant_details']['growth_assessment'];
-          growthStage = growth['stage'];
-          growthScore = growth['score'];
+        if (json.containsKey('growth_assessment') &&
+            json['growth_assessment'] is Map<String, dynamic>) {
+          final growth = json['growth_assessment'] as Map<String, dynamic>;
+          growthStage = growth['stage']?.toString();
+          growthScore = growth['score'] is int ? growth['score'] : null;
+        } else if (firstMatch.containsKey('plant_details')) {
+          // plant_details bir Map değilse, dönüştürmeyi dene
+          var plantDetails = firstMatch['plant_details'];
+          if (plantDetails is String) {
+            // String ise Map'e dönüştür
+            plantDetails = {'description': plantDetails};
+            firstMatch['plant_details'] = plantDetails;
+          }
+
+          if (plantDetails is Map<String, dynamic> &&
+              plantDetails.containsKey('growth_assessment') &&
+              plantDetails['growth_assessment'] is Map<String, dynamic>) {
+            final growth =
+                plantDetails['growth_assessment'] as Map<String, dynamic>;
+            growthStage = growth['stage']?.toString();
+            growthScore = growth['score'] is int ? growth['score'] : null;
+          }
+        }
+
+        // plant_details kontrolü
+        Map<String, dynamic> plantDetails = {};
+        if (firstMatch.containsKey('plant_details')) {
+          if (firstMatch['plant_details'] is Map<String, dynamic>) {
+            plantDetails = firstMatch['plant_details'] as Map<String, dynamic>;
+          } else if (firstMatch['plant_details'] is String) {
+            // String tipinde geldiyse Map'e dönüştür
+            plantDetails = {'description': firstMatch['plant_details']};
+          }
         }
 
         return PlantAnalysisResult(
           id: json['id'] ?? '',
-          plantName: firstMatch['plant_name'] ?? 'Bilinmeyen Bitki',
-          probability: firstMatch['probability']?.toDouble() ?? 0.0,
+          plantName: firstMatch['plant_name']?.toString() ?? 'Bilinmeyen Bitki',
+          probability: firstMatch['probability'] is num
+              ? firstMatch['probability']!.toDouble()
+              : 0.0,
           isHealthy: isHealthy,
           diseases: diseases,
-          description: firstMatch['plant_details']?['description'] ?? '',
+          description: plantDetails['description']?.toString() ?? '',
           suggestions: _extractSuggestions(json),
-          imageUrl: json['images']?[0] ?? '',
+          imageUrl:
+              json['images'] is List && (json['images'] as List).isNotEmpty
+                  ? json['images'][0].toString()
+                  : '',
           similarImages: _extractSimilarImages(json),
-          taxonomy: firstMatch['plant_details']?['taxonomy'] != null
+          taxonomy: plantDetails.containsKey('taxonomy') &&
+                  plantDetails['taxonomy'] is Map
               ? PlantTaxonomy.fromJson(
-                  firstMatch['plant_details']['taxonomy'],
-                )
+                  plantDetails['taxonomy'] as Map<String, dynamic>)
               : null,
           edibleParts: _convertToStringList(
-            firstMatch['plant_details']?['edible_parts'],
+            plantDetails['edible_parts'],
           ),
           propagationMethods: _convertToStringList(
-            firstMatch['plant_details']?['propagation_methods'],
+            plantDetails['propagation_methods'],
           ),
-          watering: firstMatch['plant_details']?['watering'],
-          sunlight: firstMatch['plant_details']?['sunlight'],
-          soil: firstMatch['plant_details']?['soil'],
-          climate: firstMatch['plant_details']?['climate'],
-          geminiAnalysis: firstMatch['plant_details']?['gemini_analysis'],
-          location: firstMatch['plant_details']?['location'],
-          fieldName: firstMatch['plant_details']?['field_name'],
+          watering: plantDetails['watering']?.toString(),
+          sunlight: plantDetails['sunlight']?.toString(),
+          soil: plantDetails['soil']?.toString(),
+          climate: plantDetails['climate']?.toString(),
+          geminiAnalysis: plantDetails['gemini_analysis']?.toString(),
+          location: plantDetails['location']?.toString(),
+          fieldName: plantDetails['field_name']?.toString(),
           growthStage: growthStage,
           growthScore: growthScore,
-          timestamp: json['timestamp'],
+          timestamp: json['timestamp'] is int ? json['timestamp'] : null,
+          growthComment: plantDetails['growth_comment']?.toString(),
+          interventionMethods: _convertToStringList(
+            plantDetails['intervention_methods'],
+          ),
+          agriculturalTips: _convertToStringList(
+            plantDetails['agricultural_tips'],
+          ),
+          regionalInfo: _convertToStringList(
+            plantDetails['regional_info'],
+          ),
+          rawResponse: json,
         );
       }
     }
 
     // Sağlık analizi API'sinden gelen yanıtı işleme
-    if (json.containsKey('health_assessment')) {
-      final health = json['health_assessment'];
+    if (json.containsKey('health_assessment') &&
+        json['health_assessment'] is Map<String, dynamic>) {
+      final health = json['health_assessment'] as Map<String, dynamic>;
       final isHealthy = health['is_healthy'] ?? true;
 
       List<Disease> diseases = [];
-      if (health.containsKey('diseases')) {
-        diseases = (health['diseases'] as List<dynamic>)
-            .map((disease) => Disease.fromJson(disease))
+      if (health.containsKey('diseases') && health['diseases'] is List) {
+        diseases = (health['diseases'] as List)
+            .where((disease) => disease is Map<String, dynamic>)
+            .map((disease) => Disease.fromJson(disease as Map<String, dynamic>))
             .toList();
       }
 
@@ -234,23 +309,39 @@ class PlantAnalysisResult extends Equatable {
       String? growthStage;
       int? growthScore;
 
-      if (json.containsKey('growth_assessment')) {
-        final growth = json['growth_assessment'];
-        growthStage = growth['stage'];
-        growthScore = growth['score'];
+      if (json.containsKey('growth_assessment') &&
+          json['growth_assessment'] is Map<String, dynamic>) {
+        final growth = json['growth_assessment'] as Map<String, dynamic>;
+        growthStage = growth['stage']?.toString();
+        growthScore = growth['score'] is int ? growth['score'] : null;
+      }
+
+      // plant_details kontrolü
+      Map<String, dynamic> plantDetails = {};
+      if (json.containsKey('plant_details')) {
+        if (json['plant_details'] is Map<String, dynamic>) {
+          plantDetails = json['plant_details'] as Map<String, dynamic>;
+        } else if (json['plant_details'] is String) {
+          plantDetails = {'description': json['plant_details']};
+        }
       }
 
       return PlantAnalysisResult(
         id: json['id'] ?? '',
-        plantName:
-            json['plant_details']?['common_names']?[0] ?? 'Bilinmeyen Bitki',
+        plantName: plantDetails.containsKey('common_names') &&
+                plantDetails['common_names'] is List &&
+                (plantDetails['common_names'] as List).isNotEmpty
+            ? plantDetails['common_names'][0].toString()
+            : 'Bilinmeyen Bitki',
         probability:
             1.0, // Sağlık değerlendirmesinde genellikle olasılık verilmez
         isHealthy: isHealthy,
         diseases: diseases,
-        description: json['plant_details']?['description'] ?? '',
+        description: plantDetails['description']?.toString() ?? '',
         suggestions: _extractTreatments(health),
-        imageUrl: json['images']?[0] ?? '',
+        imageUrl: json['images'] is List && (json['images'] as List).isNotEmpty
+            ? json['images'][0].toString()
+            : '',
         similarImages: _extractSimilarImages(json),
         taxonomy: null,
         edibleParts: null,
@@ -260,11 +351,16 @@ class PlantAnalysisResult extends Equatable {
         soil: null,
         climate: null,
         geminiAnalysis: null,
-        location: json['plant_details']?['location'],
-        fieldName: json['plant_details']?['field_name'],
+        location: plantDetails['location']?.toString(),
+        fieldName: plantDetails['field_name']?.toString(),
         growthStage: growthStage,
         growthScore: growthScore,
-        timestamp: json['timestamp'],
+        timestamp: json['timestamp'] is int ? json['timestamp'] : null,
+        growthComment: plantDetails['growth_comment']?.toString(),
+        interventionMethods: null,
+        agriculturalTips: null,
+        regionalInfo: null,
+        rawResponse: json,
       );
     }
 
@@ -278,25 +374,7 @@ class PlantAnalysisResult extends Equatable {
             .where((disease) => disease is Map<String, dynamic>)
             .map((disease) {
           final diseaseMap = disease as Map<String, dynamic>;
-          return Disease(
-            name: diseaseMap['name'] ?? '',
-            probability: diseaseMap['probability']?.toDouble() ?? 0.0,
-            description: diseaseMap['description'],
-            treatment: diseaseMap['treatment'] != null &&
-                    diseaseMap['treatment'] is Map
-                ? Treatment(
-                    biological: _extractTreatmentList(
-                        diseaseMap['treatment'], 'biological'),
-                    chemical: _extractTreatmentList(
-                        diseaseMap['treatment'], 'chemical'),
-                    prevention: _extractTreatmentList(
-                        diseaseMap['treatment'], 'prevention'),
-                  )
-                : null,
-            similarImages: diseaseMap['similarImages'] is List
-                ? List<String>.from(diseaseMap['similarImages'])
-                : null,
-          );
+          return Disease.fromJson(diseaseMap);
         }).toList();
       }
 
@@ -320,15 +398,7 @@ class PlantAnalysisResult extends Equatable {
       PlantTaxonomy? taxonomy;
       if (json.containsKey('taxonomy') && json['taxonomy'] is Map) {
         final taxMap = json['taxonomy'] as Map<String, dynamic>;
-        taxonomy = PlantTaxonomy(
-          kingdom: taxMap['kingdom'],
-          phylum: taxMap['phylum'],
-          class_: taxMap['class'],
-          order: taxMap['order'],
-          family: taxMap['family'],
-          genus: taxMap['genus'],
-          species: taxMap['species'],
-        );
+        taxonomy = PlantTaxonomy.fromJson(taxMap);
       }
 
       // Yenilebilir kısımları dönüştür (eğer varsa)
@@ -386,6 +456,17 @@ class PlantAnalysisResult extends Equatable {
                 ? int.tryParse(json['growthScore'])
                 : null),
         timestamp: timestamp,
+        growthComment: json['growthComment'],
+        interventionMethods: _convertToStringList(
+          json['interventionMethods'],
+        ),
+        agriculturalTips: _convertToStringList(
+          json['agriculturalTips'],
+        ),
+        regionalInfo: _convertToStringList(
+          json['regionalInfo'],
+        ),
+        rawResponse: json,
       );
     } catch (e) {
       print('PlantAnalysisResult.fromJson hata: $e');
@@ -400,6 +481,8 @@ class PlantAnalysisResult extends Equatable {
         suggestions: [],
         imageUrl: '',
         similarImages: [],
+        growthComment: '',
+        rawResponse: null,
       );
     }
   }
@@ -412,6 +495,9 @@ class PlantAnalysisResult extends Equatable {
 
     if (value is List) {
       return value.map((item) => item.toString()).toList();
+    } else if (value is String) {
+      // Tek bir string değeri alıp liste haline getirir
+      return [value];
     }
 
     return null;
@@ -420,13 +506,15 @@ class PlantAnalysisResult extends Equatable {
   /// Tedavi listesini çıkaran yardımcı metod
   static List<String>? _extractTreatmentList(
       Map<String, dynamic>? treatment, String field) {
-    if (treatment == null || !treatment.containsKey(field)) {
-      return null;
-    }
+    if (treatment == null) return null;
+
+    if (!treatment.containsKey(field)) return null;
 
     final list = treatment[field];
     if (list is List) {
       return List<String>.from(list.map((item) => item.toString()));
+    } else if (list is String) {
+      return [list];
     }
 
     return null;
@@ -436,87 +524,125 @@ class PlantAnalysisResult extends Equatable {
   static List<String> _extractTreatments(Map<String, dynamic> health) {
     final List<String> treatments = [];
 
-    if (health.containsKey('diseases')) {
-      final diseases = health['diseases'] as List<dynamic>;
-      for (final disease in diseases) {
-        if (disease.containsKey('treatment')) {
-          final treatment = disease['treatment'];
-          if (treatment.containsKey('biological') &&
-              treatment['biological'] is List) {
-            treatments.addAll(
-              (treatment['biological'] as List).map((e) => e.toString()),
-            );
-          }
-          if (treatment.containsKey('chemical') &&
-              treatment['chemical'] is List) {
-            treatments.addAll(
-              (treatment['chemical'] as List).map((e) => e.toString()),
-            );
-          }
-          if (treatment.containsKey('prevention') &&
-              treatment['prevention'] is List) {
-            treatments.addAll(
-              (treatment['prevention'] as List).map((e) => e.toString()),
-            );
+    try {
+      if (health.containsKey('diseases')) {
+        final diseases = health['diseases'];
+        if (diseases is List) {
+          for (final disease in diseases) {
+            if (disease is! Map<String, dynamic>) continue;
+
+            if (disease.containsKey('treatment')) {
+              final treatment = disease['treatment'];
+              if (treatment is! Map<String, dynamic>) continue;
+
+              if (treatment.containsKey('biological') &&
+                  treatment['biological'] is List) {
+                treatments.addAll(
+                  (treatment['biological'] as List).map((e) => e.toString()),
+                );
+              }
+              if (treatment.containsKey('chemical') &&
+                  treatment['chemical'] is List) {
+                treatments.addAll(
+                  (treatment['chemical'] as List).map((e) => e.toString()),
+                );
+              }
+              if (treatment.containsKey('prevention') &&
+                  treatment['prevention'] is List) {
+                treatments.addAll(
+                  (treatment['prevention'] as List).map((e) => e.toString()),
+                );
+              }
+            }
           }
         }
       }
-    }
 
-    return treatments;
+      // Eğer hastalık tedavileri bulunamadıysa, health nesnesinde diğer ipuçlarını arayalım
+      if (treatments.isEmpty && health.containsKey('suggestions')) {
+        final suggestions = health['suggestions'];
+        if (suggestions is List) {
+          treatments.addAll(suggestions.map((e) => e.toString()));
+        } else if (suggestions is String) {
+          treatments.add(suggestions);
+        }
+      }
+
+      return treatments;
+    } catch (e) {
+      print('_extractTreatments hatası: $e');
+      return ['Bakım önerisi çıkarılırken hata oluştu'];
+    }
   }
 
   /// Benzer görüntüleri çıkartan yardımcı metot
   static List<String> _extractSimilarImages(Map<String, dynamic> json) {
-    final List<String> images = [];
+    try {
+      List<String> images = [];
 
-    if (json.containsKey('similar_images')) {
-      final similarImages = json['similar_images'] as List<dynamic>;
-      for (final image in similarImages) {
-        if (image.containsKey('url')) {
-          images.add(image['url']);
-        }
-      }
-    }
-
-    return images;
-  }
-
-  /// Önerileri çıkartan yardımcı metot
-  static List<String> _extractSuggestions(Map<String, dynamic> json) {
-    final List<String> suggestions = [];
-
-    if (json.containsKey('health_assessment')) {
-      final health = json['health_assessment'];
-      if (health.containsKey('diseases')) {
-        final diseases = health['diseases'] as List<dynamic>;
-        for (final disease in diseases) {
-          if (disease.containsKey('treatment')) {
-            final treatment = disease['treatment'];
-            if (treatment.containsKey('biological') &&
-                treatment['biological'] is List) {
-              suggestions.addAll(
-                (treatment['biological'] as List).map((e) => e.toString()),
-              );
-            }
-            if (treatment.containsKey('chemical') &&
-                treatment['chemical'] is List) {
-              suggestions.addAll(
-                (treatment['chemical'] as List).map((e) => e.toString()),
-              );
-            }
-            if (treatment.containsKey('prevention') &&
-                treatment['prevention'] is List) {
-              suggestions.addAll(
-                (treatment['prevention'] as List).map((e) => e.toString()),
-              );
-            }
+      if (json.containsKey('similar_images') &&
+          json['similar_images'] is List) {
+        for (var img in json['similar_images'] as List) {
+          if (img is Map && img.containsKey('url')) {
+            images.add(img['url'].toString());
+          } else if (img is String) {
+            images.add(img);
           }
         }
+      } else if (json.containsKey('similarImages') &&
+          json['similarImages'] is List) {
+        images =
+            (json['similarImages'] as List).map((e) => e.toString()).toList();
       }
-    }
 
-    return suggestions;
+      return images;
+    } catch (e) {
+      print('Benzer görüntüleri çıkarma hatası: $e');
+      return [];
+    }
+  }
+
+  /// Önerileri çıkaran yardımcı metot
+  static List<String> _extractSuggestions(Map<String, dynamic> json) {
+    try {
+      List<String> suggestions = [];
+
+      if (json.containsKey('suggestions') && json['suggestions'] is List) {
+        final suggestionsList = json['suggestions'] as List;
+
+        for (var suggestion in suggestionsList) {
+          if (suggestion is Map<String, dynamic>) {
+            // Bazı API yanıtlarında öneriler nesneler halinde geliyor
+            if (suggestion.containsKey('suggestion')) {
+              suggestions.add(suggestion['suggestion'].toString());
+            } else if (suggestion.containsKey('text')) {
+              suggestions.add(suggestion['text'].toString());
+            }
+          } else if (suggestion is String) {
+            suggestions.add(suggestion);
+          }
+        }
+      } else if (json.containsKey('health_assessment') &&
+          json['health_assessment'] is Map<String, dynamic>) {
+        // Sağlık değerlendirmesinden öneriler çıkarma
+        suggestions = _extractTreatments(
+            json['health_assessment'] as Map<String, dynamic>);
+      }
+
+      // Boşsa varsayılan öneri ekle
+      if (suggestions.isEmpty) {
+        suggestions = [
+          'Düzenli sulama yapın',
+          'Bitkinin ihtiyacına göre güneş ışığı sağlayın',
+          'Toprak durumunu kontrol edin'
+        ];
+      }
+
+      return suggestions;
+    } catch (e) {
+      print('Önerileri çıkarma hatası: $e');
+      return ['Bakım önerileri çıkarılırken hata oluştu'];
+    }
   }
 
   /// Modeli Map'e dönüştürür (Firestore için)
@@ -553,7 +679,51 @@ class PlantAnalysisResult extends Equatable {
         growthStage,
         growthScore,
         timestamp,
+        growthComment,
+        interventionMethods,
+        agriculturalTips,
+        regionalInfo,
+        rawResponse,
       ];
+
+  /// Boş bir analiz sonucu oluşturur
+  static PlantAnalysisResult createEmpty({
+    required String imageUrl,
+    required String location,
+    String? fieldName,
+    String? errorMessage,
+    String? originalText,
+  }) {
+    return PlantAnalysisResult(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      plantName: 'Analiz edilemedi',
+      probability: 0,
+      isHealthy: false,
+      diseases: [],
+      description: errorMessage ?? 'Görüntü analiz edilemedi',
+      suggestions: [
+        'Analiz yapılamadı. Lütfen daha net bir görüntü ile tekrar deneyin.',
+        'Farklı bir açıdan çekim yapmayı deneyebilirsiniz.',
+      ],
+      imageUrl: imageUrl,
+      similarImages: [],
+      watering: '',
+      sunlight: '',
+      soil: '',
+      climate: '',
+      growthStage: '',
+      growthScore: 0,
+      growthComment: errorMessage ?? 'Görüntü analiz edilemedi',
+      timestamp: DateTime.now().millisecondsSinceEpoch,
+      location: location,
+      fieldName: fieldName,
+      geminiAnalysis: '',
+      interventionMethods: [],
+      agriculturalTips: [],
+      regionalInfo: [],
+      rawResponse: originalText != null ? {'original': originalText} : null,
+    );
+  }
 }
 
 /// Bitki taksonomisi modeli
@@ -617,52 +787,99 @@ class PlantTaxonomy extends Equatable {
 class Disease extends Equatable {
   const Disease({
     required this.name,
-    required this.probability,
+    this.probability,
     this.description,
-    this.treatment,
-    this.similarImages,
+    this.symptoms,
+    this.treatments,
+    this.interventionMethods,
+    this.pesticideSuggestions,
+    this.severity,
+    this.affectedParts,
+    this.causalAgent,
+    this.preventiveMeasures,
+    this.imageUrls,
+    this.similarDiseases,
   });
 
   final String name;
-  final double probability;
+  final double? probability;
   final String? description;
-  final Treatment? treatment;
-  final List<String>? similarImages;
+  final List<String>? symptoms;
+  final List<String>? treatments;
+  final List<String>? interventionMethods;
+  final List<String>? pesticideSuggestions;
+  final String? severity;
+  final List<String>? affectedParts;
+  final String? causalAgent;
+  final List<String>? preventiveMeasures;
+  final List<String>? imageUrls;
+  final List<String>? similarDiseases;
 
   factory Disease.fromJson(Map<String, dynamic> json) {
     return Disease(
-      name: json['name'] ?? 'Bilinmeyen Hastalık',
-      probability: json['probability']?.toDouble() ?? 0.0,
-      description: json['description'],
-      treatment: json['treatment'] != null
-          ? Treatment.fromJson(json['treatment'])
-          : null,
-      similarImages: json['similar_images'] != null
-          ? (json['similar_images'] as List)
-              .map((img) => img['url'].toString())
-              .toList()
-          : null,
+      name: json['name'] as String? ?? 'Bilinmeyen Hastalık',
+      probability: (json['probability'] as num?)?.toDouble(),
+      description: json['description'] as String?,
+      symptoms: (json['symptoms'] as List<dynamic>?)
+          ?.map((e) => e.toString())
+          .toList(),
+      treatments: (json['treatments'] as List<dynamic>?)
+          ?.map((e) => e.toString())
+          .toList(),
+      interventionMethods: (json['interventionMethods'] as List<dynamic>?)
+          ?.map((e) => e.toString())
+          .toList(),
+      pesticideSuggestions: (json['pesticideSuggestions'] as List<dynamic>?)
+          ?.map((e) => e.toString())
+          .toList(),
+      severity: json['severity'] as String?,
+      affectedParts: (json['affected_parts'] as List<dynamic>?)
+          ?.map((e) => e.toString())
+          .toList(),
+      causalAgent: json['causal_agent'] as String?,
+      preventiveMeasures: (json['preventive_measures'] as List<dynamic>?)
+          ?.map((e) => e.toString())
+          .toList(),
+      imageUrls: (json['image_urls'] as List<dynamic>?)
+          ?.map((e) => e.toString())
+          .toList(),
+      similarDiseases: (json['similar_diseases'] as List<dynamic>?)
+          ?.map((e) => e.toString())
+          .toList(),
     );
   }
 
-  /// Modeli Map'e dönüştürür (Firestore için)
-  Map<String, dynamic> toMap() {
-    return {
-      'name': name,
-      'probability': probability,
-      'description': description,
-      'treatment': treatment?.toMap(),
-      'similarImages': similarImages,
-    };
-  }
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'probability': probability,
+        'description': description,
+        'symptoms': symptoms,
+        'treatments': treatments,
+        'interventionMethods': interventionMethods,
+        'pesticideSuggestions': pesticideSuggestions,
+        'severity': severity,
+        'affected_parts': affectedParts,
+        'causal_agent': causalAgent,
+        'preventive_measures': preventiveMeasures,
+        'image_urls': imageUrls,
+        'similar_diseases': similarDiseases,
+      };
 
   @override
   List<Object?> get props => [
         name,
         probability,
         description,
-        treatment,
-        similarImages,
+        symptoms,
+        treatments,
+        interventionMethods,
+        pesticideSuggestions,
+        severity,
+        affectedParts,
+        causalAgent,
+        preventiveMeasures,
+        imageUrls,
+        similarDiseases,
       ];
 }
 
@@ -675,16 +892,27 @@ class Treatment extends Equatable {
   final List<String>? prevention;
 
   factory Treatment.fromJson(Map<String, dynamic> json) {
-    return Treatment(
-      biological: json['biological'] != null
-          ? List<String>.from(json['biological'])
-          : null,
-      chemical:
-          json['chemical'] != null ? List<String>.from(json['chemical']) : null,
-      prevention: json['prevention'] != null
-          ? List<String>.from(json['prevention'])
-          : null,
-    );
+    try {
+      // Listeleri güvenli şekilde dönüştür
+      List<String>? convertToStringList(dynamic value) {
+        if (value == null) return null;
+        if (value is List) {
+          return value.map((e) => e.toString()).toList();
+        } else if (value is String) {
+          return [value];
+        }
+        return null;
+      }
+
+      return Treatment(
+        biological: convertToStringList(json['biological']),
+        chemical: convertToStringList(json['chemical']),
+        prevention: convertToStringList(json['prevention']),
+      );
+    } catch (e) {
+      print('Treatment.fromJson hata: $e');
+      return const Treatment();
+    }
   }
 
   /// Modeli Map'e dönüştürür (Firestore için)
@@ -709,17 +937,7 @@ extension PlantAnalysisResultJsonSerialization on PlantAnalysisResult {
       'plantName': plantName,
       'probability': probability,
       'isHealthy': isHealthy,
-      'diseases': diseases
-          .map(
-            (disease) => {
-              'name': disease.name,
-              'probability': disease.probability,
-              'description': disease.description,
-              'treatment': disease.treatment?.toMap(),
-              'similarImages': disease.similarImages,
-            },
-          )
-          .toList(),
+      'diseases': diseases.map((disease) => disease.toJson()).toList(),
       'description': description,
       'suggestions': suggestions,
       'imageUrl': imageUrl,
@@ -736,8 +954,277 @@ extension PlantAnalysisResultJsonSerialization on PlantAnalysisResult {
       'fieldName': fieldName,
       'growthStage': growthStage,
       'growthScore': growthScore,
-      'timestamp': timestamp ??
-          DateTime.now().millisecondsSinceEpoch, // Zaman damgası ekle
+      'timestamp': timestamp ?? DateTime.now().millisecondsSinceEpoch,
+      'growthComment': growthComment,
+      'interventionMethods': interventionMethods,
+      'agriculturalTips': agriculturalTips,
+      'regionalInfo': regionalInfo,
+      'rawResponse': rawResponse,
     };
   }
+}
+
+/// PlantAnalysisResult için UI yardımcı metodları
+extension PlantAnalysisResultUIExtension on PlantAnalysisResult {
+  /// Bitkinin genel durumunu gösteren emoji
+  String get healthEmoji => isHealthy ? '🌱' : '🤒';
+
+  /// Bitkinin durumunu açıklayan metin
+  String get healthStatusText => isHealthy
+      ? 'Sağlıklı Bitki'
+      : diseases.isNotEmpty
+          ? '${diseases.length} Hastalık Tespit Edildi'
+          : 'Sağlık Durumu Belirsiz';
+
+  /// Bitkinin durumunu gösteren renk (tema renklerine bağlı)
+  String get healthColorName => isHealthy ? 'success' : 'error';
+
+  /// Eğer varsa, hastalıkları ve olasılıklarını formatlı metin olarak döndürür
+  String get formattedDiseases {
+    if (diseases.isEmpty) return 'Hastalık tespit edilmedi';
+
+    return diseases.map((disease) {
+      final percentage = (disease.probability! * 100).toStringAsFixed(0);
+      return '${disease.name} (%$percentage)';
+    }).join(', ');
+  }
+
+  /// Ana bakım önerilerini formatlı bir şekilde döndürür
+  List<String> get formattedSuggestions {
+    final List<String> result = [];
+
+    // Eğer öneriler varsa, ilk 5'ini al
+    if (suggestions.isNotEmpty) {
+      result.addAll(suggestions.take(5));
+    }
+
+    // Eğer müdahale yöntemleri varsa ve listemiz hala kısa ise, onları da ekle
+    if (interventionMethods != null &&
+        interventionMethods!.isNotEmpty &&
+        result.length < 7) {
+      result.addAll(interventionMethods!.take(7 - result.length));
+    }
+
+    return result;
+  }
+
+  /// Gelişim durumunu yüzdelik olarak göster
+  String get growthPercentage {
+    if (growthScore == null) return 'Belirtilmemiş';
+    return '%${growthScore}';
+  }
+
+  /// Detaylı yetiştirme bilgilerini özet halinde döndürür
+  Map<String, String> get careDetails {
+    return {
+      'Sulama': watering ?? 'Belirtilmemiş',
+      'Işık': sunlight ?? 'Belirtilmemiş',
+      'Toprak': soil ?? 'Belirtilmemiş',
+      'İklim': climate ?? 'Belirtilmemiş',
+    };
+  }
+
+  /// Eğer herhangi bir bakım önerisi varsa true döndürür
+  bool get hasCareInformation {
+    return watering != null ||
+        sunlight != null ||
+        soil != null ||
+        climate != null ||
+        (suggestions.isNotEmpty) ||
+        (interventionMethods != null && interventionMethods!.isNotEmpty) ||
+        (agriculturalTips != null && agriculturalTips!.isNotEmpty);
+  }
+
+  /// Tam tarih ve saat bilgisini formatlar
+  String get formattedDate {
+    if (timestamp == null) return 'Belirtilmemiş';
+
+    final dateTime = DateTime.fromMillisecondsSinceEpoch(timestamp!);
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inDays == 0) {
+      // Bugün
+      return 'Bugün ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+    } else if (difference.inDays == 1) {
+      // Dün
+      return 'Dün ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+    } else if (difference.inDays < 7) {
+      // Bu hafta
+      return '${_getDayName(dateTime.weekday)} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+    } else {
+      // Daha eski
+      return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
+    }
+  }
+
+  /// Günün adını döndürür
+  String _getDayName(int weekday) {
+    switch (weekday) {
+      case 1:
+        return 'Pazartesi';
+      case 2:
+        return 'Salı';
+      case 3:
+        return 'Çarşamba';
+      case 4:
+        return 'Perşembe';
+      case 5:
+        return 'Cuma';
+      case 6:
+        return 'Cumartesi';
+      case 7:
+        return 'Pazar';
+      default:
+        return '';
+    }
+  }
+}
+
+/// Metinden hastalıkları çıkar
+void _extractDiseasesFromText(String text, Map<String, dynamic> target) {
+  List<Map<String, dynamic>> diseases = [];
+  final lowerText = text.toLowerCase();
+
+  // 1. Önce belirli hastalık adlarını aramaya çalış
+  final diseasePatterns = {
+    'yaprak yanıklığı': 0.8,
+    'kök çürüklüğü': 0.8,
+    'külleme': 0.8,
+    'pas hastalığı': 0.7,
+    'mildiyö': 0.8,
+    'antraknoz': 0.8,
+    'mozaik virüsü': 0.75,
+    'kurşuni küf': 0.7,
+    'beyaz sinek': 0.7,
+    'yaprak biti': 0.75,
+    'kırmızı örümcek': 0.7,
+    'fusarium': 0.8,
+    'alternaria': 0.8,
+    'septoria': 0.8,
+    'verticillium': 0.8,
+    'bakteriyel solgunluk': 0.8,
+    'nematod': 0.7,
+    'beslenme eksikliği': 0.6,
+    'güneş yanığı': 0.6,
+    'su stresi': 0.65,
+  };
+
+  // Hastalık belirten terimleri ara
+  bool hasAnyDiseaseIndication = lowerText.contains('hastalık') ||
+      lowerText.contains('hasar') ||
+      lowerText.contains('zarar') ||
+      lowerText.contains('enfeksiyon') ||
+      lowerText.contains('belirti') ||
+      lowerText.contains('çürük') ||
+      lowerText.contains('küf') ||
+      lowerText.contains('leke') ||
+      lowerText.contains('sararmış') ||
+      lowerText.contains('solmuş');
+
+  // Hastalık adlarını metin içinde ara
+  for (var disease in diseasePatterns.entries) {
+    if (lowerText.contains(disease.key)) {
+      // Hastalık adının geçtiği cümleyi bul
+      int startIdx = lowerText.indexOf(disease.key);
+
+      // Cümlenin başlangıcını bul
+      int sentenceStart = lowerText.lastIndexOf('.', startIdx);
+      if (sentenceStart < 0) {
+        sentenceStart = lowerText.lastIndexOf('\n', startIdx);
+      }
+      if (sentenceStart < 0) sentenceStart = 0;
+      sentenceStart += 1; // Noktayı dahil etme
+
+      // Cümlenin sonunu bul
+      int sentenceEnd = lowerText.indexOf('.', startIdx + disease.key.length);
+      if (sentenceEnd < 0) {
+        sentenceEnd = lowerText.indexOf('\n', startIdx + disease.key.length);
+      }
+      if (sentenceEnd < 0) sentenceEnd = lowerText.length;
+
+      String description = text.substring(sentenceStart, sentenceEnd).trim();
+
+      // Hastalığa uygun tedavi önerilerini bul
+      List<String> treatments = [];
+      if (lowerText.contains('tedavi') ||
+          lowerText.contains('öneri') ||
+          lowerText.contains('müdahale') ||
+          lowerText.contains('yapılmalı')) {
+        final treatmentRegex = RegExp(
+            r'(?:tedavi|öneri|müdahale|yapılmalı)[^\.]*\.',
+            caseSensitive: false);
+        final treatmentMatches = treatmentRegex.allMatches(lowerText);
+
+        for (var match in treatmentMatches) {
+          treatments.add(text.substring(match.start, match.end).trim());
+        }
+      }
+
+      // Hastalık kapitalize edilmiş adı
+      String capitalizedName = disease.key
+          .split(' ')
+          .map((word) => word[0].toUpperCase() + word.substring(1))
+          .join(' ');
+
+      diseases.add({
+        'name': capitalizedName,
+        'probability': disease.value,
+        'description': description,
+        'treatments': treatments,
+      });
+    }
+  }
+
+  // 2. "Hastalık" kelimesini içeren bölümü ara (eğer belirli hastalıklar bulunamadıysa)
+  if (diseases.isEmpty && hasAnyDiseaseIndication) {
+    // Hastalık bölümünü bul
+    final diseaseSection = RegExp(r'(?:hastalık|enfeksiyon|belirti)[^\n\.]+',
+        caseSensitive: false);
+    final matches = diseaseSection.allMatches(lowerText);
+
+    for (var match in matches) {
+      final content = text.substring(match.start, match.end).trim();
+
+      // Genel bir hastalık girişi oluştur
+      diseases.add({
+        'name': 'Bitki Hastalığı',
+        'probability': 0.7,
+        'description': content,
+        'treatments': [],
+      });
+    }
+  }
+
+  // 3. Sağlıklı olup olmadığını belirle
+  bool isHealthy = true;
+
+  if (diseases.isNotEmpty) {
+    isHealthy = false; // Hastalık bulunduysa sağlıksız
+  } else if (lowerText.contains('hastalık yok') ||
+      lowerText.contains('sağlıklı görünüyor') ||
+      lowerText.contains('sağlıklı bir bitki')) {
+    isHealthy = true; // Açıkça sağlıklı olduğu belirtildi
+  } else if (hasAnyDiseaseIndication) {
+    // Hastalık belirtisi var ama spesifik hastalık bulunamadı
+    isHealthy = false;
+    diseases.add({
+      'name': 'Belirsiz Hastalık Belirtileri',
+      'probability': 0.6,
+      'description':
+          'Bitkide hastalık belirtileri görülüyor ancak spesifik bir tanı yapılamadı.',
+      'treatments': [
+        'Profesyonel bir ziraat mühendisine danışın.',
+        'Düzenli gözlem yapın ve değişimleri not edin.',
+        'Sulama ve gübreleme rutininizi gözden geçirin.'
+      ],
+    });
+  }
+
+  // Hastalık durumunu ve varsa hastalıkları ekle
+  target['isHealthy'] = isHealthy;
+  target['diseases'] = diseases;
+
+  AppLogger.i('Hastalık durumu tespit edildi',
+      'Sağlıklı: ${target["isHealthy"]}, Tespit edilen hastalık sayısı: ${diseases.length}');
 }

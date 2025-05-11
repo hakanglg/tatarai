@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:math' as math;
 
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:tatarai/core/base/base_service.dart';
@@ -115,17 +116,71 @@ class GeminiService extends BaseService {
       // 5. Gemini modeline istek gönder
       logInfo('Gemini modeline istek gönderiliyor');
       try {
-        final response =
-            await _model!.generateContent([Content.text(finalPrompt)]);
+        // Görüntü ve metin içeren istek gönder
+        final bytes = processedImageBytes;
+
+        // Doğru formatla istek oluştur ve gönder
+        final prompt = TextPart(finalPrompt);
+        final imagePart = DataPart('image/jpeg', bytes);
+
+        // Gelişmiş model ayarları ile istek gönder
+        final generationConfig = GenerationConfig(
+          temperature: 0.01, // Çok düşük yaratıcılık, yüksek determinizm
+          topK: 1, // En olası seçeneği seç
+          topP: 0.99, // En yüksek olasılıklı yanıtları seç
+          maxOutputTokens: 2048, // Uzun yanıtlara izin ver
+          responseMimeType: 'application/json', // JSON formatında yanıt iste
+          stopSequences: [
+            '```', // Markdown bloklarını durdur
+            'Bu analiz',
+            'Görüntüdeki bitki',
+            'Bu yanıt',
+          ],
+        );
+
+        final response = await _model!.generateContent(
+          [
+            Content.multi([prompt, imagePart])
+          ],
+          generationConfig: generationConfig,
+        );
 
         if (response.text == null || response.text!.isEmpty) {
           logWarning('Gemini boş yanıt döndürdü');
           return _getDefaultEmptyAnalysisResponse();
         }
 
-        logSuccess('Gemini başarılı yanıt döndürdü',
-            'Karakter sayısı: ${response.text!.length}');
-        return response.text!;
+        // Yanıtı işle - markdown kod bloklarını temizle
+        String responseText = response.text!.trim();
+        // Markdown kod bloklarını kaldır ve temiz JSON elde et
+        if (responseText.contains("```json")) {
+          final startIndex = responseText.indexOf("```json") + 7;
+          final endIndex = responseText.lastIndexOf("```");
+          if (startIndex > 7 && endIndex > startIndex) {
+            responseText = responseText.substring(startIndex, endIndex).trim();
+            logInfo('Markdown JSON bloğu temizlendi');
+          }
+        } else if (responseText.startsWith("```") &&
+            responseText.endsWith("```")) {
+          responseText =
+              responseText.substring(3, responseText.length - 3).trim();
+          logInfo('Markdown kod bloğu temizlendi');
+        }
+
+        // JSON geçerliliğini test et
+        try {
+          json.decode(
+              responseText); // Sadece test için, parse edilebiliyor mu diye
+          logSuccess('Gemini başarılı yanıt döndürdü - geçerli JSON',
+              'Karakter sayısı: ${responseText.length}');
+        } catch (jsonError) {
+          // JSON parse edilemese bile yanıtı döndür, repository sonra işleyecek
+          logWarning(
+              'Gemini yanıtı JSON olarak ayrıştırılamadı, düz metin olarak işlenecek',
+              jsonError.toString());
+        }
+
+        return responseText;
       } catch (apiError) {
         // 6. API hatası durumunda alternatif yöntem dene (REST API)
         logError('Gemini API hatası', apiError.toString());
@@ -263,56 +318,61 @@ class GeminiService extends BaseService {
   String _prepareAnalysisPrompt(String? promptParam, String locationInfo) {
     // Konum bilgisi varsa prompt'a ekle
     final String locationPrompt = locationInfo.isNotEmpty
-        ? "\n\nBu bitki $locationInfo bölgesinde yetiştirilmektedir. Bu bölgedeki iklim koşulları ve yerel tarım uygulamaları göz önünde bulundurularak önerilerinizi vermelisin."
+        ? "Bu bitki $locationInfo bölgesinde yetiştirilmektedir. Bu bölgedeki iklim koşulları ve yerel tarım uygulamaları göz önünde bulundurularak önerilerini vermelisin."
         : "";
 
     // Prompt varsa kullan, yoksa default prompt
     return promptParam ??
-        '''Bu görüntüdeki bitkiyi bir ziraat mühendisi ve bitki patolojisi uzmanı olarak analiz etmeni istiyorum. ÖNEMLİ: Görüntüdeki bitkide herhangi bir hastalık belirtisi (sararmış yapraklar, lekeler, kurumalar, deformasyonlar, böcek zararları vb.) olup olmadığını tespit et. 
+        '''[GÖREV] Sen bir uzman ziraat mühendisi ve bitki patoloji uzmanısın. Bu görüntüdeki bitkiyi analiz etmeni istiyorum.
 
-MUTLAKA BİTKİNİN SAĞLIKLI MI YOKSA HASTALIĞA SAHİP Mİ OLDUĞUNU BELİRLE.
-- Bitkide herhangi bir anormallik, renk değişimi, yaprak deformasyonu, leke, küf, çürüme, kuruma, sararma, solma, böcek istilası veya diğer hastalık belirtileri VARSA, bitki "SAĞLIKSIZ" olarak işaretlenmelidir. 
-- YALNIZCA bitkide HİÇBİR hastalık belirtisi yoksa "SAĞLIKLI" olarak işaretle.
-- Bitki net görünmüyorsa veya emin değilsen, yaprak rengindeki değişimlere, lekelere, böcek izlerine dikkat et. Şüphe durumunda "SAĞLIKSIZ" olarak işaretle ve muhtemel sorunları belirt.
+[FORMAT] SADECE ve YALNIZCA JSON formatında yanıt vereceksin. Cevabın başında veya sonunda herhangi bir açıklama olmadan, tamamen saf JSON döndüreceksin.
+
+[ANALİZ TALİMATLARI]
+1. Bitkiyi teşhis et: Türkçe ve Latince adını belirt.
+2. Sağlık durumunu kontrol et: Hastalık belirtileri var mı? (sararmış yapraklar, lekeler, kurumalar, deformasyonlar vb.)
+3. Bitki hakkında genel bilgi ver.
+4. Bakım önerileri hazırla.
+5. Bitki hastalık varsa, tedavi önerileri ekle.
 
 $locationPrompt
 
-Aşağıdaki formatta cevap ver:
+[KRİTİK UYARI]
+Verdiğin cevap YALNIZCA bu JSON nesnesi olacaktır. HİÇBİR ön söz, açıklama veya son söz EKLEME.
+JSON dışında TEK BİR KARAKTER bile yazma.
+Markdown biçimlendirme KULLANMA (```json, ``` gibi).
 
-BITKI_ADI: [Bitkinin Türkçe adı] ([Latince adı])
-SAGLIK_DURUMU: [SAĞLIKLI/SAĞLIKSIZ] - Eğer SAĞLIKSIZ ise hastalık adını MUTLAKA belirt!
+[JSON FORMATI - TAM OLARAK BU ŞABLONU DOLDUR]
+{
+  "plantName": "Domates (Solanum lycopersicum)",
+  "isHealthy": false,
+  "description": "Bu bitki orta boylu bir domates bitkisidir. Yapraklarda sararmalar görülmektedir.",
+  "diseases": [
+    {
+      "name": "Erken Yaprak Yanıklığı",
+      "description": "Alt yapraklarda başlayıp yukarı doğru ilerleyen kahverengi lekeler",
+      "probability": 0.8,
+      "treatments": ["Etkilenen yaprakları uzaklaştırın", "Bakır bazlı fungisit uygulayın"]
+    }
+  ],
+  "suggestions": ["Haftada iki kez sulayın", "Güneşli bir konumda tutun", "Düzenli gübreleme yapın"],
+  "interventionMethods": ["Damlama sulama sistemi kullanın", "Organik malçlama yapın"],
+  "agriculturalTips": ["Destek çubukları kullanın", "Yan dalları budayın"],
+  "watering": "Haftada 2-3 kez, toprağın üst kısmı kuruduğunda",
+  "sunlight": "Tam güneş, günde en az 6 saat",
+  "soil": "Organik maddece zengin, iyi drene olan toprak",
+  "climate": "Ilıman iklim, 18-29°C arası sıcaklık",
+  "growthStage": "Meyve olgunlaşma dönemi",
+  "growthScore": 75,
+  "growthComment": "Bitki normal gelişim göstermekte ancak hastalık belirtileri mevcut"
+}
 
-TANIM: [Bitki hakkında kısa tanım]
-
-HASTALIKLAR:
-- [Hastalık adı 1]: [Kısa açıklama ve hastalığın çiftçi tarafından tanınma belirtileri]
-- [Hastalık adı 2]: [Kısa açıklama ve hastalığın çiftçi tarafından tanınma belirtileri]
-
-MUDAHALE_YONTEMLERI:
-- [İlaçlama önerisi 1]: [Kullanılabilecek ilaç/kimyasal/biyolojik mücadele yöntemi ve uygulama şekli]
-- [İlaçlama önerisi 2]: [Kullanılabilecek ilaç/kimyasal/biyolojik mücadele yöntemi ve uygulama şekli]
-- [Diğer müdahale yöntemleri]
-
-TARIMSAL_ONERILER:
-- [Sulama, gübreleme, budama gibi genel bakım önerileri]
-- [Hastalıkları/zararlıları önlemeye yönelik tarımsal uygulamalar]
-- [Toprağın iyileştirilmesi, ekim/dikim zamanı vb. konularda pratik bilgiler]
-
-BOLGESEL_BILGILER:
-- [Bölgeye özgü tarımsal bilgiler]
-- [Bölgedeki yaygın sorunlar ve bu sorunlara özel çözümler]
-- [Bölgesel iklim koşullarına göre uyarlamalar]
-
-GELISIM_ASAMASI: [Bitkinin şu anki gelişim aşaması - örneğin: Fide, Çiçeklenme, Meyvelenme, Olgunlaşma, Hasat vb.]
-GELISIM_SKORU: [0-100 arası bir değer olarak bitkinin gelişim durumu. Örneğin: 75]
-GELISIM_YORUMU: [Bitkinin gelişim durumu hakkında kısa bir yorum, varsa gelişimini yavaşlatan faktörler veya gelişimini destekleyen olumlu koşullar]
-
-SULAMA: [Sulama sıklığı ve yöntemleri hakkında çiftçiye pratik bilgiler]
-ISIK: [Işık ihtiyacı]
-TOPRAK: [Toprak gereksinimleri ve toprak hazırlama tavsiyeleri]
-IKLIM: [Bölgesel iklim koşullarına göre uyarılar ve öneriler]
-
-TEMEL İLKE: Bitki tamamen sağlıklı görünmedikçe SAĞLIKLI olarak işaretleme. Şüphe varsa, bitki SAĞLIKSIZ olarak değerlendirilmeli ve potansiyel sorunlar belirtilmelidir. SAGLIK_DURUMU değerlendirmesine özellikle dikkat et, bu çiftçi için çok önemlidir.''';
+[ZORUNLU TALİMATLAR]
+1. YUKARIDAKİ JSON ŞABLONUNU KULLAN. Farklı alanlar ekleme veya çıkarma.
+2. BİR JSON OLUŞTUR, BİRDEN FAZLA DEĞİL.
+3. JSON SÖZDİZİMİNE KESİNLİKLE UYGUN OLSUN (çift tırnak kullan, virgüller doğru yerde olsun).
+4. TÜM GEREKLİ ALANLARI DOLDUR, boş bırakma.
+5. "isHealthy" değeri boolean olmalı (true/false). Bitki tamamen sağlıklıysa true, herhangi bir hastalık belirtisi varsa false.
+6. BU TALİMATLAR KISMI DAHİL CEVABINDA HİÇBİR METİN VEYA AÇIKLAMA OLMASIN, SADECE JSON DÖNDÜR.''';
   }
 
   /// Görsel analizi yapar
@@ -333,197 +393,9 @@ TEMEL İLKE: Bitki tamamen sağlıklı görünmedikçe SAĞLIKLI olarak işaretl
     String? neighborhood,
     String? fieldName,
   }) async {
-    try {
-      // Boyut kontrolü ve log işlemi
-      logInfo('analyzeImage başlatılıyor',
-          'Görsel boyutu: ${imageBytes.length} bayt');
-
-      // Görüntü boyutu fazla ise küçült (maksimum 300KB)
-      Uint8List processedImageBytes = imageBytes;
-      if (imageBytes.length > 300 * 1024) {
-        try {
-          // FlutterImageCompress ile sıkıştırma yapamıyoruz, o yüzden basit bir kesme işlemi yapacağız
-          processedImageBytes =
-              await _resizeImageBytes(imageBytes, maxSizeInBytes: 300 * 1024);
-          logInfo('Görsel boyutu düşürüldü',
-              'Orijinal: ${imageBytes.length} bayt, Yeni: ${processedImageBytes.length} bayt');
-        } catch (e) {
-          logWarning('Görsel boyutu düşürülemedi', e.toString());
-          // Orijinal görüntü kullanılmaya devam edilecek
-        }
-      }
-
-      // Konum bilgilerini hazırla
-      String locationInfo = "";
-      String detailedLocation = "";
-
-      // İl, ilçe ve mahalle bilgilerinden detaylı konum oluştur
-      if (province != null && district != null) {
-        detailedLocation = "$province/$district";
-
-        if (neighborhood != null && neighborhood.isNotEmpty) {
-          detailedLocation += "/$neighborhood";
-        }
-      }
-
-      // Eğer detaylı konum bilgisi oluşturulabilirse, onu kullan
-      // Yoksa, varsa location parametresini kullan
-      final String locationToUse = detailedLocation.isNotEmpty
-          ? detailedLocation
-          : (location != null && location.isNotEmpty)
-              ? location
-              : "";
-
-      // Tarla bilgisini ekle
-      String fieldInfo = "";
-      if (fieldName != null && fieldName.isNotEmpty) {
-        fieldInfo = " ($fieldName tarla)";
-      }
-
-      // Detaylı konum bilgisi prompt'a ekle
-      if (locationToUse.isNotEmpty) {
-        locationInfo =
-            "\n\nBu bitki $locationToUse$fieldInfo bölgesinde yetiştirilmektedir. Bu bölgedeki iklim koşulları ve yerel tarım uygulamaları göz önünde bulundurularak önerilerinizi vermelisin.";
-      }
-
-      // Analiz prompt'ını hazırla
-      final finalPrompt = prompt ?? // (mevcut prompt yapısını koru)
-          '''Bu görüntüdeki bitkiyi bir ziraat mühendisi ve bitki patolojisi uzmanı olarak analiz etmeni istiyorum. ÖNEMLİ: Görüntüdeki bitkide herhangi bir hastalık belirtisi (sararmış yapraklar, lekeler, kurumalar, deformasyonlar, böcek zararları vb.) olup olmadığını tespit et. 
-
-MUTLAKA BİTKİNİN SAĞLIKLI MI YOKSA HASTALIĞA SAHİP Mİ OLDUĞUNU BELİRLE.
-- Bitkide herhangi bir anormallik, renk değişimi, yaprak deformasyonu, leke, küf, çürüme, kuruma, sararma, solma, böcek istilası veya diğer hastalık belirtileri VARSA, bitki "SAĞLIKSIZ" olarak işaretlenmelidir. 
-- YALNIZCA bitkide HİÇBİR hastalık belirtisi yoksa "SAĞLIKLI" olarak işaretle.
-- Bitki net görünmüyorsa veya emin değilsen, yaprak rengindeki değişimlere, lekelere, böcek izlerine dikkat et. Şüphe durumunda "SAĞLIKSIZ" olarak işaretle ve muhtemel sorunları belirt.
-
-$locationInfo
-
-Aşağıdaki formatta cevap ver:
-
-BITKI_ADI: [Bitkinin Türkçe adı] ([Latince adı])
-SAGLIK_DURUMU: [SAĞLIKLI/SAĞLIKSIZ] - Eğer SAĞLIKSIZ ise hastalık adını MUTLAKA belirt!
-
-TANIM: [Bitki hakkında kısa tanım]
-
-HASTALIKLAR:
-- [Hastalık adı 1]: [Kısa açıklama ve hastalığın çiftçi tarafından tanınma belirtileri]
-- [Hastalık adı 2]: [Kısa açıklama ve hastalığın çiftçi tarafından tanınma belirtileri]
-
-MUDAHALE_YONTEMLERI:
-- [İlaçlama önerisi 1]: [Kullanılabilecek ilaç/kimyasal/biyolojik mücadele yöntemi ve uygulama şekli]
-- [İlaçlama önerisi 2]: [Kullanılabilecek ilaç/kimyasal/biyolojik mücadele yöntemi ve uygulama şekli]
-- [Diğer müdahale yöntemleri]
-
-TARIMSAL_ONERILER:
-- [Sulama, gübreleme, budama gibi genel bakım önerileri]
-- [Hastalıkları/zararlıları önlemeye yönelik tarımsal uygulamalar]
-- [Toprağın iyileştirilmesi, ekim/dikim zamanı vb. konularda pratik bilgiler]
-
-BOLGESEL_BILGILER:
-- [Bölgeye özgü tarımsal bilgiler]
-- [Bölgedeki yaygın sorunlar ve bu sorunlara özel çözümler]
-- [Bölgesel iklim koşullarına göre uyarlamalar]
-
-GELISIM_ASAMASI: [Bitkinin şu anki gelişim aşaması - örneğin: Fide, Çiçeklenme, Meyvelenme, Olgunlaşma, Hasat vb.]
-GELISIM_SKORU: [0-100 arası bir değer olarak bitkinin gelişim durumu. Örneğin: 75]
-GELISIM_YORUMU: [Bitkinin gelişim durumu hakkında kısa bir yorum, varsa gelişimini yavaşlatan faktörler veya gelişimini destekleyen olumlu koşullar]
-
-SULAMA: [Sulama sıklığı ve yöntemleri hakkında çiftçiye pratik bilgiler]
-ISIK: [Işık ihtiyacı]
-TOPRAK: [Toprak gereksinimleri ve toprak hazırlama tavsiyeleri]
-IKLIM: [Bölgesel iklim koşullarına göre uyarılar ve öneriler]
-
-TEMEL İLKE: Bitki tamamen sağlıklı görünmedikçe SAĞLIKLI olarak işaretleme. Şüphe varsa, bitki SAĞLIKSIZ olarak değerlendirilmeli ve potansiyel sorunlar belirtilmelidir. SAGLIK_DURUMU değerlendirmesine özellikle dikkat et, bu çiftçi için çok önemlidir.''';
-
-      // API anahtarı kontrolü
-      String apiKey = AppConstants.geminiApiKey;
-      if (apiKey.isEmpty) {
-        apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
-      }
-
-      if (apiKey.isEmpty) {
-        logWarning('Gemini API anahtarı bulunamadı');
-        return _getDefaultImageAnalysisResponse(
-          location: location,
-          province: province,
-          district: district,
-          neighborhood: neighborhood,
-          fieldName: fieldName,
-        );
-      }
-
-      // Model başlatılmadıysa tekrar başlatmayı dene
-      if (!_isInitialized || _model == null) {
-        logInfo('Gemini modeli yeniden başlatılıyor');
-        _initializeModel();
-
-        // Hala başlatılamadıysa varsayılan yanıt dön
-        if (!_isInitialized || _model == null) {
-          logWarning('Gemini modeli hala başlatılamadı');
-          return _getDefaultImageAnalysisResponse(
-            location: location,
-            province: province,
-            district: district,
-            neighborhood: neighborhood,
-            fieldName: fieldName,
-          );
-        }
-      }
-
-      // Bu noktada model başarıyla başlatıldı, API isteği gönderebiliriz
-      try {
-        logInfo('Gemini modeline istek gönderiliyor');
-
-        // Basitleştirilmiş API çağrısı - kütüphane değişikliklerinden etkilenmemesi için
-        if (_model != null) {
-          final response =
-              await _model!.generateContent([Content.text(finalPrompt)]);
-
-          if (response.text == null || response.text!.isEmpty) {
-            logWarning('Gemini boş yanıt döndürdü');
-            return _getDefaultEmptyAnalysisResponse();
-          }
-
-          logSuccess('Gemini başarılı yanıt döndürdü',
-              'Karakter sayısı: ${response.text!.length}');
-          return response.text!;
-        } else {
-          logError('Model null iken API isteği yapıldı');
-          return _getDefaultEmptyAnalysisResponse();
-        }
-      } catch (apiError) {
-        logError('Gemini API hatası', apiError.toString());
-
-        // API hatalarında alternatif yöntem dene (REST API ile istek)
-        try {
-          logInfo('Alternatif REST API yöntemi deneniyor');
-          final restResponse = await _sendImageToGeminiRestApi(
-            imageBytes: processedImageBytes,
-            prompt: finalPrompt,
-            apiKey: apiKey,
-          );
-
-          if (restResponse != null && restResponse.isNotEmpty) {
-            logSuccess('REST API başarılı yanıt döndürdü');
-            return restResponse;
-          } else {
-            logWarning('REST API boş yanıt döndürdü');
-            return _getDefaultEmptyAnalysisResponse();
-          }
-        } catch (restError) {
-          logError('REST API hatası', restError.toString());
-          return _getDefaultErrorAnalysisResponse(
-            error: restError.toString(),
-            location: locationToUse,
-          );
-        }
-      }
-    } catch (error) {
-      logError('Beklenmeyen analiz hatası', error.toString());
-      return _getDefaultErrorAnalysisResponse(
-        error: error.toString(),
-        location: location ?? '',
-      );
-    }
+    // Eski metodu tamamen kaldırıyoruz
+    throw UnimplementedError(
+        "Bu metod artık kullanılmıyor, lütfen analyzeImage kullanın");
   }
 
   /// Alternatif REST API kullanarak görsel analizi yapar
@@ -546,7 +418,6 @@ TEMEL İLKE: Bitki tamamen sağlıklı görünmedikçe SAĞLIKLI olarak işaretl
   Future<Uint8List> _resizeImageBytes(
     Uint8List bytes, {
     int maxSizeInBytes = 300 * 1024, // Varsayılan 300KB
-    int quality = 85, // Varsayılan kalite
   }) async {
     // Çok büyük görüntüleri doğrudan kes
     if (bytes.length > 1 * 1024 * 1024) {
@@ -555,15 +426,8 @@ TEMEL İLKE: Bitki tamamen sağlıklı görünmedikçe SAĞLIKLI olarak işaretl
       final newSize = (bytes.length * cutRatio).toInt();
       return Uint8List.fromList(bytes.sublist(0, newSize));
     } else {
-      // Daha küçük görüntüleri ise kalite düşürerek küçült
-      // Base64 encoding kullanarak bir string oluştur, sonra kalitesini düşürerek geri dönüştür
-      // Bu metot ideal değil ama Gemini'nin ihtiyaçları için yeterli
+      // Daha küçük görüntüleri ise boyutunu küçült
       final ratio = maxSizeInBytes / bytes.length;
-      final newQuality = (quality * ratio).toInt();
-
-      // Kaliteyi sınırla (10-100 arası)
-      final finalQuality =
-          newQuality < 10 ? 10 : (newQuality > 100 ? 100 : newQuality);
 
       // Basit bir şekilde kesip alıyoruz - ideal olmayan ama çalışan bir yöntem
       int targetLength = (bytes.length * ratio).toInt();
@@ -575,76 +439,74 @@ TEMEL İLKE: Bitki tamamen sağlıklı görünmedikçe SAĞLIKLI olarak işaretl
     }
   }
 
-  /// Hastalık önerileri alır
-  ///
-  /// [diseaseName] hastalık adı
-  Future<String> getDiseaseRecommendations(String diseaseName) async {
-    // Model başlatılmadıysa varsayılan yanıt döndür
-    if (!_isInitialized || _model == null) {
-      logWarning('Gemini modeli başlatılmadı. Varsayılan yanıt döndürülüyor.');
-      return 'Bu bir test yanıtıdır. Gerçek Gemini API yanıtı için API anahtarınızı kontrol edin.';
-    }
-
-    try {
-      final content = [
-        Content.text(
-          '$diseaseName bitki hastalığı için detaylı tedavi ve bakım önerileri nelerdir? '
-          'Lütfen hastalığın belirtilerini, nedenlerini, yayılma şeklini, tedavi yöntemlerini '
-          've gelecekte önleme stratejilerini Türkçe olarak açıklayın.',
-        ),
-      ];
-
-      // Gemini-2.0-flash model ayarları
-      final generationConfig = GenerationConfig(
-        temperature: 0.1,
-        topK: 20,
-        topP: 0.7,
-        maxOutputTokens: 2048,
-      );
-
-      final response = await _model!.generateContent(
-        content,
-        generationConfig: generationConfig,
-      );
-
-      if (response.text == null || response.text!.isEmpty) {
-        logWarning('Hastalık önerisi alınamadı');
-        return 'Öneri alınamadı. Lütfen tekrar deneyin.';
-      }
-
-      logSuccess('Hastalık önerisi başarıyla alındı');
-      return response.text!;
-    } catch (e) {
-      logError('Gemini öneri hatası', e.toString());
-      return 'Öneri alınırken bir hata oluştu: ${e.toString()}';
-    }
-  }
-
   /// Bitki bakım tavsiyeleri alır
-  ///
-  /// [plantName] bitki adı
   Future<String> getPlantCareAdvice(String plantName) async {
     // Model başlatılmadıysa varsayılan yanıt döndür
     if (!_isInitialized || _model == null) {
       logWarning('Gemini modeli başlatılmadı. Varsayılan yanıt döndürülüyor.');
-      return 'Bu bir test yanıtıdır. Gerçek Gemini API yanıtı için API anahtarınızı kontrol edin.';
+
+      final Map<String, dynamic> defaultResponse = {
+        "title": "Bakım Tavsiyeleri",
+        "plantName": plantName,
+        "recommendations": [
+          "Bu bir test yanıtıdır. Gerçek Gemini API yanıtı için API anahtarınızı kontrol edin."
+        ]
+      };
+      return json.encode(defaultResponse);
     }
 
     try {
       final content = [
         Content.text(
-          '$plantName bitkisi için optimal yetiştirme ve bakım tavsiyeleri nelerdir? '
-          'Lütfen sulama sıklığı, ışık gereksinimleri, toprak tipi, gübreleme, budama, '
-          've yaygın sorunlar hakkında Türkçe olarak detaylı bilgi verin.',
-        ),
+            '''[GÖREV] Sen bir bitkiler konusunda uzman ziraat mühendisisin. "$plantName" bitkisi için bakım tavsiyeleri vereceksin.
+
+[FORMAT] SADECE ve YALNIZCA JSON formatında yanıt vereceksin. Cevabın başında veya sonunda herhangi bir açıklama olmadan.
+
+[ANALİZ TALİMATLARI]
+1. "$plantName" bitkisinin optimal yetiştirme şartlarını belirle.
+2. Sulama sıklığı, ışık gereksinimleri, toprak tipi, gübreleme ve budama tavsiyeleri ver.
+3. Yaygın sorunları ve çözümlerini belirt.
+4. Tüm bilgileri Türkçe olarak hazırla.
+
+[KRİTİK UYARI]
+Verdiğin cevap YALNIZCA bu JSON nesnesi olacaktır. HİÇBİR ön söz veya son söz EKLEME.
+JSON dışında TEK BİR KARAKTER bile yazma.
+Markdown biçimlendirme KULLANMA.
+
+[JSON FORMATI - TAM OLARAK BU ŞABLONU DOLDUR]
+{
+  "title": "Bakım Tavsiyeleri",
+  "plantName": "$plantName",
+  "watering": "Haftada 2 kez, toprağın üst 5 cm kısmının kuruması beklenmelidir",
+  "sunlight": "Kısmi gölge ile tam güneş arası, günde 4-6 saat doğrudan güneş ışığı",
+  "soil": "Organik maddece zengin, iyi drene olan, hafif asidik toprak",
+  "fertilizing": "Büyüme döneminde ayda bir kez dengeli gübre, kış aylarında daha az",
+  "pruning": "İlkbahar başında ölü dalları temizleyin, şeklini korumak için düzenli budama",
+  "commonIssues": ["Yaprak bitleri", "Kök çürümesi", "Yapraklarda sararma"],
+  "recommendations": [
+    "Kireçsiz su kullanın",
+    "Aşırı sulamadan kaçının",
+    "Hava sirkülasyonu sağlayın",
+    "Kışın sıcaklık 15°C'nin altına düşmemelidir"
+  ]
+}
+
+[ZORUNLU TALİMATLAR]
+1. YUKARIDAKİ JSON ŞABLONUNU KULLAN. Farklı alanlar ekleme veya çıkarma.
+2. BİR JSON OLUŞTUR, BİRDEN FAZLA DEĞİL.
+3. JSON SÖZDİZİMİNE KESİNLİKLE UYGUN OLSUN.
+4. TÜM ALANLARI DOLDUR, boş bırakma.
+5. BU TALİMATLAR KISMI DAHİL CEVABINDA HİÇBİR METİN OLMAMALI, SADECE JSON DÖNDÜR.'''),
       ];
 
       // Gemini-2.0-flash model ayarları
       final generationConfig = GenerationConfig(
-        temperature: 0.1,
-        topK: 20,
-        topP: 0.7,
+        temperature: 0.01,
+        topK: 1,
+        topP: 0.99,
         maxOutputTokens: 2048,
+        responseMimeType: 'application/json',
+        stopSequences: ['```', 'Bu yanıt', 'Bu bilgiler'],
       );
 
       final response = await _model!.generateContent(
@@ -654,14 +516,206 @@ TEMEL İLKE: Bitki tamamen sağlıklı görünmedikçe SAĞLIKLI olarak işaretl
 
       if (response.text == null || response.text!.isEmpty) {
         logWarning('Bakım tavsiyesi alınamadı');
-        return 'Bakım tavsiyeleri alınamadı. Lütfen tekrar deneyin.';
+        final Map<String, dynamic> emptyResponse = {
+          "title": "Bakım Tavsiyeleri",
+          "plantName": plantName,
+          "recommendations": [
+            "Bakım tavsiyeleri alınamadı. Lütfen tekrar deneyin."
+          ]
+        };
+        return json.encode(emptyResponse);
       }
 
       logSuccess('Bakım tavsiyesi başarıyla alındı');
-      return response.text!;
+
+      // Yanıtın JSON olup olmadığını kontrol et
+      try {
+        // JSON yanıt formatını doğrula, geçerli değilse ham metni JSON içinde döndür
+        String responseText = response.text!.trim();
+
+        // Markdown kod bloklarını temizle
+        if (responseText.contains("```json")) {
+          final startIndex = responseText.indexOf("```json") + 7;
+          final endIndex = responseText.lastIndexOf("```");
+          if (startIndex > 7 && endIndex > startIndex) {
+            responseText = responseText.substring(startIndex, endIndex).trim();
+          }
+        } else if (responseText.startsWith("```") &&
+            responseText.endsWith("```")) {
+          responseText =
+              responseText.substring(3, responseText.length - 3).trim();
+        }
+
+        // JSON geçerliliğini test et
+        json.decode(responseText);
+        return responseText;
+      } catch (jsonError) {
+        logWarning('JSON ayrıştırma hatası, ham metin döndürülüyor',
+            jsonError.toString());
+        final Map<String, dynamic> textResponse = {
+          "title": "Bakım Tavsiyeleri",
+          "plantName": plantName,
+          "rawText": response.text
+        };
+        return json.encode(textResponse);
+      }
     } catch (e) {
       logError('Gemini bakım tavsiyesi hatası', e.toString());
-      return 'Bakım tavsiyeleri alınırken bir hata oluştu: ${e.toString()}';
+      final Map<String, dynamic> errorResponse = {
+        "title": "Hata",
+        "plantName": plantName,
+        "error":
+            "Bakım tavsiyeleri alınırken bir hata oluştu: ${e.toString().substring(0, math.min(e.toString().length, 100))}..."
+      };
+      return json.encode(errorResponse);
+    }
+  }
+
+  /// Hastalık önerileri alır
+  Future<String> getDiseaseRecommendations(String diseaseName) async {
+    // Model başlatılmadıysa varsayılan yanıt döndür
+    if (!_isInitialized || _model == null) {
+      logWarning('Gemini modeli başlatılmadı. Varsayılan yanıt döndürülüyor.');
+
+      final Map<String, dynamic> defaultResponse = {
+        "title": "Hastalık Tavsiyeleri",
+        "diseaseName": diseaseName,
+        "recommendations": [
+          "Bu bir test yanıtıdır. Gerçek Gemini API yanıtı için API anahtarınızı kontrol edin."
+        ]
+      };
+      return json.encode(defaultResponse);
+    }
+
+    try {
+      final content = [
+        Content.text(
+            '''[GÖREV] Sen bir bitki patolojisi uzmanısın. "$diseaseName" bitki hastalığı için detaylı tedavi ve bakım önerilerini vereceksin.
+
+[FORMAT] SADECE ve YALNIZCA JSON formatında yanıt vereceksin. Cevabın başında veya sonunda herhangi bir açıklama olmadan.
+
+[ANALİZ TALİMATLARI]
+1. "$diseaseName" bitki hastalığının belirtilerini, nedenlerini ve yayılma şeklini belirle.
+2. Tedavi yöntemlerini, kimyasal ve biyolojik müdahale seçeneklerini detaylandır.
+3. Gelecekte önleme stratejilerini açıkla.
+4. Tüm bilgileri Türkçe olarak hazırla.
+
+[KRİTİK UYARI]
+Verdiğin cevap YALNIZCA bu JSON nesnesi olacaktır. HİÇBİR ön söz veya son söz EKLEME.
+JSON dışında TEK BİR KARAKTER bile yazma.
+Markdown biçimlendirme KULLANMA.
+
+[JSON FORMATI - TAM OLARAK BU ŞABLONU DOLDUR]
+{
+  "title": "Hastalık Tavsiyeleri",
+  "diseaseName": "$diseaseName",
+  "symptoms": [
+    "Yapraklarda sarı-kahverengi lekeler", 
+    "Yaprak kenarlarında kıvrılma",
+    "Büyüme geriliği"
+  ],
+  "causes": [
+    "Pseudomonas syringae bakterisi", 
+    "Yüksek nem oranı",
+    "Hava sirkülasyonu eksikliği"
+  ],
+  "treatments": [
+    "Etkilenen yaprakları hemen uzaklaştırın",
+    "Bakır bazlı fungisitlerle ilaçlama yapın",
+    "Bitki beslemesini güçlendirin"
+  ],
+  "prevention": [
+    "Dayanıklı bitki çeşitleri kullanın",
+    "Sulama yaparken yaprakları ıslatmaktan kaçının",
+    "Bitkiler arasında yeterli mesafe bırakın"
+  ],
+  "chemicalTreatments": [
+    "Bakır oksiklorür solüsyonu",
+    "Mankozeb içerikli ilaçlar",
+    "Streptomisin sülfat (bakteriyel enfeksiyonlar için)"
+  ],
+  "biologicalTreatments": [
+    "Bacillus subtilis içeren biyolojik preparatlar",
+    "Trichoderma harzianum mantarı içeren ürünler",
+    "Sarımsak özü spreyi"
+  ]
+}
+
+[ZORUNLU TALİMATLAR]
+1. YUKARIDAKİ JSON ŞABLONUNU KULLAN. Farklı alanlar ekleme veya çıkarma.
+2. BİR JSON OLUŞTUR, BİRDEN FAZLA DEĞİL.
+3. JSON SÖZDİZİMİNE KESİNLİKLE UYGUN OLSUN.
+4. TÜM ALANLARI DOLDUR, boş bırakma.
+5. BU TALİMATLAR KISMI DAHİL CEVABINDA HİÇBİR METİN OLMAMALI, SADECE JSON DÖNDÜR.'''),
+      ];
+
+      // Gemini-2.0-flash model ayarları
+      final generationConfig = GenerationConfig(
+        temperature: 0.01,
+        topK: 1,
+        topP: 0.99,
+        maxOutputTokens: 2048,
+        responseMimeType: 'application/json',
+        stopSequences: ['```', 'Bu yanıt', 'Bu bilgiler'],
+      );
+
+      final response = await _model!.generateContent(
+        content,
+        generationConfig: generationConfig,
+      );
+
+      if (response.text == null || response.text!.isEmpty) {
+        logWarning('Hastalık önerisi alınamadı');
+        final Map<String, dynamic> emptyResponse = {
+          "title": "Hastalık Tavsiyeleri",
+          "diseaseName": diseaseName,
+          "treatments": ["Öneri alınamadı. Lütfen tekrar deneyin."]
+        };
+        return json.encode(emptyResponse);
+      }
+
+      logSuccess('Hastalık önerisi başarıyla alındı');
+
+      // Yanıtın JSON olup olmadığını kontrol et
+      try {
+        // JSON yanıt formatını doğrula, geçerli değilse ham metni JSON içinde döndür
+        String responseText = response.text!.trim();
+
+        // Markdown kod bloklarını temizle
+        if (responseText.contains("```json")) {
+          final startIndex = responseText.indexOf("```json") + 7;
+          final endIndex = responseText.lastIndexOf("```");
+          if (startIndex > 7 && endIndex > startIndex) {
+            responseText = responseText.substring(startIndex, endIndex).trim();
+          }
+        } else if (responseText.startsWith("```") &&
+            responseText.endsWith("```")) {
+          responseText =
+              responseText.substring(3, responseText.length - 3).trim();
+        }
+
+        // JSON geçerliliğini test et
+        json.decode(responseText);
+        return responseText;
+      } catch (jsonError) {
+        logWarning('JSON ayrıştırma hatası, ham metin döndürülüyor',
+            jsonError.toString());
+        final Map<String, dynamic> textResponse = {
+          "title": "Hastalık Tavsiyeleri",
+          "diseaseName": diseaseName,
+          "rawText": response.text
+        };
+        return json.encode(textResponse);
+      }
+    } catch (e) {
+      logError('Gemini öneri hatası', e.toString());
+      final Map<String, dynamic> errorResponse = {
+        "title": "Hata",
+        "diseaseName": diseaseName,
+        "error":
+            "Öneri alınırken bir hata oluştu: ${e.toString().substring(0, math.min(e.toString().length, 100))}..."
+      };
+      return json.encode(errorResponse);
     }
   }
 
@@ -683,7 +737,7 @@ TEMEL İLKE: Bitki tamamen sağlıklı görünmedikçe SAĞLIKLI olarak işaretl
       }
 
       final response = await _dio.post(
-        '$_apiUrl?key=$_apiKey',
+        "$_apiUrl?key=$_apiKey",
         data: {
           'contents': [
             {
@@ -716,11 +770,11 @@ TEMEL İLKE: Bitki tamamen sağlıklı görünmedikçe SAĞLIKLI olarak işaretl
         return 'Yanıt alınamadı.';
       } else {
         logError('Gemini API hatası: ${response.statusCode}', response.data);
-        return 'API hatası: ${response.statusCode}';
+        return "API hatası: ${response.statusCode}";
       }
     } catch (e) {
       logError('Gemini API isteği sırasında hata', e.toString());
-      return 'Bir hata oluştu: $e';
+      return "Bir hata oluştu: $e";
     }
   }
 
@@ -732,7 +786,7 @@ TEMEL İLKE: Bitki tamamen sağlıklı görünmedikçe SAĞLIKLI olarak işaretl
         prompt.toLowerCase().contains('analiz')) {
       return 'Bu bir test yanıtıdır. Gerçek Gemini API yanıtı için API anahtarınızı kontrol edin.';
     }
-    return 'API anahtarı bulunamadı. Lütfen .env dosyanızı kontrol edin.';
+    return "API anahtarı bulunamadı. Lütfen .env dosyanızı kontrol edin.";
   }
 
   /// Görsel analiz için varsayılan yanıt döndürür
@@ -744,69 +798,88 @@ TEMEL İLKE: Bitki tamamen sağlıklı görünmedikçe SAĞLIKLI olarak işaretl
     String? fieldName,
   }) {
     // Konum bilgilerini hazırla
-    String locationInfo = "";
-    String detailedLocation = "";
+    final locationInfo = _prepareLocationInfo(
+        location: location,
+        province: province,
+        district: district,
+        neighborhood: neighborhood,
+        fieldName: fieldName);
 
-    // İl, ilçe ve mahalle bilgilerinden detaylı konum oluştur
-    if (province != null && district != null) {
-      detailedLocation = "$province/$district";
+    // JSON yanıt oluştur
+    final Map<String, dynamic> jsonResponse = {
+      "plantName": "Test Bitkisi (Testus plantus)",
+      "isHealthy": false,
+      "description":
+          "Bu bir test yanıtıdır. Gerçek Gemini API yanıtı için API anahtarınızı kontrol edin.",
+      "diseases": [
+        {
+          "name": "Test Hastalığı",
+          "description": "Bu bir test hastalığıdır. API anahtarı gerekli.",
+          "probability": 0.8,
+          "treatments": [
+            "API anahtarınızı kontrol edin",
+            "Gerçek analiz için API anahtarı kullanın"
+          ]
+        }
+      ],
+      "suggestions": [
+        "API anahtarınızı kontrol edin",
+        "Gerçek analiz için API anahtarı kullanın"
+      ],
+      "interventionMethods": ["API anahtarı ekleyin"],
+      "agriculturalTips": ["Düzenli sulama yapın", "Güneş ışığı sağlayın"],
+      "watering": "Haftada iki kez sulama yapın",
+      "sunlight": "Orta düzeyde güneş ışığı",
+      "soil": "İyi drene olmuş verimli toprak",
+      "climate": "Ilıman iklim koşulları",
+      "growthStage": "Test aşaması",
+      "growthScore": 45,
+      "growthComment": "Bu bir test gelişim yorumudur."
+    };
 
-      if (neighborhood != null && neighborhood.isNotEmpty) {
-        detailedLocation += "/$neighborhood";
-      }
+    // Eğer konum bilgisi varsa ekle
+    if (locationInfo.isNotEmpty) {
+      jsonResponse["location"] = locationInfo;
     }
 
-    // Eğer detaylı konum bilgisi oluşturulabilirse, onu kullan
-    // Yoksa, varsa location parametresini kullan
-    final String locationToUse = detailedLocation.isNotEmpty
-        ? detailedLocation
-        : (location != null && location.isNotEmpty)
-            ? location
-            : "";
-
-    // Tarla bilgisini ekle
-    String fieldInfo = "";
-    if (fieldName != null && fieldName.isNotEmpty) {
-      fieldInfo = " ($fieldName tarla)";
+    try {
+      // JSON'ı string'e çevir
+      return json.encode(jsonResponse);
+    } catch (e) {
+      logError('JSON encode hatası', e.toString());
+      // Hata durumunda basit format döndür
+      return '{"plantName":"Test Bitkisi","isHealthy":false,"description":"JSON hatası oluştu"}';
     }
-
-    // Konum bilgisini ekle
-    if (locationToUse.isNotEmpty) {
-      locationInfo =
-          "\n\nBu bitki $locationToUse$fieldInfo bölgesinde yetiştirilmektedir.";
-    }
-
-    // Varsayılan yanıt oluştur
-    return '''BITKI_ADI: Test Bitkisi (Testus plantus)
-SAGLIK_DURUMU: Sağlıksız
-TANIM: Bu bir test yanıtıdır. Gerçek Gemini API yanıtı için API anahtarınızı kontrol edin.
-
-HASTALIKLAR:
-- Test Hastalığı: Bu bir test hastalığıdır.
-
-MUDAHALE_YONTEMLERI:
-- Test İlaçlama: Bu bir test ilaçlamadır.
-
-TARIMSAL_ONERILER:
-- Test Sulama: Bu bir test sulamadır.
-- Test Gübreleme: Bu bir test gübrelemedir.
-
-BOLGESEL_BILGILER:
-- Test Bölge Bilgisi: Bu bir test bölge bilgisidir.$locationInfo
-
-GELISIM_ASAMASI: Test Aşaması
-GELISIM_SKORU: 45
-GELISIM_YORUMU: Bu bir test gelişim yorumudur.
-
-SULAMA: Test sulama bilgisi
-ISIK: Test ışık bilgisi
-TOPRAK: Test toprak bilgisi
-IKLIM: Test iklim bilgisi''';
   }
 
   /// Görsel analiz için varsayılan boş yanıt döndürür
   String _getDefaultEmptyAnalysisResponse() {
-    return 'Görsel analizi yapılamadı. Lütfen daha sonra tekrar deneyin.';
+    final Map<String, dynamic> jsonResponse = {
+      "plantName": "Analiz Edilemedi",
+      "isHealthy": false,
+      "description":
+          "Görsel analizi yapılamadı. Lütfen daha sonra tekrar deneyin.",
+      "diseases": [],
+      "suggestions": [
+        "Daha net bir görüntü ile tekrar deneyin",
+        "Farklı bir açıdan çekim yapın"
+      ],
+      "interventionMethods": [],
+      "agriculturalTips": [],
+      "watering": "Belirlenemedi",
+      "sunlight": "Belirlenemedi",
+      "soil": "Belirlenemedi",
+      "climate": "Belirlenemedi",
+      "growthStage": "Belirlenemedi",
+      "growthScore": 0,
+      "growthComment": "Görüntü analiz edilemedi"
+    };
+
+    try {
+      return json.encode(jsonResponse);
+    } catch (e) {
+      return '{"plantName":"Analiz Edilemedi","isHealthy":false,"description":"Görsel analizi yapılamadı."}';
+    }
   }
 
   /// Görsel analiz için varsayılan hata yanıtı döndürür
@@ -814,6 +887,36 @@ IKLIM: Test iklim bilgisi''';
     required String error,
     required String location,
   }) {
-    return 'Görsel analiz sırasında bir hata oluştu: $error. Lütfen daha sonra tekrar deneyin.';
+    final Map<String, dynamic> jsonResponse = {
+      "plantName": "Hata Oluştu",
+      "isHealthy": false,
+      "description":
+          "Görsel analiz sırasında bir hata oluştu: ${error.length > 100 ? '${error.substring(0, 100)}...' : error}",
+      "diseases": [],
+      "suggestions": [
+        "Lütfen daha sonra tekrar deneyin",
+        "Farklı bir görüntü ile deneme yapın"
+      ],
+      "interventionMethods": [],
+      "agriculturalTips": [],
+      "watering": "Belirlenemedi",
+      "sunlight": "Belirlenemedi",
+      "soil": "Belirlenemedi",
+      "climate": "Belirlenemedi",
+      "growthStage": "Belirlenemedi",
+      "growthScore": 0,
+      "growthComment": "Hata nedeniyle analiz yapılamadı"
+    };
+
+    // Konum bilgisini ekle
+    if (location.isNotEmpty) {
+      jsonResponse["location"] = location;
+    }
+
+    try {
+      return json.encode(jsonResponse);
+    } catch (e) {
+      return '{"plantName":"Hata Oluştu","isHealthy":false,"description":"Görsel analiz sırasında bir hata oluştu."}';
+    }
   }
 }

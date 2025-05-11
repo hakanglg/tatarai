@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:convert';
+import 'dart:math' as math; // Math için eklendi
 // Base64 için eklendi
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -14,6 +16,7 @@ import 'package:tatarai/features/plant_analysis/services/gemini_service.dart';
 import 'package:tatarai/features/plant_analysis/services/plant_analysis_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:tatarai/core/utils/logger.dart';
+import 'package:http/http.dart' as http; // Görüntü indirme için eklendi
 
 /// Bitki analizi repository sınıfı
 /// API, Firestore ve Storage işlemlerini koordine eder
@@ -84,265 +87,150 @@ class PlantAnalysisRepository extends BaseRepository {
     }
   }
 
-  /// Bitki resmini analiz et - Gemini veya PlantID API kullanarak
-  Future<PlantAnalysisResult> analyzeImage(
-    File imageFile, {
-    bool useGemini = true,
-    String? location,
-    String? province,
-    String? district,
-    String? neighborhood,
+  /// Bitkiyi Gemini ile analiz et
+  Future<PlantAnalysisResult> analyzeImage({
+    required String imageUrl,
+    required String location,
     String? fieldName,
   }) async {
     await _ensureInitialized();
 
-    // 1. Temel loglamayı yap
-    logInfo('Bitki analizi başlatılıyor',
-        'Dosya: ${imageFile.path}, Boyut: ${await imageFile.length()} bayt');
+    final analysisResult = await _analyzeWithGemini(
+      imageUrl,
+      location,
+      fieldName,
+    );
 
     try {
-      // 2. Kullanıcı kontrolü
+      await saveAnalysisResult(result: analysisResult);
+      return analysisResult;
+    } catch (e) {
+      logError('Analiz kaydetme hatası', e.toString());
+      return analysisResult;
+    }
+  }
+
+  // URL'den görüntü byte'larını indirmek için yardımcı metot
+  // TODO: Gerçek görüntü indirme mantığını implemente et
+  Future<Uint8List> _downloadImageBytes(String imageUrl) async {
+    try {
+      AppLogger.i("URL'den görüntü indiriliyor: $imageUrl");
+      final response = await http.get(Uri.parse(imageUrl));
+      if (response.statusCode == 200) {
+        AppLogger.i("$imageUrl adresinden görüntü başarıyla indirildi");
+        return response.bodyBytes;
+      } else {
+        AppLogger.e(
+            "$imageUrl adresinden görüntü indirilemedi. Durum kodu: ${response.statusCode}");
+        throw Exception('Görüntü indirilemedi');
+      }
+    } catch (e) {
+      AppLogger.e(
+          "$imageUrl adresinden görüntü indirilirken hata oluştu: ${e.toString()}");
+      throw Exception('Görüntü indirilirken hata oluştu: ${e.toString()}');
+    }
+  }
+
+  /// Analizi Gemini ile gerçekleştir
+  Future<PlantAnalysisResult> _analyzeWithGemini(
+      String imageUrl, String location, String? fieldName) async {
+    try {
+      AppLogger.i("Gemini ile bitki analizi başlatılıyor");
+
       final userId = _getCurrentUserId();
       if (userId == null) {
-        logError('Kullanıcı oturum açmamış');
-        return PlantAnalysisResult(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          plantName: 'Analiz Edilemedi',
-          probability: 0.0,
-          isHealthy: false,
-          diseases: [],
-          description: 'Kullanıcı oturum açmamış.',
-          suggestions: ['Lütfen önce giriş yapın.'],
-          imageUrl: '',
-          similarImages: [],
-        );
-      }
-      logInfo('Kullanıcı kimliği doğrulandı', 'UserID: $userId');
-
-      // 3. Görüntüyü yükle - doğrudan _storage kullanarak
-      logInfo('Görüntü yükleniyor', 'Dosya: ${imageFile.path}');
-
-      String imageUrl = '';
-      try {
-        final userId = _getCurrentUserId() ?? 'anonymous';
-        final timestamp = DateTime.now().millisecondsSinceEpoch;
-        final fileName = '$timestamp.jpg';
-        final folderPath = 'analyses/$userId';
-        final filePath = '$folderPath/$fileName';
-        final ref = _storage.ref().child(filePath);
-
-        // Görüntüyü sıkıştır
-        final Uint8List imageBytes = await _compressImageIfNeeded(imageFile);
-
-        // Yükleme işlemini başlat
-        final uploadTask = ref.putData(
-          imageBytes,
-          SettableMetadata(
-            contentType: 'image/jpeg',
-            customMetadata: {
-              'userId': userId,
-              'originalSize': (await imageFile.length()).toString(),
-              'compressedSize': imageBytes.length.toString(),
-              'uploadDate': DateTime.now().toIso8601String(),
-            },
-          ),
-        );
-
-        // Yükleme tamamlanana kadar bekle ve sonucu al
-        final taskSnapshot = await uploadTask;
-        imageUrl = await taskSnapshot.ref.getDownloadURL();
-        AppLogger.i('Görüntü yüklendi', 'URL: $imageUrl, Yol: $filePath');
-      } catch (uploadError) {
-        logError('Görüntü yükleme hatası', uploadError.toString());
-        return PlantAnalysisResult(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          plantName: 'Analiz Edilemedi',
-          probability: 0.0,
-          isHealthy: false,
-          diseases: [],
-          description: 'Görüntü yüklenirken bir hata oluştu.',
-          suggestions: [
-            'Lütfen başka bir fotoğraf ile tekrar deneyin.',
-            'Hata: ${uploadError.toString()}'
-          ],
-          imageUrl: '',
-          similarImages: [],
-        );
+        throw Exception('Kullanıcı oturum açmamış. Lütfen önce giriş yapın.');
       }
 
-      if (imageUrl.isEmpty) {
-        logError('Görüntü yüklenemedi');
-        return PlantAnalysisResult(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          plantName: 'Analiz Edilemedi',
-          probability: 0.0,
-          isHealthy: false,
-          diseases: [],
-          description: 'Görüntü yüklenemedi.',
-          suggestions: ['Lütfen başka bir fotoğraf ile tekrar deneyin.'],
-          imageUrl: '',
-          similarImages: [],
-        );
-      }
-      logSuccess('Görüntü yüklendi', 'URL: $imageUrl');
+      final String prompt = _createBilingualPrompt(imageUrl, '');
+      final Uint8List imageBytes = await _downloadImageBytes(imageUrl);
 
-      // 4. Varsayılan değerleri hazırla
-      final String locationInfo = location ?? "Tekirdağ/Tatarlı";
-      PlantAnalysisResult result = _createEmptyAnalysisResult(
-        imageUrl: imageUrl,
-        location: locationInfo,
+      if (imageBytes.isEmpty) {
+        AppLogger.e("${imageUrl} URL'si için indirilen görüntü byte'ları boş.");
+        return PlantAnalysisResult(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            plantName: 'Görüntü İndirilemedi',
+            probability: 0.0,
+            isHealthy: false,
+            diseases: [],
+            description: 'Görüntü URL\'den indirilemedi: $imageUrl',
+            suggestions: [],
+            imageUrl: imageUrl,
+            similarImages: [],
+            location: location,
+            fieldName: fieldName,
+            geminiAnalysis: 'Görüntü URL\'den indirilemedi.');
+      }
+
+      final response = await _plantAnalysisService.analyzePlant(
+        imageBytes,
+        userId,
+        prompt: prompt,
+        location: location,
         fieldName: fieldName,
       );
 
-      if (useGemini) {
-        try {
-          // 5. Görüntüyü analiz et
-          logInfo('Görüntü analizi başlatılıyor', 'Gemini API kullanılıyor');
-          final imageBytes = await imageFile.readAsBytes();
-
-          try {
-            // Direk PlantAnalysisService üzerinden çağrı yap
-            final response = await _plantAnalysisService.analyzePlant(
-              imageBytes,
-              userId,
-              prompt: null,
-              location: location,
-              province: province,
-              district: district,
-              neighborhood: neighborhood,
-              fieldName: fieldName,
-            );
-
-            if (!response.success) {
-              if (response.needsPremium) {
-                logWarning('Premium gerekli', response.message);
-                return PlantAnalysisResult(
-                  id: DateTime.now().millisecondsSinceEpoch.toString(),
-                  plantName: 'Premium Gerekli',
-                  probability: 0.0,
-                  isHealthy: false,
-                  diseases: [],
-                  description: 'Bu özellik premium üyelik gerektirir.',
-                  suggestions: ['Lütfen üyelik planınızı yükseltin.'],
-                  imageUrl: imageUrl,
-                  similarImages: [],
-                );
-              } else {
-                logError('Gemini yanıtı başarısız', response.message);
-                logInfo('Alternatif analiz denenecek');
-
-                // İlk yöntem başarısız oldu, yedek yöntemi dene
-                return await _runBackupAnalysis(
-                    imageFile, imageUrl, locationInfo, fieldName);
-              }
-            }
-
-            // 6. Yanıtı kontrol et
-            final responseText = response.result ?? '';
-            if (responseText.isEmpty) {
-              logError('Gemini yanıtı boş');
-              logInfo('Alternatif analiz denenecek');
-
-              // İlk yöntem başarısız oldu, yedek yöntemi dene
-              return await _runBackupAnalysis(
-                  imageFile, imageUrl, locationInfo, fieldName);
-            }
-            logSuccess('Gemini yanıtı alındı',
-                'Yanıt uzunluğu: ${responseText.length} karakter');
-
-            // 7. Yanıtı işle
-            try {
-              result = _parseGeminiResponse(
-                responseText,
-                imageUrl,
-                locationInfo,
-                fieldName,
-              );
-              logSuccess('Gemini yanıtı işlendi', 'Bitki: ${result.plantName}');
-            } catch (parseError) {
-              logError('Gemini yanıtı işleme hatası', parseError.toString());
-              // Parse hatası durumunda yedek yöntem yerine ham yanıtı kullan
-              return PlantAnalysisResult(
-                id: DateTime.now().millisecondsSinceEpoch.toString(),
-                plantName: 'İşleme Hatası',
-                probability: 0.0,
-                isHealthy: true,
-                diseases: [],
-                description:
-                    'Analiz sonucu işlenirken bir hata oluştu, ancak ham yanıt aşağıdadır:',
-                suggestions: [
-                  responseText.length > 1000
-                      ? responseText.substring(0, 1000) + "..."
-                      : responseText
-                ],
-                imageUrl: imageUrl,
-                similarImages: [],
-                geminiAnalysis: responseText,
-              );
-            }
-          } catch (serviceError) {
-            logError('Servis hatası', serviceError.toString());
-            logInfo('Alternatif analiz denenecek');
-
-            // Service çağrısı başarısız oldu, yedek yöntemi dene
-            return await _runBackupAnalysis(
-                imageFile, imageUrl, locationInfo, fieldName);
-          }
-        } catch (analysisError) {
-          logError('Gemini analizi hatası', analysisError.toString());
-          // Analiz hatası durumunda da yedek yöntemi dene
-          return await _runBackupAnalysis(
-              imageFile, imageUrl, locationInfo, fieldName);
-        }
+      if (!response.success) {
+        final errorMessage = response.message ?? 'Bilinmeyen hata';
+        logError('Gemini analiz hatası', errorMessage);
+        return PlantAnalysisResult(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            plantName: 'Analiz Başarısız',
+            probability: 0.0,
+            isHealthy: false,
+            diseases: [],
+            description: errorMessage,
+            suggestions: [],
+            imageUrl: imageUrl,
+            similarImages: [],
+            location: location,
+            fieldName: fieldName,
+            geminiAnalysis: response.result ?? errorMessage);
       }
 
-      // 8. Analiz sonucunu kaydet
-      try {
-        logInfo('Analiz sonucunu kaydediyor');
-        await saveAnalysisResult(result: result);
-        logSuccess('Analiz sonucu kaydedildi', 'ID: ${result.id}');
-      } catch (saveError) {
-        logError('Analiz sonucu kaydetme hatası', saveError.toString());
-        // Kayıt hatası olsa bile analiz sonucunu dön
+      final result = response.result;
+      if (result == null || result.trim().isEmpty) {
+        AppLogger.e("Gemini analizi boş sonuç döndü");
+        return PlantAnalysisResult(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            plantName: 'Analiz Sonucu Boş',
+            probability: 0.0,
+            isHealthy: false,
+            diseases: [],
+            description: 'Gemini analizi boş veya geçersiz bir sonuç döndürdü.',
+            suggestions: [],
+            imageUrl: imageUrl,
+            similarImages: [],
+            location: location,
+            fieldName: fieldName,
+            geminiAnalysis: result ?? 'Boş yanıt');
       }
 
-      // 9. Sonucu döndür
-      return result;
-    } catch (error) {
-      logError('Analiz sırasında hata oluştu', 'Hata: ${error.toString()}');
-
-      // Hatanın içeriğinden bölüm gösteren bir yapıyla logu zenginleştir
-      String errorDetails = '';
-      try {
-        errorDetails = error.toString().substring(
-            0, error.toString().length > 500 ? 500 : error.toString().length);
-      } catch (_) {
-        errorDetails = error.toString();
-      }
-      logError('Hata detayları', errorDetails);
-
-      // Hata ile bir sonuç oluştur - bu aşamada hatayı üst katmana gönderme
+      AppLogger.i("Gemini analizi başarılı");
+      return _parseGeminiResponse(result, imageUrl, location, fieldName);
+    } catch (e, stackTrace) {
+      final errorMessage = 'Gemini analizi sırasında hata: ${e.toString()}';
+      AppLogger.e(errorMessage, e, stackTrace);
       return PlantAnalysisResult(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        plantName: 'Analiz Edilemedi',
-        probability: 0.0,
-        isHealthy: false,
-        diseases: [],
-        description: 'Analiz sırasında bir hata oluştu: ${error.toString()}',
-        suggestions: [
-          'Lütfen başka bir fotoğraf ile tekrar deneyin.',
-          'Hata: ${errorDetails}'
-        ],
-        imageUrl: '',
-        similarImages: [],
-      );
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          plantName: 'Analiz Hatası',
+          probability: 0.0,
+          isHealthy: false,
+          diseases: [],
+          description: errorMessage,
+          suggestions: [],
+          imageUrl: imageUrl,
+          similarImages: [],
+          location: location,
+          fieldName: fieldName,
+          geminiAnalysis: errorMessage);
     }
   }
 
   /// Yedek analiz yöntemi - AI servisi çalışmadığında default yanıt dondürür
   Future<PlantAnalysisResult> _runBackupAnalysis(File imageFile,
       String imageUrl, String location, String? fieldName) async {
-    logInfo('Yedek analiz yöntemi çalıştırılıyor');
+    AppLogger.i("Yedek analiz yöntemi çalıştırılıyor");
 
     try {
       // Basit bir bitkisel analiz sonucu oluştur
@@ -375,7 +263,7 @@ class PlantAnalysisRepository extends BaseRepository {
         growthScore: 50,
       );
     } catch (backupError) {
-      logError('Yedek analiz yöntemi hatası', backupError.toString());
+      AppLogger.e("Yedek analiz yöntemi hatası", backupError);
 
       // Tamamen basit bir sonuç döndür
       return PlantAnalysisResult(
@@ -397,25 +285,19 @@ class PlantAnalysisRepository extends BaseRepository {
     required String imageUrl,
     required String location,
     String? fieldName,
+    String? errorMessage,
   }) {
-    return PlantAnalysisResult(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      plantName: 'Analiz Edilemedi',
-      probability: 0.0,
-      isHealthy: false,
-      diseases: [],
-      description: 'Analiz sonucu alınamadı.',
-      suggestions: ['Lütfen başka bir fotoğraf ile tekrar deneyin.'],
+    // PlantAnalysisResult.createEmpty statik metodunu kullan
+    return PlantAnalysisResult.createEmpty(
       imageUrl: imageUrl,
-      similarImages: [],
-      geminiAnalysis: '',
       location: location,
       fieldName: fieldName,
+      errorMessage: errorMessage,
     );
   }
 
   /// Görüntüyü Firebase Storage'a yükle
-  Future<String> _uploadImage(File imageFile) async {
+  Future<String> uploadImage(File imageFile) async {
     await _ensureInitialized();
 
     final result = await storageCall<String>(
@@ -485,7 +367,7 @@ class PlantAnalysisRepository extends BaseRepository {
             'Görüntü yeterince küçük, sıkıştırma yapılmıyor: ${(originalSize / 1024).toStringAsFixed(1)} KB');
       }
 
-      // Sıkıştırma yapılamadıysa veya gerekli değilse orijinal görüntüyü döndür
+      // Sıkıştırma yapılamadıysa ve gerekli değilse orijinal görüntüyü döndür
       return await imageFile.readAsBytes();
     } catch (e) {
       AppLogger.w('Görüntü sıkıştırma hatası, orijinal dosya kullanılacak',
@@ -533,58 +415,14 @@ class PlantAnalysisRepository extends BaseRepository {
   /// Analiz sonucunu Firestore için hazırla
   Map<String, dynamic> _prepareAnalysisDataForSave(
       PlantAnalysisResult result, String docId) {
-    final Map<String, dynamic> dataToSave = {
-      'id': docId,
-      'plantName': result.plantName,
-      'probability': result.probability,
-      'isHealthy': result.isHealthy,
-      'description': result.description,
-      'imageUrl': result.imageUrl,
-      'timestamp': DateTime.now().millisecondsSinceEpoch,
-      // Primitive tipler ve basit listeler
-      'suggestions': result.suggestions.map((s) => s.toString()).toList(),
-      'similarImages': result.similarImages.map((s) => s.toString()).toList(),
-      // Diğer alanlar
-      'watering': result.watering,
-      'sunlight': result.sunlight,
-      'soil': result.soil,
-      'climate': result.climate,
-      'location': result.location,
-      'fieldName': result.fieldName,
-      'growthStage': result.growthStage,
-      'growthScore': result.growthScore,
-    };
+    // PlantAnalysisResult.toJson() metodunu kullanarak doğrudan JSON yapısını oluştur
+    final Map<String, dynamic> dataToSave = result.toJson();
 
-    // Diseases listesini hazırla
-    if (result.diseases.isNotEmpty) {
-      dataToSave['diseases'] = result.diseases
-          .map((disease) => {
-                'name': disease.name,
-                'probability': disease.probability,
-                'description': disease.description,
-              })
-          .toList();
-    } else {
-      dataToSave['diseases'] = [];
-    }
+    // ID alanını docId ile güncelle
+    dataToSave['id'] = docId;
 
-    // Gemini analizini ekle (eğer varsa)
-    if (result.geminiAnalysis != null && result.geminiAnalysis!.isNotEmpty) {
-      dataToSave['geminiAnalysis'] = result.geminiAnalysis;
-    }
-
-    // Taksonomi bilgisini ekle (eğer varsa)
-    if (result.taxonomy != null) {
-      dataToSave['taxonomy'] = {
-        'kingdom': result.taxonomy!.kingdom,
-        'phylum': result.taxonomy!.phylum,
-        'class': result.taxonomy!.class_,
-        'order': result.taxonomy!.order,
-        'family': result.taxonomy!.family,
-        'genus': result.taxonomy!.genus,
-        'species': result.taxonomy!.species,
-      };
-    }
+    // Zaman damgasını ekle/güncelle
+    dataToSave['timestamp'] = DateTime.now().millisecondsSinceEpoch;
 
     return dataToSave;
   }
@@ -676,14 +514,15 @@ class PlantAnalysisRepository extends BaseRepository {
           return null;
         }
 
+        // Veriyi al ve ID kontrolü yap
         final data = docSnapshot.data()!;
-        // Belge ID'sini ekleyelim (eğer yoksa)
         if (!data.containsKey('id') ||
             data['id'] == null ||
             data['id'].toString().isEmpty) {
           data['id'] = docSnapshot.id;
         }
 
+        // doğrudan fromJson metodunu kullan
         return PlantAnalysisResult.fromJson(data);
       },
     );
@@ -738,31 +577,9 @@ class PlantAnalysisRepository extends BaseRepository {
           return null;
         }
 
-        try {
-          final data = docSnapshot.data()!;
-          // Belge ID'sini ekleyelim (eğer yoksa)
-          if (!data.containsKey('id') ||
-              data['id'] == null ||
-              data['id'].toString().isEmpty) {
-            data['id'] = docSnapshot.id;
-          }
-
-          return _convertDocToAnalysisResult(data, analysisId);
-        } catch (parseError) {
-          logError('Belge dönüştürülürken hata oluştu', parseError.toString());
-
-          // Dokümandaki tüm alanları kontrol et
-          final data = docSnapshot.data()!;
-          final fields = data.keys
-              .map((key) =>
-                  "$key: ${data[key] is String ? 'String' : (data[key] is List ? 'List' : (data[key] is Map ? 'Map' : 'Other'))}")
-              .join(', ');
-          logDebug('Belge alanları', fields);
-
-          // En azından temel bilgileri içeren basitleştirilmiş bir sonuç döndür
-          return _createSimplifiedErrorResult(
-              analysisId, data, parseError.toString());
-        }
+        // Veriyi al ve _convertDocToAnalysisResult metodunu kullan
+        final data = docSnapshot.data()!;
+        return _convertDocToAnalysisResult(data, analysisId);
       },
     );
   }
@@ -772,11 +589,12 @@ class PlantAnalysisRepository extends BaseRepository {
       String analysisId, Map<String, dynamic> data, String errorMessage) {
     return PlantAnalysisResult(
       id: analysisId,
-      plantName: data['plantName'] ?? 'Dönüşüm Hatası',
+      plantName: 'Bilinmeyen Bitki',
       probability: 0.0,
       isHealthy: true,
       diseases: [],
-      description: 'Analiz sonucu dönüştürülürken hata oluştu: $errorMessage',
+      description:
+          'Analiz sonucu gösterilirken bir hata oluştu. Bu bir örnek analiz sonucudur.',
       suggestions: [
         'Lütfen başka bir analiz seçin veya yeni bir analiz yapın.'
       ],
@@ -788,117 +606,27 @@ class PlantAnalysisRepository extends BaseRepository {
   /// Firestore belgesini PlantAnalysisResult nesnesine dönüştürür
   PlantAnalysisResult _convertDocToAnalysisResult(
       Map<String, dynamic> data, String docId) {
-    // Hastalıkları dönüştür
-    List<Disease> diseases = _extractDiseases(data);
-
-    // Önerileri dönüştür
-    List<String> suggestions = _extractSuggestions(data);
-
-    // Benzer görüntüleri dönüştür
-    List<String> similarImages = _extractSimilarImages(data);
-
-    // Taksonomi bilgisini dönüştür
-    PlantTaxonomy? taxonomy = _extractTaxonomy(data);
-
-    // PlantAnalysisResult nesnesini oluştur
-    return PlantAnalysisResult(
-      id: data['id'] ?? docId,
-      plantName: data['plantName'] ?? 'Bilinmeyen Bitki',
-      probability:
-          (data['probability'] is num) ? data['probability'].toDouble() : 0.0,
-      isHealthy: data['isHealthy'] ?? true,
-      diseases: diseases,
-      description: data['description'] ?? '',
-      suggestions: suggestions,
-      imageUrl: data['imageUrl'] ?? '',
-      similarImages: similarImages,
-      taxonomy: taxonomy,
-      watering: data['watering'],
-      sunlight: data['sunlight'],
-      soil: data['soil'],
-      climate: data['climate'],
-      geminiAnalysis: data['geminiAnalysis'],
-      location: data['location'],
-      fieldName: data['fieldName'],
-      growthStage: data['growthStage'],
-      growthScore: _extractGrowthScore(data),
-      timestamp: data['timestamp'] is int ? data['timestamp'] : null,
-    );
-  }
-
-  /// Büyüme skorunu veri haritasından çıkarır
-  int? _extractGrowthScore(Map<String, dynamic> data) {
-    if (data['growthScore'] is int) {
-      return data['growthScore'];
-    } else if (data['growthScore'] is String) {
-      return int.tryParse(data['growthScore']);
+    // ID'yi kontrol et ve doküman ID'sini ekle (eğer yoksa)
+    if (!data.containsKey('id') ||
+        data['id'] == null ||
+        data['id'].toString().isEmpty) {
+      data['id'] = docId;
     }
-    return null;
-  }
 
-  /// Hastalıkları veri haritasından çıkarır
-  List<Disease> _extractDiseases(Map<String, dynamic> data) {
-    List<Disease> diseases = [];
-    if (data.containsKey('diseases') && data['diseases'] is List) {
-      final diseasesList = data['diseases'] as List;
-      for (final diseaseItem in diseasesList) {
-        if (diseaseItem is Map<String, dynamic>) {
-          diseases.add(Disease(
-            name: diseaseItem['name'] ?? '',
-            probability: (diseaseItem['probability'] is num)
-                ? diseaseItem['probability'].toDouble()
-                : 0.0,
-            description: diseaseItem['description'],
-          ));
-        }
+    // PlantAnalysisResult.fromJson metodunu kullanarak doğrudan dönüştürme yap
+    try {
+      return PlantAnalysisResult.fromJson(data);
+    } catch (e) {
+      String errorDataPreview = data.toString();
+      if (errorDataPreview.length > 200) {
+        errorDataPreview = errorDataPreview.substring(0, 200) + "...";
       }
-    }
-    return diseases;
-  }
+      AppLogger.e(
+          "PlantAnalysisResult dönüştürme hatası. Hata: ${e.toString()}, Veri: $errorDataPreview");
 
-  /// Önerileri veri haritasından çıkarır
-  List<String> _extractSuggestions(Map<String, dynamic> data) {
-    List<String> suggestions = [];
-    if (data.containsKey('suggestions')) {
-      if (data['suggestions'] is List) {
-        suggestions = (data['suggestions'] as List)
-            .map((item) => item.toString())
-            .toList();
-      } else if (data['suggestions'] is String) {
-        // String ise tek öğeli listeye çevir
-        suggestions = [data['suggestions'].toString()];
-      }
+      // Hata durumunda basitleştirilmiş bir sonuç döndür
+      return _createSimplifiedErrorResult(docId, data, e.toString());
     }
-    return suggestions;
-  }
-
-  /// Benzer görüntüleri veri haritasından çıkarır
-  List<String> _extractSimilarImages(Map<String, dynamic> data) {
-    List<String> similarImages = [];
-    if (data.containsKey('similarImages') && data['similarImages'] is List) {
-      similarImages = (data['similarImages'] as List)
-          .map((item) => item.toString())
-          .toList();
-    }
-    return similarImages;
-  }
-
-  /// Taksonomi bilgisini veri haritasından çıkarır
-  PlantTaxonomy? _extractTaxonomy(Map<String, dynamic> data) {
-    PlantTaxonomy? taxonomy;
-    if (data.containsKey('taxonomy') && data['taxonomy'] is Map) {
-      final taxMap = data['taxonomy'] as Map<String, dynamic>;
-      taxonomy = PlantTaxonomy(
-        kingdom: taxMap['kingdom'],
-        phylum: taxMap['phylum'],
-        class_: taxMap['class'],
-        order: taxMap['order'],
-        family: taxMap['family'],
-        genus: taxMap['genus'],
-        species: taxMap['species'],
-      );
-    }
-    return taxonomy;
   }
 
   /// Bitkinin bakım önerilerini alır
@@ -965,6 +693,486 @@ class PlantAnalysisRepository extends BaseRepository {
         'Hastalık önerisi alınamadı.';
   }
 
+  /// JSON verisini doğrula ve temizle
+  void _validateAndSanitizeJsonData(Map<String, dynamic> jsonData) {
+    // Plant name kontrolü
+    if (!jsonData.containsKey('plantName') || jsonData['plantName'] == null) {
+      AppLogger.w("plantName alanı bulunamadı, varsayılan değer kullanılıyor");
+      jsonData['plantName'] = 'Bilinmeyen Bitki';
+    }
+
+    // isHealthy kontrolü
+    if (!jsonData.containsKey('isHealthy')) {
+      AppLogger.w("isHealthy alanı bulunamadı, varsayılan değer kullanılıyor");
+      jsonData['isHealthy'] = true;
+    }
+
+    // description kontrolü
+    if (!jsonData.containsKey('description') ||
+        jsonData['description'] == null) {
+      AppLogger.w(
+          "description alanı bulunamadı, varsayılan değer kullanılıyor");
+      jsonData['description'] = 'Açıklama bulunamadı';
+    }
+
+    // suggestions kontrolü
+    if (!jsonData.containsKey('suggestions') ||
+        jsonData['suggestions'] == null) {
+      AppLogger.w(
+          "suggestions alanı bulunamadı, varsayılan değer kullanılıyor");
+      jsonData['suggestions'] = ['Bakım önerisi bulunamadı'];
+    } else if (jsonData['suggestions'] is String) {
+      // String olarak geldiyse liste olarak dönüştür
+      jsonData['suggestions'] = [jsonData['suggestions']];
+    }
+
+    // diseases kontrolü
+    if (!jsonData.containsKey('diseases') || jsonData['diseases'] == null) {
+      AppLogger.w("diseases alanı bulunamadı, varsayılan değer kullanılıyor");
+      jsonData['diseases'] = [];
+
+      // Eğer hastalık bilgisi yoksa ve Gemini analiz metni varsa metin analizi yap
+      if (jsonData.containsKey('geminiAnalysis') &&
+          jsonData['geminiAnalysis'] is String &&
+          jsonData['geminiAnalysis'].toString().isNotEmpty) {
+        // Metinden hastalık tespiti yap
+        _extractDiseasesFromText(jsonData['geminiAnalysis'], jsonData);
+
+        AppLogger.i(
+            "Metin analizinden hastalık bilgisi çıkarıldı. Sağlık durumu: ${jsonData['isHealthy']}, Hastalık sayısı: ${(jsonData['diseases'] as List).length}");
+      }
+    }
+
+    // probability kontrolü
+    if (!jsonData.containsKey('probability') ||
+        jsonData['probability'] == null) {
+      AppLogger.w(
+          "probability alanı bulunamadı, varsayılan değer kullanılıyor");
+      jsonData['probability'] = 0.5; // Varsayılan değer
+    }
+
+    // similarImages kontrolü
+    if (!jsonData.containsKey('similarImages') ||
+        jsonData['similarImages'] == null) {
+      AppLogger.w(
+          "similarImages alanı bulunamadı, varsayılan değer kullanılıyor");
+      jsonData['similarImages'] = [];
+    }
+
+    // Diseases listesini işle ve her bir hastalık için alanları doğrula
+    if (jsonData.containsKey('diseases') && jsonData['diseases'] is List) {
+      final List<dynamic> diseasesList = jsonData['diseases'];
+      for (var diseaseData in diseasesList) {
+        if (diseaseData is Map<String, dynamic>) {
+          // Her bir hastalık objesi için interventionMethods ve pesticideSuggestions listelerini doğrula
+          _convertToList(diseaseData, 'interventionMethods');
+          _convertToList(diseaseData, 'pesticideSuggestions');
+          // Diğer hastalık alanı kontrolleri buraya eklenebilir (örn: name, description)
+          if (!diseaseData.containsKey('name') || diseaseData['name'] == null) {
+            diseaseData['name'] = 'Bilinmeyen Hastalık';
+          }
+          if (!diseaseData.containsKey('description') ||
+              diseaseData['description'] == null) {
+            diseaseData['description'] = 'Hastalık açıklaması bulunamadı.';
+          }
+          if (!diseaseData.containsKey('probability') ||
+              diseaseData['probability'] == null) {
+            diseaseData['probability'] = 0.0;
+          }
+          if (!diseaseData.containsKey('severity') ||
+              diseaseData['severity'] == null) {
+            diseaseData['severity'] = 'Belirtilmemiş';
+          }
+        }
+      }
+    }
+
+    // Liste dönüşümlerini garantile (genel alanlar için)
+    _convertToList(jsonData, 'suggestions');
+    _convertToList(jsonData, 'similarImages');
+    // _convertToList(jsonData, 'diseases'); // Zaten yukarıda her bir elemanı için yapıldı
+    // _convertToList(jsonData, 'interventionMethods'); // Bu, hastalık bazlı, yukarıda işlendi
+    _convertToList(jsonData, 'agriculturalTips');
+    _convertToList(jsonData, 'regionalInfo');
+    _convertToList(jsonData, 'edibleParts');
+    _convertToList(jsonData, 'propagationMethods');
+  }
+
+  /// Belirtilen alanı liste haline getirir
+  void _convertToList(Map<String, dynamic> jsonData, String fieldName) {
+    if (jsonData.containsKey(fieldName)) {
+      if (jsonData[fieldName] == null) {
+        jsonData[fieldName] = [];
+      } else if (jsonData[fieldName] is! List) {
+        // Liste değilse liste haline dönüştür
+        jsonData[fieldName] = [jsonData[fieldName]];
+      }
+    } else {
+      jsonData[fieldName] = [];
+    }
+  }
+
+  /// Metinden hastalıkları çıkar
+  void _extractDiseasesFromText(String text, Map<String, dynamic> target) {
+    List<Map<String, dynamic>> diseases = [];
+    final lowerText = text.toLowerCase();
+
+    // 1. Önce belirli hastalık adlarını aramaya çalış
+    final diseasePatterns = {
+      'yaprak yanıklığı': 0.8,
+      'kök çürüklüğü': 0.8,
+      'külleme': 0.8,
+      'pas hastalığı': 0.7,
+      'mildiyö': 0.8,
+      'antraknoz': 0.8,
+      'mozaik virüsü': 0.75,
+      'kurşuni küf': 0.7,
+      'beyaz sinek': 0.7,
+      'yaprak biti': 0.75,
+      'kırmızı örümcek': 0.7,
+      'fusarium': 0.8,
+      'alternaria': 0.8,
+      'septoria': 0.8,
+      'verticillium': 0.8,
+      'bakteriyel solgunluk': 0.8,
+      'nematod': 0.7,
+      'beslenme eksikliği': 0.6,
+      'güneş yanığı': 0.6,
+      'su stresi': 0.65,
+    };
+
+    // Hastalık belirten terimleri ara
+    bool hasAnyDiseaseIndication = lowerText.contains('hastalık') ||
+        lowerText.contains('hasar') ||
+        lowerText.contains('zarar') ||
+        lowerText.contains('enfeksiyon') ||
+        lowerText.contains('belirti') ||
+        lowerText.contains('çürük') ||
+        lowerText.contains('küf') ||
+        lowerText.contains('leke') ||
+        lowerText.contains('sararmış') ||
+        lowerText.contains('solmuş');
+
+    // Hastalık adlarını metin içinde ara
+    for (var disease in diseasePatterns.entries) {
+      if (lowerText.contains(disease.key)) {
+        // Hastalık adının geçtiği cümleyi bul
+        int startIdx = lowerText.indexOf(disease.key);
+
+        // Cümlenin başlangıcını bul
+        int sentenceStart = lowerText.lastIndexOf('.', startIdx);
+        if (sentenceStart < 0) {
+          sentenceStart = lowerText.lastIndexOf('\n', startIdx);
+        }
+        if (sentenceStart < 0) sentenceStart = 0;
+        sentenceStart += 1; // Noktayı dahil etme
+
+        // Cümlenin sonunu bul
+        int sentenceEnd = lowerText.indexOf('.', startIdx + disease.key.length);
+        if (sentenceEnd < 0) {
+          sentenceEnd = lowerText.indexOf('\n', startIdx + disease.key.length);
+        }
+        if (sentenceEnd < 0) sentenceEnd = lowerText.length;
+
+        String description = text.substring(sentenceStart, sentenceEnd).trim();
+
+        // Hastalığa uygun tedavi önerilerini bul
+        List<String> treatments = [];
+        if (lowerText.contains('tedavi') ||
+            lowerText.contains('öneri') ||
+            lowerText.contains('müdahale') ||
+            lowerText.contains('yapılmalı')) {
+          final treatmentRegex = RegExp(
+              r'(?:tedavi|öneri|müdahale|yapılmalı)[^\.]*\.',
+              caseSensitive: false);
+          final treatmentMatches = treatmentRegex.allMatches(lowerText);
+
+          for (var match in treatmentMatches) {
+            treatments.add(text.substring(match.start, match.end).trim());
+          }
+        }
+
+        // Hastalık kapitalize edilmiş adı
+        String capitalizedName = disease.key
+            .split(' ')
+            .map((word) => word[0].toUpperCase() + word.substring(1))
+            .join(' ');
+
+        diseases.add({
+          'name': capitalizedName,
+          'probability': disease.value,
+          'description': description,
+          'treatments': treatments,
+        });
+      }
+    }
+
+    // 2. "Hastalık" kelimesini içeren bölümü ara (eğer belirli hastalıklar bulunamadıysa)
+    if (diseases.isEmpty && hasAnyDiseaseIndication) {
+      // Hastalık bölümünü bul
+      final diseaseSection = RegExp(r'(?:hastalık|enfeksiyon|belirti)[^\n\.]+',
+          caseSensitive: false);
+      final matches = diseaseSection.allMatches(lowerText);
+
+      for (var match in matches) {
+        final content = text.substring(match.start, match.end).trim();
+
+        // Genel bir hastalık girişi oluştur
+        diseases.add({
+          'name': 'Bitki Hastalığı',
+          'probability': 0.7,
+          'description': content,
+          'treatments': [],
+        });
+      }
+    }
+
+    // 3. Sağlıklı olup olmadığını belirle
+    bool isHealthy = true;
+
+    if (diseases.isNotEmpty) {
+      isHealthy = false; // Hastalık bulunduysa sağlıksız
+    } else if (lowerText.contains('hastalık yok') ||
+        lowerText.contains('sağlıklı görünüyor') ||
+        lowerText.contains('sağlıklı bir bitki')) {
+      isHealthy = true; // Açıkça sağlıklı olduğu belirtildi
+    } else if (hasAnyDiseaseIndication) {
+      // Hastalık belirtisi var ama spesifik hastalık bulunamadı
+      isHealthy = false;
+      diseases.add({
+        'name': 'Belirsiz Hastalık Belirtileri',
+        'probability': 0.6,
+        'description':
+            'Bitkide hastalık belirtileri görülüyor ancak spesifik bir tanı yapılamadı.',
+        'treatments': [
+          'Profesyonel bir ziraat mühendisine danışın.',
+          'Düzenli gözlem yapın ve değişimleri not edin.',
+          'Sulama ve gübreleme rutininizi gözden geçirin.'
+        ],
+      });
+    }
+
+    // Hastalık durumunu ve varsa hastalıkları ekle
+    target['isHealthy'] = isHealthy;
+    target['diseases'] = diseases;
+
+    AppLogger.i(
+        "Hastalık durumu tespit edildi. Sağlıklı: ${target['isHealthy']}, Tespit edilen hastalık sayısı: ${diseases.length}");
+  }
+
+  /// Düz metinden veri çıkarma
+  Map<String, dynamic> _extractDataFromText(String text) {
+    final Map<String, dynamic> data = {};
+    final lowerText = text.toLowerCase();
+
+    try {
+      // Bitki adını bul
+      String? plantName;
+      final plantNameRegex = RegExp(
+        r'(?:bitki(?:nin)? (?:adı|ismi|türü)|tür(?:ü)?)[:,\s]+([^\n.]+)',
+        caseSensitive: false,
+      );
+      final plantNameMatch = plantNameRegex.firstMatch(lowerText);
+      if (plantNameMatch != null && plantNameMatch.group(1) != null) {
+        plantName = plantNameMatch.group(1)!.trim();
+        // İlk harfi büyük yap
+        if (plantName.isNotEmpty) {
+          plantName = plantName[0].toUpperCase() + plantName.substring(1);
+        }
+      }
+
+      // İngilizce yanıt için de kontrol et
+      if (plantName == null) {
+        final engPlantNameRegex = RegExp(
+          r'(?:plant name|plant species|species)[:,\s]+([^\n.]+)',
+          caseSensitive: false,
+        );
+        final engPlantNameMatch =
+            engPlantNameRegex.firstMatch(text.toLowerCase());
+        if (engPlantNameMatch != null && engPlantNameMatch.group(1) != null) {
+          plantName = engPlantNameMatch.group(1)!.trim();
+          if (plantName.isNotEmpty) {
+            plantName = plantName[0].toUpperCase() + plantName.substring(1);
+          }
+        }
+      }
+
+      data['plantName'] = plantName ?? 'Bilinmeyen Bitki';
+
+      // Açıklama bul
+      String? description;
+      final descRegex = RegExp(
+        r'(?:açıklama|tanım|genel bilgi)[:\s]+([^\n]+)',
+        caseSensitive: false,
+      );
+      final descMatch = descRegex.firstMatch(lowerText);
+      if (descMatch != null && descMatch.group(1) != null) {
+        description = descMatch.group(1)!.trim();
+      }
+      data['description'] = description ?? 'Açıklama bulunamadı';
+
+      // Önerileri bul
+      List<String> suggestions = [];
+      final suggestionRegexList = [
+        RegExp(r'(?:öneri(?:ler)?|tavsiye(?:ler)?)[:\s]+([^\n]+)',
+            caseSensitive: false),
+        RegExp(r'(?:\d+\.)[\s]([^.\n]+)', caseSensitive: false),
+        RegExp(r'(?:•|-)[\s]([^•\n]+)', caseSensitive: false),
+      ];
+
+      for (var regex in suggestionRegexList) {
+        final matches = regex.allMatches(text);
+        for (var match in matches) {
+          if (match.group(1) != null) {
+            final suggestion = match.group(1)!.trim();
+            if (suggestion.isNotEmpty && !suggestions.contains(suggestion)) {
+              suggestions.add(suggestion);
+            }
+          }
+        }
+      }
+      data['suggestions'] =
+          suggestions.isEmpty ? ['Özel bakım önerisi bulunamadı'] : suggestions;
+
+      // Sulama bilgilerini bul
+      String? watering;
+      final wateringRegex = RegExp(
+        r'(?:sulama)[:\s]+([^\n.]+)',
+        caseSensitive: false,
+      );
+      final wateringMatch = wateringRegex.firstMatch(lowerText);
+      if (wateringMatch != null && wateringMatch.group(1) != null) {
+        watering = wateringMatch.group(1)!.trim();
+      }
+      data['watering'] = watering;
+
+      // Işık ihtiyacını bul
+      String? sunlight;
+      final sunlightRegex = RegExp(
+        r'(?:ışık|güneş(?:lenme)?)[:\s]+([^\n.]+)',
+        caseSensitive: false,
+      );
+      final sunlightMatch = sunlightRegex.firstMatch(lowerText);
+      if (sunlightMatch != null && sunlightMatch.group(1) != null) {
+        sunlight = sunlightMatch.group(1)!.trim();
+      }
+      data['sunlight'] = sunlight;
+
+      // Toprak ihtiyacını bul
+      String? soil;
+      final soilRegex = RegExp(
+        r'(?:toprak)[:\s]+([^\n.]+)',
+        caseSensitive: false,
+      );
+      final soilMatch = soilRegex.firstMatch(lowerText);
+      if (soilMatch != null && soilMatch.group(1) != null) {
+        soil = soilMatch.group(1)!.trim();
+      }
+      data['soil'] = soil;
+
+      // Gelişim aşamasını bul
+      String? growthStage;
+      final growthStageRegex = RegExp(
+        r'(?:gelişim(?:\s+aşaması|\s+dönemi)?|büyüme(?:\s+aşaması)?)[:\s]+([^\n.]+)',
+        caseSensitive: false,
+      );
+      final growthStageMatch = growthStageRegex.firstMatch(lowerText);
+      if (growthStageMatch != null && growthStageMatch.group(1) != null) {
+        growthStage = growthStageMatch.group(1)!.trim();
+      }
+      data['growthStage'] = growthStage;
+
+      // Hastalık durumunu ve hastalıkları çıkar
+      _extractDiseasesFromText(text, data);
+
+      return data;
+    } catch (e) {
+      AppLogger.e("Metinden veri çıkarma hatası", e);
+      return {};
+    }
+  }
+
+  /// JSON string'inden yorum satırlarını temizler
+  String _cleanJsonComments(String jsonStr) {
+    // Yorum satırlarını kaldır - // ile başlayan yorumlar
+    final lineRegex = RegExp(r'//.*?$', multiLine: true);
+    return jsonStr.replaceAll(lineRegex, '');
+  }
+
+  /// Düz metin yanıttan JSON verilerini çıkarma denemeleri
+  Map<String, dynamic> _extractJsonFromText(String text) {
+    try {
+      AppLogger.i(
+          "Metin içinden JSON veri çıkarma işlemi başladı. Metin uzunluğu: ${text.length} karakter");
+
+      // 1. Metin içinde { ile başlayıp } ile biten en geniş bloğu bul
+      final jsonRegex = RegExp(r'{[\s\S]*}');
+      final match = jsonRegex.firstMatch(text);
+
+      if (match != null) {
+        final jsonCandidate = match.group(0);
+        if (jsonCandidate != null) {
+          try {
+            final jsonData = json.decode(jsonCandidate);
+            if (jsonData is Map<String, dynamic>) {
+              AppLogger.i("Metin içinden JSON yapısı başarıyla çıkarıldı");
+              return jsonData;
+            }
+          } catch (e) {
+            AppLogger.w(
+                "Çıkarılan JSON bloğu ayrıştırılamadı. Hata: ${e.toString()}");
+          }
+        }
+      }
+
+      // 2. JSON çıkarılamadıysa metni semantik olarak analiz et
+      return _extractDataFromText(text);
+    } catch (e) {
+      AppLogger.e("JSON verileri çıkarma hatası", e);
+      return {};
+    }
+  }
+
+  /// İngilizce prompt oluştur ve Türkçe yanıt iste
+  String _createBilingualPrompt(String imageUrl, String prompt) {
+    // İngilizce analiz promptunu oluştur, Türkçe yanıt iste
+    return '''
+[PROMPT IN ENGLISH]
+Analyze this plant image and provide detailed information about it. Include:
+1. Plant species and family.
+2. Health assessment (is it healthy or not?).
+3. If there are any diseases or issues, identify them with symptoms, severity (Low, Medium, High), and probability.
+4. General intervention methods (cultural, biological, physical) for each disease.
+5. Specific pesticide or fungicide suggestions (trade names or active ingredients) for each disease.
+6. Specific care recommendations for the plant (general, not disease-related).
+7. Watering, sunlight, and soil needs for the plant.
+8. Growth stage estimation of the plant.
+9. Agricultural tips for optimal growth of the plant.
+
+Format the result in well-structured JSON with these fields:
+- plantName: (String) The name of the plant.
+- description: (String) A brief description of the plant.
+- isHealthy: (Boolean) Indicating if the plant is healthy.
+- diseases: (Array of Objects) List of identified diseases. Each disease object should contain:
+    - name: (String) Name of the disease.
+    - probability: (Float) Probability of the disease (0.0 to 1.0).
+    - severity: (String) Severity of the disease (e.g., "Low", "Medium", "High").
+    - description: (String) Description of the disease symptoms.
+    - interventionMethods: (Array of Strings) General intervention methods (non-pesticide).
+    - pesticideSuggestions: (Array of Strings) Specific pesticide/fungicide names or active ingredients.
+- suggestions: (Array of Strings) General care recommendations for the plant.
+- watering: (String) Watering requirements.
+- sunlight: (String) Sunlight needs.
+- soil: (String) Soil preferences.
+- growthStage: (String) Current growth stage of the plant.
+- growthScore: (Integer) Numeric assessment of growth (0-100).
+- similarImages: (Array of Strings) URLs of similar plant images (can be empty).
+
+[RESPONSE IN TURKISH]
+Lütfen yukarıdaki analizi Türkçe olarak yap ve JSON formatında döndür. Hastalıklar için hem genel müdahale yöntemlerini (`interventionMethods`) hem de spesifik pestisit/fungisit önerilerini (`pesticideSuggestions`) ayrı listeler halinde verdiğinden emin ol.
+''';
+  }
+
   /// Gemini cevabından PlantAnalysisResult oluştur
   PlantAnalysisResult _parseGeminiResponse(
     String geminiResponse,
@@ -973,387 +1181,172 @@ class PlantAnalysisRepository extends BaseRepository {
     String? fieldName,
   ) {
     try {
-      // Debug için yanıtın ilk kısmını logla
       final previewLength =
           geminiResponse.length > 100 ? 100 : geminiResponse.length;
       final preview = geminiResponse.substring(0, previewLength);
-      logInfo('Gemini yanıtı parse ediliyor', 'Önizleme: $preview...');
+      AppLogger.i("Gemini yanıtı parse ediliyor. Önizleme: $preview...");
 
-      // Gemini yanıtı boş kontrolü
       if (geminiResponse.trim().isEmpty) {
-        logError('Gemini yanıtı boş geldi');
-        throw Exception('Gemini yanıtı boş');
+        AppLogger.e("Gemini yanıtı boş geldi");
+        return PlantAnalysisResult(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            plantName: 'Boş Yanıt',
+            probability: 0.0,
+            isHealthy: false,
+            diseases: [],
+            description: 'Gemini boş yanıt döndürdü.',
+            suggestions: [],
+            imageUrl: imageUrl,
+            similarImages: [],
+            location: location,
+            fieldName: fieldName,
+            geminiAnalysis: geminiResponse);
       }
 
-      // Gemini yanıtını parse işlemini gerçekleştir
-      final parsedData = _parseGeminiText(geminiResponse);
+      AppLogger.i(
+          "Gemini ham yanıtı alındı, uzunluk: ${geminiResponse.length}");
+      String jsonString = geminiResponse.trim();
 
-      // Parsed data kontrolü
-      if (parsedData.isEmpty) {
-        logError('Gemini yanıtı parse edilemedi');
-        throw Exception('Gemini yanıtından veri çıkarılamadı');
+      if (jsonString.contains("```json")) {
+        final startIndex = jsonString.indexOf("```json") + 7;
+        final endIndex = jsonString.lastIndexOf("```");
+        if (startIndex > 7 && endIndex > startIndex) {
+          jsonString = jsonString.substring(startIndex, endIndex).trim();
+          AppLogger.i("Markdown JSON bloğu temizlendi");
+        }
+      } else if (jsonString.contains("```")) {
+        final startIndex = jsonString.indexOf("```") + 3;
+        final endIndex = jsonString.lastIndexOf("```");
+        if (startIndex > 3 && endIndex > startIndex) {
+          jsonString = jsonString.substring(startIndex, endIndex).trim();
+          AppLogger.i("Markdown kod bloğu temizlendi");
+        }
       }
 
-      // Parse edilen verilerin bir kısmını logla
-      logInfo('Parse edilen veriler',
-          'Bitki adı: ${parsedData['plantName']}, Sağlıklı: ${parsedData['isHealthy']}');
+      jsonString = _cleanJsonComments(jsonString);
 
-      // Tüm önerileri birleştir
-      List<String> allSuggestions = _combineAllSuggestions(
-        parsedData,
-        location,
-      );
-
-      // Açıklamayı hazırla
-      String fullDescription = _prepareFullDescription(
-        parsedData['description'] as String? ?? '',
-        parsedData['soil'] as String?,
-        parsedData['climate'] as String?,
-      );
-
-      // Sonuç nesnesini oluştur
-      return PlantAnalysisResult(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        plantName: parsedData['plantName'] as String? ?? 'Bilinmeyen Bitki',
-        probability: 0.9, // Gemini'den kesin bir olasılık alamıyoruz
-        isHealthy: parsedData['isHealthy'] as bool? ?? true,
-        diseases: parsedData['diseases'] as List<Disease>? ?? [],
-        description: fullDescription,
-        suggestions: allSuggestions,
-        imageUrl: imageUrl,
-        similarImages: [], // Gemini benzer görüntü sağlamıyor
-        watering: parsedData['watering'] as String?,
-        sunlight: parsedData['sunlight'] as String?,
-        geminiAnalysis: geminiResponse, // Tam Gemini yanıtı
-        location: location, // Konum bilgisini de ekle
-        fieldName: fieldName,
-        growthStage: parsedData['growthStage'] as String?,
-        growthScore: parsedData['growthScore'] as int?,
-      );
-    } catch (e) {
-      logError('Gemini yanıtını işleme hatası', e.toString());
-
-      // Hata bilgisini daha detaylı al
-      String errorDetails = '';
       try {
-        // Yanıtın ilk 200 karakteri
-        if (geminiResponse.isNotEmpty) {
-          final previewLength =
-              geminiResponse.length > 200 ? 200 : geminiResponse.length;
-          errorDetails =
-              'İlk ${previewLength} karakter: ${geminiResponse.substring(0, previewLength)}';
-        } else {
-          errorDetails = 'Yanıt boş';
+        Map<String, dynamic> jsonData = {};
+        try {
+          final decoded = json.decode(jsonString);
+          if (decoded is Map<String, dynamic>) {
+            jsonData = decoded;
+            AppLogger.i("Gemini yanıtı JSON olarak başarıyla ayrıştırıldı");
+          }
+        } catch (jsonDecodeError) {
+          AppLogger.w(
+              "JSON ayrıştırılamadı. Hata: ${jsonDecodeError.toString()}. Alternatif çözüm yöntemleri deneniyor.");
         }
-      } catch (logError) {
-        errorDetails = 'Yanıt detayları alınamadı: $logError';
-      }
 
-      logError('Gemini yanıtı detayları', errorDetails);
-
-      // Hata durumunda basit bir sonuç oluştur
-      return PlantAnalysisResult(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        plantName: 'Analiz Edilemedi',
-        probability: 0.0,
-        isHealthy: false,
-        diseases: [],
-        description:
-            'Gemini yanıtı işlenirken bir hata oluştu: $e.\n\nHam yanıt:\n$geminiResponse',
-        suggestions: ['Lütfen başka bir fotoğraf ile tekrar deneyin.'],
-        imageUrl: imageUrl,
-        similarImages: [],
-        geminiAnalysis: geminiResponse,
-        location: location, // Konum bilgisini de ekle
-        fieldName: fieldName,
-        growthStage: null,
-        growthScore: null,
-      );
-    }
-  }
-
-  /// Gemini yanıt metnini parçalara ayırır
-  Map<String, dynamic> _parseGeminiText(String geminiResponse) {
-    // Sonuç değişkenleri
-    String plantName = 'Bilinmeyen Bitki';
-    bool isHealthy = true;
-    String description = '';
-    List<Disease> diseases = [];
-    List<String> suggestions = [];
-    List<String> interventionMethods = []; // Müdahale yöntemleri
-    List<String> agriculturalTips = []; // Tarımsal öneriler
-    List<String> regionalInfo = []; // Bölgesel bilgiler
-    String? watering;
-    String? sunlight;
-    String? soil;
-    String? climate;
-    String? growthStage; // Gelişim aşaması
-    int? growthScore; // Gelişim skoru
-    String? growthComment; // Gelişim yorumu
-
-    // Yanıtı satır satır analiz et
-    final lines = geminiResponse.split('\n');
-    String currentSection = '';
-
-    for (final line in lines) {
-      final trimmedLine = line.trim();
-
-      // Boş satırları atla
-      if (trimmedLine.isEmpty) continue;
-
-      // Başlıkları tanımla ve işle
-      if (trimmedLine.startsWith('BITKI_ADI:')) {
-        currentSection = 'plantName';
-        plantName = trimmedLine.substring('BITKI_ADI:'.length).trim();
-      } else if (trimmedLine.startsWith('SAGLIK_DURUMU:')) {
-        currentSection = 'healthStatus';
-        final status =
-            trimmedLine.substring('SAGLIK_DURUMU:'.length).trim().toLowerCase();
-        isHealthy =
-            status.contains('sağlıklı') && !status.contains('sağlıksız');
-      } else if (trimmedLine.startsWith('TANIM:')) {
-        currentSection = 'description';
-        description = trimmedLine.substring('TANIM:'.length).trim();
-      } else if (trimmedLine.startsWith('HASTALIKLAR:')) {
-        currentSection = 'diseases';
-      } else if (trimmedLine.startsWith('MUDAHALE_YONTEMLERI:')) {
-        currentSection = 'interventions';
-      } else if (trimmedLine.startsWith('TARIMSAL_ONERILER:')) {
-        currentSection = 'agriculturalTips';
-      } else if (trimmedLine.startsWith('BOLGESEL_BILGILER:')) {
-        currentSection = 'regionalInfo';
-      } else if (trimmedLine.startsWith('ONERILER:')) {
-        currentSection = 'suggestions';
-      } else if (trimmedLine.startsWith('SULAMA:')) {
-        currentSection = 'watering';
-        watering = trimmedLine.substring('SULAMA:'.length).trim();
-      } else if (trimmedLine.startsWith('ISIK:')) {
-        currentSection = 'sunlight';
-        sunlight = trimmedLine.substring('ISIK:'.length).trim();
-      } else if (trimmedLine.startsWith('TOPRAK:')) {
-        currentSection = 'soil';
-        soil = trimmedLine.substring('TOPRAK:'.length).trim();
-      } else if (trimmedLine.startsWith('IKLIM:')) {
-        currentSection = 'climate';
-        climate = trimmedLine.substring('IKLIM:'.length).trim();
-      } else if (trimmedLine.startsWith('GELISIM_ASAMASI:')) {
-        currentSection = 'growthStage';
-        growthStage = trimmedLine.substring('GELISIM_ASAMASI:'.length).trim();
-      } else if (trimmedLine.startsWith('GELISIM_SKORU:')) {
-        currentSection = 'growthScore';
-        final scoreText = trimmedLine.substring('GELISIM_SKORU:'.length).trim();
-        // Sayısal değeri ayıkla (70/100 veya sadece 70 formatından)
-        final scoreRegex = RegExp(r'(\d+)');
-        final match = scoreRegex.firstMatch(scoreText);
-        if (match != null) {
-          growthScore = int.tryParse(match.group(1) ?? '0') ?? 0;
+        if (jsonData.isEmpty) {
+          jsonData = _extractJsonFromText(jsonString);
+          if (jsonData.isEmpty) {
+            jsonData = _extractDataFromText(geminiResponse);
+            if (jsonData.isEmpty) {
+              AppLogger.w(
+                  "Metin işleme başarısız, varsayılan JSON oluşturuluyor");
+              jsonData = {
+                "plantName": "Bitki Analizi",
+                "isHealthy": true,
+                "description": "API yanıtı işlenemedi. Ham yanıt:",
+                "suggestions": [
+                  jsonString.length > 500
+                      ? jsonString.substring(0, 500) + "..."
+                      : jsonString
+                ],
+                "diseases": [],
+                "interventionMethods": [],
+                "agriculturalTips": ["API yanıtı işlenemedi."],
+                "watering": "Belirtilmemiş",
+                "sunlight": "Belirtilmemiş",
+                "soil": "Belirtilmemiş",
+                "climate": "Belirtilmemiş",
+                "growthStage": "Belirtilmemiş",
+                "growthScore": 50
+              };
+            }
+            AppLogger.i("Düz metin yanıt JSON yapısına dönüştürüldü");
+          }
         }
-      } else if (trimmedLine.startsWith('GELISIM_YORUMU:')) {
-        currentSection = 'growthComment';
-        growthComment = trimmedLine.substring('GELISIM_YORUMU:'.length).trim();
-      }
-      // İçeriği bölümlere göre işle
-      else {
-        _processContentLine(
-          currentSection,
-          trimmedLine,
-          diseases,
-          description,
-          interventionMethods,
-          agriculturalTips,
-          regionalInfo,
-          suggestions,
-          growthComment,
-        );
-      }
-    }
 
-    // Gelişim aşamasına göre tahmini gelişim skoru ata
-    if (growthScore == null && growthStage != null) {
-      growthScore = _estimateGrowthScore(growthStage);
-    }
+        jsonData['id'] = DateTime.now().millisecondsSinceEpoch.toString();
+        jsonData['imageUrl'] = imageUrl;
+        jsonData['location'] = location;
+        jsonData['fieldName'] = fieldName;
+        jsonData['timestamp'] = DateTime.now().millisecondsSinceEpoch;
+        jsonData['geminiAnalysis'] = geminiResponse;
 
-    // Tüm parse edilmiş verileri bir haritada döndür
-    return {
-      'plantName': plantName,
-      'isHealthy': isHealthy,
-      'description': description,
-      'diseases': diseases,
-      'suggestions': suggestions,
-      'interventionMethods': interventionMethods,
-      'agriculturalTips': agriculturalTips,
-      'regionalInfo': regionalInfo,
-      'watering': watering,
-      'sunlight': sunlight,
-      'soil': soil,
-      'climate': climate,
-      'growthStage': growthStage,
-      'growthScore': growthScore,
-      'growthComment': growthComment,
-    };
-  }
+        _validateAndSanitizeJsonData(jsonData);
 
-  /// Gelişim aşamasına göre tahmini bir gelişim skoru hesaplar
-  int _estimateGrowthScore(String growthStage) {
-    final stageLower = growthStage.toLowerCase();
-    if (stageLower.contains('olgun') ||
-        stageLower.contains('hasat') ||
-        stageLower.contains('olgunlaşma')) {
-      return 85;
-    } else if (stageLower.contains('çiçek') ||
-        stageLower.contains('cicek') ||
-        stageLower.contains('meyve')) {
-      return 70;
-    } else if (stageLower.contains('büyüme') ||
-        stageLower.contains('gelişme') ||
-        stageLower.contains('genc')) {
-      return 50;
-    } else if (stageLower.contains('fide') ||
-        stageLower.contains('çimlenme') ||
-        stageLower.contains('yeni')) {
-      return 30;
-    } else {
-      return 60; // Varsayılan orta düzey
-    }
-  }
-
-  /// İçerik satırını mevcut bölüme göre işler
-  void _processContentLine(
-    String currentSection,
-    String trimmedLine,
-    List<Disease> diseases,
-    String description,
-    List<String> interventionMethods,
-    List<String> agriculturalTips,
-    List<String> regionalInfo,
-    List<String> suggestions,
-    String? growthComment,
-  ) {
-    if (currentSection == 'diseases' && trimmedLine.startsWith('-')) {
-      final diseaseLine = trimmedLine.substring(1).trim();
-      String diseaseName = diseaseLine;
-      String diseaseDescription = '';
-
-      // Hastalık adı ve açıklamasını ayır
-      if (diseaseLine.contains(':')) {
-        final parts = diseaseLine.split(':');
-        diseaseName = parts[0].trim();
-        diseaseDescription = parts.length > 1 ? parts[1].trim() : '';
+        try {
+          return PlantAnalysisResult.fromJson(jsonData);
+        } catch (fromJsonError) {
+          String jsonDataPreview = jsonData.toString();
+          if (jsonDataPreview.length > 200) {
+            jsonDataPreview = jsonDataPreview.substring(0, 200) + "...";
+          }
+          AppLogger.e(
+              "PlantAnalysisResult.fromJson hatası. Hata: ${fromJsonError.toString()}, JSON: $jsonDataPreview");
+          return PlantAnalysisResult(
+              id: jsonData['id'] ??
+                  DateTime.now().millisecondsSinceEpoch.toString(),
+              plantName: jsonData['plantName']?.toString() ?? 'fromJson Hatası',
+              probability: 0.0,
+              isHealthy: false,
+              diseases: [],
+              description:
+                  'JSON dönüştürme hatası: ${fromJsonError.toString()}',
+              suggestions: [],
+              imageUrl: imageUrl,
+              similarImages: [],
+              location: location,
+              fieldName: fieldName,
+              geminiAnalysis: geminiResponse);
+        }
+      } catch (jsonError) {
+        String responsePreview = geminiResponse;
+        if (responsePreview.length > 200) {
+          responsePreview = responsePreview.substring(0, 200) + "...";
+        }
+        AppLogger.e(
+            "Gemini yanıtını işlemede kritik hata. Hata: ${jsonError.toString()}, Yanıt: $responsePreview");
+        return PlantAnalysisResult(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            plantName: 'JSON İşleme Hatası',
+            probability: 0.0,
+            isHealthy: false,
+            diseases: [],
+            description: 'Yanıt işleme hatası: ${jsonError.toString()}',
+            suggestions: [],
+            imageUrl: imageUrl,
+            similarImages: [],
+            location: location,
+            fieldName: fieldName,
+            geminiAnalysis: geminiResponse);
       }
-
-      diseases.add(
-        Disease(
-          name: diseaseName,
-          probability: 0.8, // Varsayılan olasılık
-          description: diseaseDescription,
-        ),
-      );
-    } else if (currentSection == 'interventions' &&
-        trimmedLine.startsWith('-')) {
-      // Müdahale yöntemlerini işle
-      final intervention = trimmedLine.substring(1).trim();
-      if (intervention.isNotEmpty) {
-        interventionMethods.add(intervention);
-      }
-    } else if (currentSection == 'agriculturalTips' &&
-        trimmedLine.startsWith('-')) {
-      // Tarımsal önerileri işle
-      final tip = trimmedLine.substring(1).trim();
-      if (tip.isNotEmpty) {
-        agriculturalTips.add(tip);
-      }
-    } else if (currentSection == 'regionalInfo' &&
-        trimmedLine.startsWith('-')) {
-      // Bölgesel bilgileri işle
-      final info = trimmedLine.substring(1).trim();
-      if (info.isNotEmpty) {
-        regionalInfo.add(info);
-      }
-    } else if (currentSection == 'suggestions' && trimmedLine.startsWith('-')) {
-      // Eski format önerileri işle
-      final suggestion = trimmedLine.substring(1).trim();
-      if (suggestion.isNotEmpty) {
-        suggestions.add(suggestion);
-      }
-    } else if (currentSection == 'description') {
-      // Daha önceki açıklamaya ekleyin (eğer birden fazla satır varsa)
-      if (description.isNotEmpty) {
-        description += ' $trimmedLine';
+    } catch (e, stackTrace) {
+      AppLogger.e(
+          "Gemini yanıtını parse ederken genel hata oluştu", e, stackTrace);
+      if (geminiResponse.length > 1000) {
+        AppLogger.e(
+            "Uzun yanıt hatası. İlk 500: ${geminiResponse.substring(0, 500)}... Son 500: ${geminiResponse.substring(geminiResponse.length - 500)}");
       } else {
-        description = trimmedLine;
+        AppLogger.e("Yanıt içeriği", geminiResponse);
       }
-    } else if (currentSection == 'growthComment' && growthComment != null) {
-      // Gelişim yorumunu birleştir (birden fazla satır olabilir)
-      growthComment += ' $trimmedLine';
+      return PlantAnalysisResult(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          plantName: 'Parse Hatası',
+          probability: 0.0,
+          isHealthy: false,
+          diseases: [],
+          description: 'Parse hatası: ${e.toString()}',
+          suggestions: [],
+          imageUrl: imageUrl,
+          similarImages: [],
+          location: location,
+          fieldName: fieldName,
+          geminiAnalysis: geminiResponse);
     }
-  }
-
-  /// Tüm öneri türlerini birleştirir
-  List<String> _combineAllSuggestions(
-      Map<String, dynamic> parsedData, String location) {
-    List<String> allSuggestions = [];
-    final interventionMethods =
-        parsedData['interventionMethods'] as List<String>? ?? [];
-    final agriculturalTips =
-        parsedData['agriculturalTips'] as List<String>? ?? [];
-    final regionalInfo = parsedData['regionalInfo'] as List<String>? ?? [];
-    final suggestions = parsedData['suggestions'] as List<String>? ?? [];
-
-    // Önce müdahale yöntemlerini ekle
-    if (interventionMethods.isNotEmpty) {
-      allSuggestions.add("MÜDAHALE YÖNTEMLERİ:");
-      allSuggestions.addAll(interventionMethods);
-    }
-
-    // Sonra tarımsal önerileri ekle
-    if (agriculturalTips.isNotEmpty) {
-      if (allSuggestions.isNotEmpty) allSuggestions.add(""); // Boşluk ekle
-      allSuggestions.add("TARIMSAL ÖNERİLER:");
-      allSuggestions.addAll(agriculturalTips);
-    }
-
-    // Bölgesel bilgileri ekle
-    if (regionalInfo.isNotEmpty) {
-      if (allSuggestions.isNotEmpty) allSuggestions.add(""); // Boşluk ekle
-      allSuggestions.add("$location İÇİN BÖLGESEL BİLGİLER:");
-      allSuggestions.addAll(regionalInfo);
-    }
-
-    // Eski format önerileri varsa ekle
-    if (suggestions.isNotEmpty) {
-      if (allSuggestions.isNotEmpty) allSuggestions.add(""); // Boşluk ekle
-      allSuggestions.add("DİĞER ÖNERİLER:");
-      allSuggestions.addAll(suggestions);
-    }
-
-    // Hiçbir öneri yoksa varsayılan öneri ekle
-    if (allSuggestions.isEmpty) {
-      allSuggestions.add(
-        'Düzenli sulama yapın ve bitkinin ihtiyaçlarına uygun ortam sağlayın.',
-      );
-    }
-
-    return allSuggestions;
-  }
-
-  /// Tam açıklama metnini hazırlar
-  String _prepareFullDescription(
-      String description, String? soil, String? climate) {
-    // Açıklama çok uzunsa kısalt
-    if (description.length > 500) {
-      description = '${description.substring(0, 497)}...';
-    }
-
-    // Toprak ve iklim bilgilerini açıklamaya ekle (eğer varsa)
-    String fullDescription = description;
-    if (soil != null && soil.isNotEmpty) {
-      fullDescription += '\n\nToprak Gereksinimleri: $soil';
-    }
-    if (climate != null && climate.isNotEmpty) {
-      fullDescription += '\n\nİklim Gereksinimleri: $climate';
-    }
-
-    return fullDescription;
   }
 
   /// Kullanıcının analizlerini gerçek zamanlı olarak dinle
@@ -1375,19 +1368,22 @@ class PlantAnalysisRepository extends BaseRepository {
       final results = <PlantAnalysisResult>[];
       for (final doc in snapshot.docs) {
         try {
-          final data = doc.data();
-          // ID yoksa ekle
-          if (!data.containsKey('id') ||
-              data['id'] == null ||
-              data['id'].toString().isEmpty) {
-            data['id'] = doc.id;
-          }
-          results.add(_convertDocToAnalysisResult(data, doc.id));
+          // _convertDocToAnalysisResult metodunu doğrudan kullan
+          results.add(_convertDocToAnalysisResult(doc.data(), doc.id));
         } catch (e) {
-          logError('Analiz sonucu dönüştürme hatası', e.toString());
+          AppLogger.e(
+              "Analiz sonucu dönüştürme hatası. Hata: ${e.toString()}, Belge ID: ${doc.id}");
+          // Hata durumunda basitleştirilmiş bir sonuç ekle
+          try {
+            results.add(
+                _createSimplifiedErrorResult(doc.id, doc.data(), e.toString()));
+          } catch (innerError) {
+            AppLogger.e(
+                "Basitleştirilmiş analiz sonucu oluşturulamadı. Hata: ${innerError.toString()}, Belge ID: ${doc.id}");
+          }
         }
       }
-      logInfo('Stream analizler güncellendi', 'Sayı: ${results.length}');
+      AppLogger.i("Stream analizler güncellendi. Sayı: ${results.length}");
       return results;
     });
   }

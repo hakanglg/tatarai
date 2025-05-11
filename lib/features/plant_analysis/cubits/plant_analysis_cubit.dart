@@ -231,29 +231,23 @@ class PlantAnalysisCubit extends BaseCubit<PlantAnalysisState> {
         AppLogger.i('Konum: $location');
       }
 
-      if (province != null) {
-        AppLogger.i('İl: $province');
-      }
-
-      if (district != null) {
-        AppLogger.i('İlçe: $district');
-      }
-
-      if (neighborhood != null) {
-        AppLogger.i('Mahalle: $neighborhood');
-      }
-
       if (fieldName != null) {
         AppLogger.i('Tarla: $fieldName');
       }
 
-      // Resmi analiz et - Resmi, konum ve tarla adını repository'ye gönder
+      // Resmi Firebase Storage'a yükle ve URL'ini al
+      final String imageUrl = await _repository.uploadImage(imageFile);
+      if (imageUrl.isEmpty) {
+        emit(PlantAnalysisState.error('Görüntü yüklenemedi.',
+            errorType: ErrorType.image));
+        return;
+      }
+
+      // Resmi analiz et - Yüklenen resmin URL'ini, konum ve tarla adını repository'ye gönder
       final result = await _repository.analyzeImage(
-        imageFile,
-        location: location,
-        province: province,
-        district: district,
-        neighborhood: neighborhood,
+        imageUrl: imageUrl,
+        location: location ??
+            'Konum Belirtilmedi', // location null ise varsayılan değer ata
         fieldName: fieldName,
       );
 
@@ -455,6 +449,12 @@ class PlantAnalysisCubit extends BaseCubit<PlantAnalysisState> {
     // API hatası
     else if (errorMessage.contains('api')) {
       return ErrorType.api;
+    }
+
+    // JSON ayrıştırma hatası
+    else if (errorMessage.contains('json') ||
+        errorMessage.contains('ayrıştırılamadı')) {
+      return ErrorType.analysis;
     }
 
     // Analiz hatası
