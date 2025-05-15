@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -11,6 +12,8 @@ import 'package:tatarai/features/auth/models/user_role.dart';
 import 'package:tatarai/features/auth/services/auth_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 
 /// Kullanıcı repository'si - Firebase Auth ve Firestore işlemlerini birleştirir
 class UserRepository extends BaseRepository with CacheableMixin {
@@ -1555,6 +1558,238 @@ class UserRepository extends BaseRepository with CacheableMixin {
           rethrow;
         }
       },
+    );
+  }
+
+  /// Kullanıcının profil fotoğrafını Firebase Storage'a yükler
+  Future<String?> uploadProfileImage(File imageFile, String userId) async {
+    await _ensureInitialized();
+
+    return await apiCall<String?>(
+      operationName: 'Profil fotoğrafı yükleme',
+      apiCall: () async {
+        try {
+          AppLogger.i(
+              'UserRepository: Profil fotoğrafını Storage\'a yükleme başlatılıyor');
+
+          // Storage referansı
+          final storage = FirebaseStorage.instance;
+          final timestamp = DateTime.now().millisecondsSinceEpoch;
+          final pathName = 'profile_images/$userId/profile_$timestamp.jpg';
+          final profileImageRef = storage.ref().child(pathName);
+
+          // Metadata oluştur
+          final metadata = SettableMetadata(
+            contentType: 'image/jpeg',
+            customMetadata: {
+              'userId': userId,
+              'timestamp': timestamp.toString()
+            },
+          );
+
+          // Görüntüyü sıkıştır ve yükle
+          Uint8List imageData = await imageFile.readAsBytes();
+          if (!kIsWeb) {
+            try {
+              final compressedImage =
+                  await FlutterImageCompress.compressWithFile(
+                imageFile.absolute.path,
+                quality: 85,
+                minWidth: 500,
+                minHeight: 500,
+              );
+              if (compressedImage != null) {
+                imageData = compressedImage;
+                AppLogger.i('Görüntü sıkıştırıldı: ${imageData.length} bytes');
+              }
+            } catch (e) {
+              AppLogger.w(
+                  'Görüntü sıkıştırma hatası, orjinal görüntü kullanılacak: $e');
+            }
+          } else {
+            // Web platformunda sıkıştırma kullanma
+            AppLogger.i('Web platformunda görüntü sıkıştırma atlanıyor');
+          }
+
+          // Yükle ve URL al
+          final uploadTask = profileImageRef.putData(imageData, metadata);
+          final snapshot = await uploadTask;
+          final downloadUrl = await snapshot.ref.getDownloadURL();
+
+          AppLogger.i('Profil resmi başarıyla yüklendi: $downloadUrl');
+          return downloadUrl;
+        } catch (e) {
+          AppLogger.e('Profil fotoğrafı yükleme hatası', e);
+          rethrow;
+        }
+      },
+      ignoreConnectionCheck: false,
+      throwError: true,
+    );
+  }
+
+  /// Kullanıcının profil fotoğrafı URL'sini günceller (sadece Firestore)
+  Future<bool> updateUserPhotoURL(String userId, String photoURL) async {
+    await _ensureInitialized();
+
+    final result = await apiCall<bool>(
+      operationName: 'Profil fotoğrafı URL güncelleme',
+      apiCall: () async {
+        try {
+          AppLogger.i('UserRepository: Profil fotoğrafı URL\'i güncelleniyor');
+          AppLogger.i('UserID: $userId, PhotoURL: $photoURL');
+
+          // Firestore instance
+          final userDocRef = _firestore.collection(_userCollection).doc(userId);
+
+          // Önce belgenin var olup olmadığını kontrol et
+          final docExists = await userDocRef.get().then((doc) => doc.exists);
+
+          if (!docExists) {
+            AppLogger.w('Kullanıcı belgesi bulunamadı, oluşturuluyor...');
+
+            // Firebase Auth'tan kullanıcı bilgilerini al
+            final firebaseUser = _authService.currentUser;
+            if (firebaseUser == null || firebaseUser.uid != userId) {
+              AppLogger.e('Geçerli kullanıcı bilgisi bulunamadı');
+              return false;
+            }
+
+            // Temel kullanıcı belgesini oluştur
+            await userDocRef.set({
+              'id': userId,
+              'email': firebaseUser.email ?? '',
+              'displayName': firebaseUser.displayName,
+              'isEmailVerified': firebaseUser.emailVerified,
+              'photoURL': photoURL,
+              'createdAt': FieldValue.serverTimestamp(),
+              'updatedAt': FieldValue.serverTimestamp(),
+              'role': 'free',
+              'analysisCredits': 10, // Varsayılan değer
+            });
+
+            AppLogger.i(
+                'Yeni kullanıcı belgesi oluşturuldu ve fotoğraf URL\'i ayarlandı');
+            return true;
+          } else {
+            // Mevcut belgeyi güncelle - transaction kullan (daha güvenli)
+            await _firestore.runTransaction((transaction) async {
+              transaction.update(userDocRef, {
+                'photoURL': photoURL,
+                'updatedAt': FieldValue.serverTimestamp(),
+              });
+            });
+
+            // Güncellemenin başarılı olup olmadığını kontrol et
+            final updatedDoc = await userDocRef.get();
+            final updatedPhotoURL = updatedDoc.data()?['photoURL'];
+
+            if (updatedPhotoURL == photoURL) {
+              AppLogger.i('Profil fotoğrafı URL\'i başarıyla güncellendi');
+              return true;
+            } else {
+              AppLogger.w(
+                  'URL güncelleme başarısız olmuş olabilir. Beklenen: $photoURL, Mevcut: $updatedPhotoURL');
+
+              // Son bir deneme daha yap - SetOptions.merge ile
+              await userDocRef.set({
+                'photoURL': photoURL,
+                'updatedAt': FieldValue.serverTimestamp(),
+              }, SetOptions(merge: true));
+
+              AppLogger.i('URL merge yöntemiyle yeniden denendi');
+              return true;
+            }
+          }
+        } catch (e) {
+          AppLogger.e('Profil fotoğrafı URL güncelleme hatası', e);
+
+          if (_isNetworkOrFirestoreError(e)) {
+            // Çevrimdışı durumda, önbelleğe kaydet
+            try {
+              final cachedUser = await _recoverFromOfflineCache(userId);
+              if (cachedUser != null) {
+                final updatedUser = cachedUser.copyWith(photoURL: photoURL);
+                await cacheData(
+                    _userCachePrefix + userId, updatedUser.toFirestore());
+                AppLogger.i(
+                    'Çevrimdışı durum: Fotoğraf URL\'i önbelleğe kaydedildi');
+
+                // Bekleyen işlem olarak ekle
+                _addPendingOperation(
+                  _PendingOperation(
+                    type: 'UPDATE_USER_PHOTO_URL',
+                    execute: () => updateUserPhotoURL(userId, photoURL),
+                    timestamp: DateTime.now(),
+                  ),
+                );
+
+                return true;
+              }
+            } catch (cacheError) {
+              AppLogger.e('Önbellek işlemi hatası', cacheError);
+            }
+          }
+
+          return false;
+        }
+      },
+      ignoreConnectionCheck: false,
+      throwError: false,
+    );
+
+    // Her durumda bool değer döndürdüğümüzden emin ol
+    return result ?? false;
+  }
+
+  /// Profil fotoğrafı işleme ve güncelleme sürecini yönetir
+  Future<String?> processProfilePhoto(File imageFile, String userId) async {
+    await _ensureInitialized();
+
+    return await apiCall<String?>(
+      operationName: 'Profil fotoğrafı işleme',
+      apiCall: () async {
+        try {
+          // Dosya kontrolü
+          if (!imageFile.existsSync()) {
+            throw Exception('Seçilen dosya bulunamadı veya erişilemiyor');
+          }
+
+          // Dosya boyutu kontrolü
+          final fileSize = await imageFile.length();
+          AppLogger.i(
+              'Dosya boyutu: ${(fileSize / 1024).toStringAsFixed(2)} KB');
+
+          if (fileSize > 5 * 1024 * 1024) {
+            throw Exception('Dosya boyutu çok büyük, maksimum 5MB olmalı');
+          }
+
+          // Storage'a yükle
+          final downloadUrl = await uploadProfileImage(imageFile, userId);
+
+          if (downloadUrl != null) {
+            // Firestore'da güncelle
+            final updateResult = await updateUserPhotoURL(userId, downloadUrl);
+
+            if (updateResult) {
+              return downloadUrl;
+            } else {
+              AppLogger.w(
+                  'Profil fotoğrafı yüklendi ancak kullanıcı verisi güncellenemedi');
+              // Storage'a yüklenen fotoğraf varsa bile URL'i dön
+              return downloadUrl;
+            }
+          } else {
+            AppLogger.e('Fotoğraf yükleme başarısız: Geçerli URL alınamadı');
+            return null;
+          }
+        } catch (e) {
+          AppLogger.e('Profil fotoğrafı işleme hatası', e);
+          rethrow;
+        }
+      },
+      ignoreConnectionCheck: false,
+      throwError: true,
     );
   }
 

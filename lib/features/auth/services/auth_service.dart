@@ -9,7 +9,6 @@ import 'package:tatarai/core/services/firebase_manager.dart';
 import 'package:tatarai/features/auth/models/user_model.dart';
 import 'package:tatarai/features/auth/models/user_role.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 
 /// Firebase authentication servisi
 /// Firebase Auth ile ilgili temel işlemleri gerçekleştirir
@@ -68,10 +67,12 @@ class AuthService extends BaseService {
   /// Çevrimdışı kalıcılığı etkinleştirir
   Future<void> _enableFirestoreOfflinePersistence() async {
     try {
-      await FirebaseFirestore.instance.enablePersistence(
-        const PersistenceSettings(
-          synchronizeTabs: true,
-        ),
+      // iOS ve Android için kalıcılığı etkinleştir
+      _logger.i(
+          'Mobil platformlar için çevrimdışı kalıcılık etkinleştiriliyor...');
+      FirebaseFirestore.instance.settings = Settings(
+        persistenceEnabled: true,
+        cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
       );
       _logger.i('Firebase çevrimdışı kalıcılık etkinleştirildi');
     } catch (e) {

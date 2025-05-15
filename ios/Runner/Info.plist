@@ -44,9 +44,11 @@
 		<string>Default</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>Bu uygulama, bitki analizi için fotoğraf çekmek üzere kameranıza erişim gerektirir</string>
+	<string>TatarAI, profil fotoğrafı çekmek ve bitki analizi yapmak için kamera erişimi gerektirir. Bu izin yalnızca açıkça fotoğraf çekmeyi seçtiğinizde kullanılır ve başka hiçbir amaçla kullanılmaz. Kamera erişimine izin vermezseniz, fotoğraf çekemezsiniz ancak galeriden seçme seçeneğini hala kullanabilirsiniz.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Bu uygulama, bitki analizi için galeriden fotoğraf seçmenize olanak tanımak için fotoğraf kitaplığınıza erişim gerektirir</string>
+	<string>TatarAI, profil fotoğrafınızı güncellemek ve bitki analizi yapmak için fotoğraf galerisi erişimi gerektirir. Bu izin yalnızca açıkça bir fotoğraf seçtiğinizde kullanılır ve fotoğraflarınız izniniz olmadan paylaşılmaz veya depolanmaz. Galeri erişimine izin vermezseniz, fotoğraf seçemezsiniz ancak kamera seçeneğini hala kullanabilirsiniz.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>TatarAI, analiz sonuçlarını ve diğer fotoğrafları galerinize kaydetmek için izin istiyor. Bu özellik yalnızca fotoğraf kaydetmeyi açıkça seçtiğinizde kullanılır ve izniniz olmadan hiçbir veri saklanmaz.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

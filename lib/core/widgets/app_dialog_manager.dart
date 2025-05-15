@@ -214,7 +214,7 @@ class AppDialogManager {
   }) async {
     final result = await showCupertinoDialog<bool>(
       context: context,
-      builder: (context) => CupertinoAlertDialog(
+      builder: (dialogContext) => CupertinoAlertDialog(
         title: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -237,18 +237,31 @@ class AppDialogManager {
         actions: [
           CupertinoDialogAction(
             child: Text(cancelText ?? 'cancel'.locale(context)),
-            onPressed: onCancelPressed ??
-                () {
-                  Navigator.pop(context, false);
-                },
+            onPressed: () {
+              // Önce diyaloğu kapat
+              Navigator.of(dialogContext).pop(false);
+
+              // Sonra callback'i çağır (eğer varsa)
+              if (onCancelPressed != null) {
+                onCancelPressed();
+              }
+            },
           ),
           CupertinoDialogAction(
             isDefaultAction: true,
             child: Text(settingsText ?? 'button_settings'.locale(context)),
-            onPressed: onSettingsPressed ??
-                () {
-                  Navigator.pop(context, true);
-                },
+            onPressed: () {
+              // Önce diyaloğu kapat
+              Navigator.of(dialogContext).pop(true);
+
+              // Sonra onSettingsPressed callback'ini çağır
+              if (onSettingsPressed != null) {
+                // Bir mikrosaniye gecikmeli olarak çağır, böylece diyalog tamamen kapanır
+                Future.delayed(const Duration(milliseconds: 100), () {
+                  onSettingsPressed();
+                });
+              }
+            },
           ),
         ],
       ),
@@ -330,5 +343,127 @@ class AppDialogManager {
   /// Diyalog'u kapat
   static void dismissDialog(BuildContext context) {
     Navigator.of(context, rootNavigator: true).pop();
+  }
+
+  /// SnackBar bildirim gösterir - kısa süreli popup şeklinde bildirim
+  static void showSnackBar({
+    required BuildContext context,
+    required String message,
+    IconData? icon,
+    Color? iconColor,
+    Duration duration = const Duration(seconds: 3),
+    VoidCallback? onDismiss,
+  }) {
+    if (!context.mounted) return;
+
+    // İkon ve rengi belirle
+    IconData iconToShow = icon ??
+        (message.contains('success') ||
+                message.contains('başarı') ||
+                message.contains('güncelle') ||
+                message.contains('updated')
+            ? CupertinoIcons.check_mark_circled_solid
+            : CupertinoIcons.info_circle_fill);
+
+    Color colorToShow = iconColor ??
+        (message.contains('success') ||
+                message.contains('başarı') ||
+                message.contains('güncelle') ||
+                message.contains('updated')
+            ? CupertinoColors.activeGreen
+            : CupertinoColors.activeBlue);
+
+    // Platform adaptif SnackBar gösterimi
+    final bool isIOS = Theme.of(context).platform == TargetPlatform.iOS ||
+        Theme.of(context).platform == TargetPlatform.macOS;
+
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    scaffoldMessenger.clearSnackBars(); // Mevcut SnackBar'ları kapat
+
+    if (isIOS) {
+      // iOS stili SnackBar
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(
+                iconToShow,
+                color: colorToShow,
+                size: 20,
+              ),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  message,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontFamily: 'sfpro',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor:
+              Colors.grey[850], // AppTheme.darkColorScheme.surface,
+          duration: duration,
+          behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.only(bottom: 16, left: 16, right: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          dismissDirection: DismissDirection.horizontal,
+          action: SnackBarAction(
+            label: 'Kapat',
+            textColor: Colors.white70,
+            onPressed: () {
+              scaffoldMessenger.hideCurrentSnackBar();
+              if (onDismiss != null) {
+                onDismiss();
+              }
+            },
+          ),
+        ),
+      );
+    } else {
+      // Android stili SnackBar
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(
+                iconToShow,
+                color: colorToShow,
+                size: 24,
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  message,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor:
+              Colors.grey[900], // AppTheme.darkColorScheme.background,
+          duration: duration,
+          behavior: SnackBarBehavior.fixed,
+          action: SnackBarAction(
+            label: 'KAPAT',
+            textColor: AppColors.primary,
+            onPressed: () {
+              scaffoldMessenger.hideCurrentSnackBar();
+              if (onDismiss != null) {
+                onDismiss();
+              }
+            },
+          ),
+        ),
+      );
+    }
   }
 }

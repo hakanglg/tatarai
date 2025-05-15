@@ -1,72 +1,33 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:bloc/bloc.dart';
-import 'package:equatable/equatable.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/features/auth/models/user_model.dart';
 import 'package:tatarai/core/repositories/user_repository.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
-/// Profil ekranı için state sınıfı
-class ProfileState extends Equatable {
-  final UserModel? user;
-  final bool isLoading;
-  final String? errorMessage;
-  final bool isProfileUpdated;
-  final bool isImageUploading;
-  final bool isRefreshing;
-
-  const ProfileState({
-    this.user,
-    this.isLoading = false,
-    this.errorMessage,
-    this.isProfileUpdated = false,
-    this.isImageUploading = false,
-    this.isRefreshing = false,
-  });
-
-  /// Başlangıç state'i
-  factory ProfileState.initial() {
-    return const ProfileState();
-  }
-
-  /// State kopyalama methodu
-  ProfileState copyWith({
-    UserModel? user,
-    bool? isLoading,
-    String? errorMessage,
-    bool? isProfileUpdated,
-    bool? isImageUploading,
-    bool? isRefreshing,
-  }) {
-    return ProfileState(
-      user: user ?? this.user,
-      isLoading: isLoading ?? this.isLoading,
-      errorMessage: errorMessage,
-      isProfileUpdated: isProfileUpdated ?? this.isProfileUpdated,
-      isImageUploading: isImageUploading ?? this.isImageUploading,
-      isRefreshing: isRefreshing ?? this.isRefreshing,
-    );
-  }
-
-  @override
-  List<Object?> get props => [
-        user,
-        isLoading,
-        errorMessage,
-        isProfileUpdated,
-        isImageUploading,
-        isRefreshing,
-      ];
-}
+import 'package:image_picker/image_picker.dart';
+import 'package:tatarai/core/utils/permission_manager.dart';
+import 'package:tatarai/features/profile/cubits/profile_state.dart';
 
 /// Profil ekranı işlemlerini yöneten Cubit
 class ProfileCubit extends Cubit<ProfileState> {
+  /// Repository instance
   final UserRepository _userRepository;
+
+  /// Auth cubit referansı
   final AuthCubit? _authCubit;
+
+  /// Kullanıcı stream subscription
   StreamSubscription<UserModel?>? _userSubscription;
+
+  /// Auth state stream subscription
   StreamSubscription<User?>? _authStateSubscription;
 
+  /// ImagePicker instance
+  final ImagePicker _imagePicker = ImagePicker();
+
+  /// Constructor
   ProfileCubit({
     required UserRepository userRepository,
     AuthCubit? authCubit,
@@ -80,11 +41,7 @@ class ProfileCubit extends Cubit<ProfileState> {
   void _init() {
     try {
       AppLogger.i('ProfileCubit başlatılıyor');
-
-      // Kullanıcıyı dinleme
       _listenUserChanges();
-
-      // Auth durumunu dinle
       _listenAuthState();
     } catch (e) {
       AppLogger.e('ProfileCubit başlatma hatası', e);
@@ -98,7 +55,7 @@ class ProfileCubit extends Cubit<ProfileState> {
       _getCurrentUser();
 
       // Kullanıcı değişikliklerini dinle
-      final currentUser = _userRepository.getCurrentUser().then((user) {
+      _userRepository.getCurrentUser().then((user) {
         if (user != null) {
           _userSubscription?.cancel();
           _userSubscription = _userRepository.getUserStream(user.id).listen(
@@ -158,46 +115,61 @@ class ProfileCubit extends Cubit<ProfileState> {
 
   /// Firestore'dan kullanıcı bilgilerini taze olarak yeniden yükler
   Future<void> refreshUserData() async {
+    AppLogger.i('ProfileCubit: refreshUserData BAŞLADI.');
+    emit(state.copyWith(isRefreshing: true, errorMessage: null));
     try {
       // Mevcut kullanıcı kimliğini al
-      final currentUser = await _userRepository.getCurrentUser();
-      if (currentUser == null) {
-        AppLogger.w('Kullanıcı verisi yenilenemedi: Kullanıcı bulunamadı');
+      final authUser =
+          FirebaseAuth.instance.currentUser; // Direkt Auth'tan alalım
+      if (authUser == null) {
+        AppLogger.w(
+            'ProfileCubit: refreshUserData - Kullanıcı oturumu açık değil, işlem durduruldu.');
         emit(state.copyWith(
-          errorMessage: 'Kullanıcı verisi yenilenemedi: Kullanıcı bulunamadı',
+          errorMessage: 'Kullanıcı oturumu bulunamadı.',
           isRefreshing: false,
+          isLoading: false, // isLoading'i de false yapalım
         ));
         return;
       }
-
-      emit(state.copyWith(isRefreshing: true, errorMessage: null));
-      AppLogger.i('Firestore\'dan kullanıcı verisi yenileniyor...');
+      final userId = authUser.uid;
+      AppLogger.i(
+          'ProfileCubit: refreshUserData - Firestore\'dan kullanıcı verisi ($userId) yenileniyor...');
 
       // UserRepository'nin bu metodu Firestore'dan taze veriyi alacak
-      final refreshedUser =
-          await _userRepository.fetchFreshUserData(currentUser.id);
+      final refreshedUser = await _userRepository.fetchFreshUserData(userId);
 
       if (refreshedUser != null) {
+        AppLogger.i(
+            'ProfileCubit: refreshUserData - Kullanıcı verisi BAŞARIYLA yenilendi. PhotoURL: ${refreshedUser.photoURL}');
         emit(state.copyWith(
           user: refreshedUser,
           isRefreshing: false,
+          isLoading: false, // isLoading'i de false yapalım
+          errorMessage: null, // Hata mesajını temizle
         ));
         AppLogger.i(
-            'Kullanıcı verisi başarıyla yenilendi. Analiz kredisi: ${refreshedUser.analysisCredits}, Rol: ${refreshedUser.role}');
+            'ProfileCubit: refreshUserData - Yeni state emit edildi. Analiz kredisi: ${refreshedUser.analysisCredits}, Rol: ${refreshedUser.role}');
       } else {
+        AppLogger.w(
+            'ProfileCubit: refreshUserData - Kullanıcı verisi yenilenemedi (fetchFreshUserData null döndü).');
         emit(state.copyWith(
           isRefreshing: false,
-          errorMessage: 'Kullanıcı verisi yenilenemedi',
+          isLoading: false, // isLoading'i de false yapalım
+          errorMessage: 'Kullanıcı verisi yenilenemedi.',
         ));
-        AppLogger.w('Kullanıcı verisi yenilenemedi');
       }
-    } catch (e) {
-      AppLogger.e('Kullanıcı verisi yenileme hatası', e);
+    } catch (e, stackTrace) {
+      AppLogger.e(
+          'ProfileCubit: refreshUserData - Kullanıcı verisi yenileme HATASI!',
+          e,
+          stackTrace);
       emit(state.copyWith(
         isRefreshing: false,
+        isLoading: false, // isLoading'i de false yapalım
         errorMessage: 'Kullanıcı verisi yenilenirken bir hata oluştu: $e',
       ));
     }
+    AppLogger.i('ProfileCubit: refreshUserData TAMAMLANDI.');
   }
 
   /// Kullanıcı profilini günceller
@@ -239,6 +211,109 @@ class ProfileCubit extends Cubit<ProfileState> {
     emit(state.copyWith(isImageUploading: isUploading));
   }
 
+  /// Kullanıcı fotoğrafını günceller ve direk olarak Firestore'daki kullanıcı alanını günceller
+  Future<String?> updateUserPhotoAndRefresh(File imageFile) async {
+    try {
+      AppLogger.i('ProfileCubit: Profil fotoğrafı güncelleme başlatılıyor');
+      emit(state.copyWith(isImageUploading: true));
+
+      // Mevcut kullanıcı kontrolü
+      final currentUser = state.user;
+      if (currentUser == null) {
+        throw Exception('Kullanıcı oturum açmamış');
+      }
+
+      final userId = currentUser.id;
+      AppLogger.i(
+          'ProfileCubit: Profil fotoğrafı yükleniyor, User ID: $userId');
+
+      // UserRepository'yi kullanarak profil fotoğrafını işle
+      final downloadUrl =
+          await _userRepository.processProfilePhoto(imageFile, userId);
+
+      // Kullanıcı verilerini yenile
+      if (downloadUrl != null) {
+        await refreshUserData();
+      }
+
+      // Yükleme durumunu güncelle
+      emit(state.copyWith(isImageUploading: false));
+
+      // URL döndür
+      return downloadUrl;
+    } catch (e) {
+      AppLogger.e('ProfileCubit: Genel fotoğraf güncelleme hatası', e);
+      emit(state.copyWith(isImageUploading: false));
+      rethrow;
+    }
+  }
+
+  /// Profil fotoğrafını Firebase Storage'a yükler ve Firestore'da günceller
+  Future<String?> uploadProfileImage(File imageFile) async {
+    try {
+      AppLogger.i('ProfileCubit: Profil fotoğrafı yükleme başlatılıyor');
+      emit(state.copyWith(isImageUploading: true));
+
+      // Dosya kontrolü
+      if (!imageFile.existsSync()) {
+        AppLogger.e('ProfileCubit: Dosya bulunamadı: ${imageFile.path}');
+        throw Exception('Seçilen dosya bulunamadı veya erişilemiyor');
+      }
+
+      // Dosya boyutu kontrolü
+      final fileSize = await imageFile.length();
+      AppLogger.i(
+          'ProfileCubit: Dosya boyutu: ${(fileSize / 1024).toStringAsFixed(2)} KB');
+
+      if (fileSize > 5 * 1024 * 1024) {
+        // 5MB'dan büyük dosyaları reddet
+        AppLogger.e(
+            'ProfileCubit: Dosya çok büyük: ${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB');
+        throw Exception(
+            'Dosya boyutu çok büyük, lütfen daha küçük bir fotoğraf seçin (maks. 5MB)');
+      }
+
+      // Token yenileme
+      await refreshAuthToken();
+
+      // Kullanıcı ID kontrolü
+      final userId = state.user?.id;
+      if (userId == null) {
+        throw Exception('Kullanıcı oturum açmamış');
+      }
+
+      // UserRepository'yi kullanarak profil fotoğrafını işle
+      return await updateUserPhotoAndRefresh(imageFile);
+    } catch (e) {
+      AppLogger.e('ProfileCubit: Genel fotoğraf yükleme hatası', e);
+      emit(state.copyWith(isImageUploading: false));
+      rethrow;
+    }
+  }
+
+  /// Profil fotoğrafını doğrudan Firestore'da günceller (acil/son çare yöntemi)
+  Future<bool> updateUserPhotoDirectly(String userId, String photoURL) async {
+    try {
+      AppLogger.i('ProfileCubit: Doğrudan Firestore photoURL güncelleniyor...');
+      AppLogger.i('ProfileCubit: User ID: $userId, Yeni photoURL: $photoURL');
+
+      // UserRepository'yi kullanarak kullanıcı fotoğrafı URL'sini güncelle
+      final result = await _userRepository.updateUserPhotoURL(userId, photoURL);
+
+      if (result) {
+        AppLogger.i('ProfileCubit: photoURL başarıyla güncellendi');
+        await refreshUserData();
+      } else {
+        AppLogger.e('ProfileCubit: photoURL güncellenemedi');
+      }
+
+      return result;
+    } catch (e) {
+      AppLogger.e('ProfileCubit: Genel güncelleme hatası', e);
+      return false;
+    }
+  }
+
   /// Firebase Auth durumunu dinler
   void _listenAuthState() {
     try {
@@ -269,7 +344,7 @@ class ProfileCubit extends Cubit<ProfileState> {
   void _listenToAuthCubit() {
     if (_authCubit != null) {
       // AuthCubit'teki kullanıcı değişikliklerini dinle
-      _authCubit!.stream.listen((authState) {
+      _authCubit.stream.listen((authState) {
         if (authState.isAuthenticated && authState.user != null) {
           // Kullanıcı girişi olduğunda profil verilerini güncelle
           if (state.user == null || state.user!.id != authState.user!.id) {
@@ -295,7 +370,7 @@ class ProfileCubit extends Cubit<ProfileState> {
           AppLogger.i(
               'Profil: AuthCubit üzerinden hesap silme işlemi algılandı');
           // accountDeleted durumunu temizle
-          _authCubit!.clearAccountDeletedState();
+          _authCubit.clearAccountDeletedState();
         }
       });
 
@@ -486,6 +561,114 @@ class ProfileCubit extends Cubit<ProfileState> {
       isImageUploading: false,
       isRefreshing: false,
     ));
+  }
+
+  /// Hata mesajları için yardımcı metot
+  String getPhotoUploadErrorMessage(dynamic error) {
+    final errorString = error.toString().toLowerCase();
+
+    if (errorString.contains('unauthorized') ||
+        errorString.contains('permission')) {
+      return 'Yetkilendirme hatası: Fotoğraf yükleme izniniz yok';
+    } else if (errorString.contains('canceled')) {
+      return 'Yükleme iptal edildi';
+    } else if (errorString.contains('network') ||
+        errorString.contains('connection') ||
+        errorString.contains('internet') ||
+        errorString.contains('retry-limit')) {
+      return 'İnternet bağlantı hatası, lütfen bağlantınızı kontrol edin';
+    } else if (errorString.contains('not found') ||
+        errorString.contains('bulunamadı')) {
+      return 'Dosya bulunamadı veya erişilemiyor';
+    } else if (errorString.contains('big') ||
+        errorString.contains('large') ||
+        errorString.contains('büyük') ||
+        errorString.contains('boyut')) {
+      return 'Dosya boyutu çok büyük, lütfen daha küçük bir fotoğraf seçin';
+    } else if (errorString.contains('quota')) {
+      return 'Depolama kotası aşıldı';
+    } else if (errorString.contains('token')) {
+      return 'Oturum süresi dolmuş olabilir, lütfen tekrar giriş yapın';
+    }
+
+    return 'Fotoğraf yüklenirken bir hata oluştu, lütfen tekrar deneyin';
+  }
+
+  /// Kamera veya galeriden profil fotoğrafı seçme işlemi
+  Future<File?> pickImage(ImageSource source) async {
+    try {
+      AppLogger.i(
+          'Profil fotoğrafı seçimi başlatılıyor, kaynak: ${source == ImageSource.camera ? 'Kamera' : 'Galeri'}');
+
+      // İzin kontrolü - Platform bazlı
+      if (source == ImageSource.camera) {
+        final hasPermission = await PermissionManager.requestPermission(
+          AppPermissionType.camera,
+        );
+        if (!hasPermission) {
+          AppLogger.w('Kamera izni reddedildi');
+          return null;
+        }
+      } else if (source == ImageSource.gallery && Platform.isAndroid) {
+        // Android'de galeri için izin gerekir
+        final hasPermission = await PermissionManager.requestPermission(
+          AppPermissionType.photos,
+        );
+        if (!hasPermission) {
+          AppLogger.w('Galeri izni reddedildi');
+          return null;
+        }
+      }
+      // Not: iOS'ta galeri için izin, image_picker tarafından otomatik olarak yönetilir
+
+      // Görüntü seçici aç
+      final XFile? pickedFile = await _imagePicker.pickImage(
+        source: source,
+        imageQuality: 90,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        preferredCameraDevice: CameraDevice.front, // Ön kamera tercih edilsin
+      );
+
+      if (pickedFile == null) {
+        AppLogger.i('Görüntü seçimi iptal edildi');
+        return null;
+      }
+
+      // Dosya oluştur
+      final File imageFile = File(pickedFile.path);
+      if (!imageFile.existsSync()) {
+        AppLogger.e('Seçilen dosya bulunamadı: ${pickedFile.path}');
+        return null;
+      }
+
+      return imageFile;
+    } catch (e) {
+      AppLogger.e('Profil fotoğrafı seçme hatası: ${e.toString()}');
+      return null;
+    }
+  }
+
+  /// E-posta doğrulama durumunu kontrol eder ve günceller
+  Future<bool> checkAndUpdateEmailVerificationStatus() async {
+    try {
+      AppLogger.i('ProfileCubit: E-posta doğrulama durumu kontrol ediliyor');
+      emit(state.copyWith(isLoading: true, errorMessage: null));
+
+      // Firebase Auth kullanıcısını yenile ve doğrulama durumunu kontrol et
+      final isVerified = await refreshEmailVerificationStatus();
+
+      emit(state.copyWith(isLoading: false));
+
+      return isVerified;
+    } catch (e) {
+      AppLogger.e('ProfileCubit: E-posta doğrulama kontrolü hatası', e);
+      emit(state.copyWith(
+          isLoading: false,
+          errorMessage:
+              'E-posta doğrulama durumu kontrol edilirken bir hata oluştu'));
+      return false;
+    }
   }
 
   @override

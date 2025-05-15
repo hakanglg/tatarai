@@ -1,14 +1,10 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
-import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:tatarai/core/constants/locale_constants.dart';
 import 'package:tatarai/core/extensions/string_extension.dart';
 import 'package:tatarai/core/init/localization/localization_manager.dart';
@@ -17,7 +13,6 @@ import 'package:tatarai/core/theme/color_scheme.dart';
 import 'package:tatarai/core/theme/dimensions.dart';
 import 'package:tatarai/core/theme/text_theme.dart';
 import 'package:tatarai/core/utils/logger.dart';
-import 'package:tatarai/core/widgets/app_button.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
 import 'package:tatarai/features/auth/cubits/auth_state.dart';
 import 'package:tatarai/features/auth/models/user_model.dart';
@@ -25,10 +20,10 @@ import 'package:tatarai/features/payment/cubits/payment_cubit.dart';
 import 'package:tatarai/features/payment/views/premium_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:tatarai/features/profile/cubits/profile_cubit.dart';
+import 'package:tatarai/features/profile/cubits/profile_state.dart';
 import 'package:sprung/sprung.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:tatarai/core/utils/permission_manager.dart';
 import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
+import 'package:tatarai/core/widgets/app_dialog_manager.dart';
 
 /// Kullanıcı profil bilgilerini gösteren ve düzenleyen ekran
 /// Apple Human Interface Guidelines'a uygun modern tasarım
@@ -42,7 +37,6 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen>
     with SingleTickerProviderStateMixin {
-  final ImagePicker _imagePicker = ImagePicker();
   File? _selectedProfileImage;
   bool _isUploading = false;
   late AnimationController _animationController;
@@ -63,6 +57,11 @@ class _ProfileScreenState extends State<ProfileScreen>
       vsync: this,
       duration: const Duration(milliseconds: 800),
     )..forward();
+
+    // Kullanıcı verilerini yükle
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ProfileCubit>().refreshUserData();
+    });
   }
 
   // Scroll pozisyonunu takip ederek başlığı göster/gizle
@@ -729,7 +728,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Widget _buildProfilePhoto(UserModel user) {
     return GestureDetector(
-      onTap: _pickImage,
+      onTap: _showPhotoSourceDialog,
       child: Stack(
         alignment: Alignment.center,
         children: [
@@ -771,44 +770,49 @@ class _ProfileScreenState extends State<ProfileScreen>
               borderRadius: BorderRadius.circular(62.5),
               child: _isUploading
                   ? const Center(child: CupertinoActivityIndicator(radius: 20))
-                  : _selectedProfileImage != null || user.photoURL != null
+                  : _selectedProfileImage != null
                       ? Hero(
                           tag: 'profile_photo',
-                          child: _selectedProfileImage != null
-                              ? Image.file(
-                                  _selectedProfileImage!,
-                                  fit: BoxFit.cover,
-                                  width: 125,
-                                  height: 125,
-                                )
-                              : Image.network(
-                                  user.photoURL!,
-                                  fit: BoxFit.cover,
-                                  width: 125,
-                                  height: 125,
-                                  loadingBuilder:
-                                      (context, child, loadingProgress) {
-                                    if (loadingProgress == null) return child;
-                                    return Center(
-                                      child: CupertinoActivityIndicator(
-                                        radius: 15,
-                                      ),
-                                    );
-                                  },
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Icon(
-                                      CupertinoIcons.person_fill,
-                                      size: 62,
-                                      color: AppColors.primary,
-                                    );
-                                  },
-                                ),
+                          child: Image.file(
+                            _selectedProfileImage!,
+                            fit: BoxFit.cover,
+                            width: 125,
+                            height: 125,
+                          ),
                         )
-                      : Icon(
-                          CupertinoIcons.person_fill,
-                          size: 62,
-                          color: AppColors.primary,
-                        ),
+                      : user.photoURL != null
+                          ? Hero(
+                              tag: 'profile_photo',
+                              child: Image.network(
+                                user.photoURL!,
+                                fit: BoxFit.cover,
+                                width: 125,
+                                height: 125,
+                                loadingBuilder:
+                                    (context, child, loadingProgress) {
+                                  if (loadingProgress == null) return child;
+                                  return Center(
+                                    child: CupertinoActivityIndicator(
+                                      radius: 15,
+                                    ),
+                                  );
+                                },
+                                errorBuilder: (context, error, stackTrace) {
+                                  AppLogger.e(
+                                      'Profil resmi yükleme hatası: $error');
+                                  return Icon(
+                                    CupertinoIcons.person_fill,
+                                    size: 62,
+                                    color: AppColors.primary,
+                                  );
+                                },
+                              ),
+                            )
+                          : Icon(
+                              CupertinoIcons.person_fill,
+                              size: 62,
+                              color: AppColors.primary,
+                            ),
             ),
           ),
 
@@ -1220,794 +1224,273 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
+  void _showDeleteAccountDialog() {
+    HapticFeedback.heavyImpact();
+    if (!mounted) return;
+
+    AppDialogManager.showConfirmDialog(
+      context: context,
+      title: 'delete_account_title'.locale(context),
+      message: 'delete_account_warning'.locale(context) +
+          '\n\n' +
+          'data_to_be_deleted'.locale(context) +
+          ':\n' +
+          '• ' +
+          'user_data'.locale(context) +
+          '\n' +
+          '• ' +
+          'analysis_history'.locale(context) +
+          '\n' +
+          '• ' +
+          'purchased_credits'.locale(context),
+      confirmText: 'delete_account_title'.locale(context),
+      cancelText: 'cancel'.locale(context),
+      onConfirmPressed: () {
+        if (!mounted) return;
+        context.read<ProfileCubit>().deleteAccount();
+      },
+    );
+  }
+
   void _showLogoutDialog(BuildContext context) {
     HapticFeedback.mediumImpact();
+    if (!mounted) return;
 
-    showCupertinoDialog(
+    AppDialogManager.showConfirmDialog(
       context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: Text('logout_title'.locale(context)),
-        content: Text('logout_confirmation'.locale(context)),
-        actions: [
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            onPressed: () => Navigator.pop(context),
-            child: Text('cancel'.locale(context)),
-          ),
-          CupertinoDialogAction(
-            isDestructiveAction: true,
-            onPressed: () {
-              Navigator.pop(context);
-              context.read<ProfileCubit>().signOut();
-              context.goNamed(RouteNames.login);
-            },
-            child: Text('logout_button'.locale(context)),
-          ),
-        ],
-      ),
+      title: 'logout_title'.locale(context),
+      message: 'logout_confirmation'.locale(context),
+      confirmText: 'logout_button'.locale(context),
+      cancelText: 'cancel'.locale(context),
+      onConfirmPressed: () {
+        if (!mounted) return;
+        context.read<ProfileCubit>().signOut();
+        context.goNamed(RouteNames.login);
+      },
     );
   }
 
   void _checkEmailVerification(BuildContext context) async {
     final profileCubit = context.read<ProfileCubit>();
 
-    // Yükleniyor dialog göster
-    showCupertinoDialog(
+    // Yükleniyor dialkogu göster
+    if (!mounted) return;
+
+    AppDialogManager.showLoadingDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (context) => CupertinoAlertDialog(
-        title: Center(
-          child: CupertinoActivityIndicator(),
-        ),
-        content: Padding(
-          padding: EdgeInsets.symmetric(vertical: 12.0),
-          child: Text(
-            'checking_verification'.locale(context),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      ),
+      message: 'checking_verification'.locale(context),
     );
 
     try {
-      final isVerified = await profileCubit.refreshEmailVerificationStatus();
-      if (context.mounted) {
-        Navigator.of(context).pop(); // Dialogu kapat
-      }
+      // ProfileCubit üzerinden doğrulama durumunu kontrol et
+      final isVerified =
+          await profileCubit.checkAndUpdateEmailVerificationStatus();
+
+      // Dialog'u kapat
+      if (!mounted) return;
+      Navigator.of(context).pop();
+
+      // Sonuç dialoglarını göster
       if (isVerified) {
         _showSuccessDialog(context);
       } else {
         _showNotVerifiedDialog(context);
       }
     } catch (error) {
-      if (context.mounted) {
-        Navigator.of(context).pop(); // Dialogu kapat
-        _showErrorDialog(context, error.toString());
-      }
+      // Hata durumunda
+      if (!mounted) return;
+      Navigator.of(context).pop(); // Dialog'u kapat
+      _showErrorDialog(context, error.toString());
     }
   }
 
   // Doğrulama başarılı mesajı
   void _showSuccessDialog(BuildContext context) {
-    showCupertinoDialog(
+    if (!mounted) return;
+
+    AppDialogManager.showIconDialog(
       context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              CupertinoIcons.checkmark_circle_fill,
-              color: CupertinoColors.systemGreen,
-              size: 20,
-            ),
-            SizedBox(width: 8),
-            Text('email_verified'.locale(context)),
-          ],
-        ),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 8.0),
-          child: Text(
-            'email_verification_success'.locale(context),
-            style: TextStyle(fontSize: 14),
-            textAlign: TextAlign.center,
-          ),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            child: Text('done'.locale(context)),
-            onPressed: () {
-              Navigator.of(context).pop();
-              // State'i yenile
-              context.read<ProfileCubit>().refreshUserData();
-            },
-          ),
-        ],
-      ),
+      title: 'email_verified'.locale(context),
+      message: 'email_verification_success'.locale(context),
+      icon: CupertinoIcons.checkmark_circle_fill,
+      iconColor: CupertinoColors.systemGreen,
+      buttonText: 'done'.locale(context),
+      onPressed: () {
+        if (!mounted) return;
+        // State'i yenile
+        context.read<ProfileCubit>().refreshUserData();
+      },
     );
   }
 
   // Doğrulama başarısız mesajı
   void _showNotVerifiedDialog(BuildContext context) {
-    showCupertinoDialog(
+    if (!mounted) return;
+
+    AppDialogManager.showConfirmDialog(
       context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              CupertinoIcons.exclamationmark_circle_fill,
-              color: CupertinoColors.systemYellow,
-              size: 20,
-            ),
-            SizedBox(width: 8),
-            Text('not_verified'.locale(context)),
-          ],
-        ),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 8.0),
-          child: Text(
-            'email_not_verified_message'.locale(context),
-            style: TextStyle(fontSize: 14),
-            textAlign: TextAlign.center,
-          ),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            child: Text('cancel'.locale(context)),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            child: Text('resend'.locale(context)),
-            onPressed: () {
-              Navigator.of(context).pop();
-              // Yeni doğrulama e-postası gönder
-              context.read<ProfileCubit>().sendEmailVerification();
-              _showVerificationEmailSentDialog(context);
-            },
-          ),
-        ],
-      ),
+      title: 'not_verified'.locale(context),
+      message: 'email_not_verified_message'.locale(context),
+      confirmText: 'resend'.locale(context),
+      cancelText: 'cancel'.locale(context),
+      onConfirmPressed: () {
+        if (!mounted) return;
+        // Yeni doğrulama e-postası gönder
+        context.read<ProfileCubit>().sendEmailVerification();
+        _showVerificationEmailSentDialog(context);
+      },
     );
   }
 
   // Doğrulama e-postası gönderildi mesajı
   void _showVerificationEmailSentDialog(BuildContext context) {
-    showCupertinoDialog(
+    if (!mounted) return;
+
+    AppDialogManager.showConfirmDialog(
       context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              CupertinoIcons.mail_solid,
-              color: CupertinoColors.activeBlue,
-              size: 20,
-            ),
-            SizedBox(width: 8),
-            Text('email_sent'.locale(context)),
-          ],
-        ),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 8.0),
-          child: Column(
-            children: [
-              Text(
-                'verification_email_sent'.locale(context),
-                style: TextStyle(fontSize: 14),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 8),
-              Text(
-                'check_email'.locale(context),
-                style: TextStyle(fontSize: 14),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            child: Text('done'.locale(context)),
-            onPressed: () => Navigator.pop(context),
-          ),
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            child: Text('check_status'.locale(context)),
-            onPressed: () {
-              Navigator.of(context).pop();
-              _checkEmailVerification(context);
-            },
-          ),
-        ],
-      ),
+      title: 'email_sent'.locale(context),
+      message: 'verification_email_sent'.locale(context) +
+          '\n' +
+          'check_email'.locale(context),
+      confirmText: 'check_status'.locale(context),
+      cancelText: 'done'.locale(context),
+      onConfirmPressed: () {
+        if (!mounted) return;
+        _checkEmailVerification(context);
+      },
     );
   }
 
   // Hata mesajı
   void _showErrorDialog(BuildContext context, String errorMessage) {
-    showCupertinoDialog(
+    if (!mounted) return;
+
+    AppDialogManager.showErrorDialog(
       context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              CupertinoIcons.exclamationmark_triangle_fill,
-              color: CupertinoColors.systemRed,
-              size: 20,
-            ),
-            SizedBox(width: 8),
-            Text('error'.locale(context)),
-          ],
-        ),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 8.0),
-          child: Text(
-            'verification_error'.locale(context),
-            style: TextStyle(fontSize: 14),
-            textAlign: TextAlign.center,
-          ),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            child: Text('done'.locale(context)),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-        ],
-      ),
+      title: 'error'.locale(context),
+      message: 'verification_error'.locale(context),
+      onPressed: () {
+        if (!mounted) return;
+        Navigator.pop(context);
+      },
     );
   }
 
-  void _showDeleteAccountDialog() {
-    HapticFeedback.heavyImpact();
+  /// Fotoğraf seçim menüsünü göster
+  Future<void> _showPhotoSourceDialog() async {
+    if (!mounted) return;
 
-    showCupertinoDialog(
+    HapticFeedback.lightImpact();
+
+    await showCupertinoModalPopup<void>(
       context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              CupertinoIcons.exclamationmark_triangle,
-              color: CupertinoColors.systemRed,
-              size: 20,
-            ),
-            SizedBox(width: 8),
-            Text('delete_account_title'.locale(context)),
-          ],
+      builder: (BuildContext context) => CupertinoActionSheet(
+        title: Text(
+          'choose_profile_photo'.locale(context),
+          style: AppTextTheme.bodyLarge,
         ),
-        content: Column(
-          children: [
-            SizedBox(height: 12),
-            Text(
-              'delete_account_warning'.locale(context),
-              style: TextStyle(
-                fontWeight: FontWeight.w400,
-                fontSize: 14,
-              ),
-            ),
-            SizedBox(height: 16),
-            Container(
-              padding: EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: CupertinoColors.systemRed.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'data_to_be_deleted'.locale(context),
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                      color: CupertinoColors.systemRed,
-                    ),
-                  ),
-                  SizedBox(height: 6),
-                  Text(
-                    'user_data'.locale(context) +
-                        '\n' +
-                        'analysis_history'.locale(context) +
-                        '\n' +
-                        'purchased_credits'.locale(context),
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: CupertinoColors.black,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+        message: Text(
+          'photo_source'.locale(context),
+          style: AppTextTheme.bodyMedium,
         ),
-        actions: [
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            onPressed: () => Navigator.pop(context),
-            child: Text('cancel'.locale(context)),
-          ),
-          CupertinoDialogAction(
-            isDestructiveAction: true,
+        actions: <CupertinoActionSheetAction>[
+          CupertinoActionSheetAction(
             onPressed: () {
               Navigator.pop(context);
-              context.read<ProfileCubit>().deleteAccount();
+              _pickImage(ImageSource.camera);
             },
-            child: Text('delete_account_title'.locale(context)),
+            child: Text(
+              'camera'.locale(context),
+              style: AppTextTheme.largeBody.copyWith(
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(context);
+              _pickImage(ImageSource.gallery);
+            },
+            child: Text(
+              'gallery'.locale(context),
+              style: AppTextTheme.largeBody.copyWith(
+                color: AppColors.primary,
+              ),
+            ),
           ),
         ],
+        cancelButton: CupertinoActionSheetAction(
+          isDestructiveAction: true,
+          onPressed: () {
+            Navigator.pop(context);
+          },
+          child: Text('cancel'.locale(context)),
+        ),
       ),
     );
   }
 
-  Future<void> _pickImage() async {
-    try {
-      HapticFeedback.lightImpact();
-
-      showCupertinoModalPopup(
-        context: context,
-        builder: (context) => CupertinoActionSheet(
-          title: Text('choose_profile_photo'.locale(context)),
-          message: Text('photo_source'.locale(context)),
-          actions: [
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.pop(context);
-                _pickImageFromSource(ImageSource.camera);
-              },
-              child: Text(
-                'camera'.locale(context),
-                style: AppTextTheme.largeBody.copyWith(
-                  color: AppColors.primary,
-                ),
-              ),
-            ),
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.pop(context);
-                _pickImageFromSource(ImageSource.gallery);
-              },
-              child: Text(
-                'gallery'.locale(context),
-                style: AppTextTheme.largeBody.copyWith(
-                  color: AppColors.primary,
-                ),
-              ),
-            ),
-          ],
-          cancelButton: CupertinoActionSheetAction(
-            isDestructiveAction: true,
-            onPressed: () => Navigator.pop(context),
-            child: Text('cancel'.locale(context)),
-          ),
-        ),
-      );
-    } catch (e) {
-      AppLogger.e('Profil fotoğrafı seçme hatası', e);
-    }
-  }
-
-  Future<void> _pickImageFromSource(ImageSource source) async {
+  // Fotoğraf seç - Business Logic'i ProfileCubit'e taşınmış, sadece UI işlemleri burada
+  Future<void> _pickImage(ImageSource source) async {
     try {
       final profileCubit = context.read<ProfileCubit>();
+      HapticFeedback.lightImpact();
 
-      AppLogger.i(
-          'Profil fotoğrafı seçimi başlatılıyor, kaynak: ${source == ImageSource.camera ? 'Kamera' : 'Galeri'}');
+      // UI'da yükleme durumunu göster
+      setState(() {
+        _isUploading = true;
+      });
 
-      // İzin kontrolü - yeni merkezi PermissionManager kullanımı
-      final permissionType = source == ImageSource.camera
-          ? AppPermissionType.camera
-          : AppPermissionType.photos;
+      // ProfileCubit üzerinden görüntü seç
+      final imageFile = await profileCubit.pickImage(source);
 
-      bool hasPermission = await PermissionManager.requestPermission(
-        permissionType,
-        context: context,
-      );
-
-      if (!hasPermission) {
-        AppLogger.w(
-            '${source == ImageSource.camera ? 'Kamera' : 'Galeri'} izni alınamadı');
-        return;
-      }
-
-      // Resim seçme işlemi
-      final XFile? image = await _imagePicker.pickImage(
-        source: source,
-        maxWidth: 1024,
-        maxHeight: 1024,
-        imageQuality: 90,
-        preferredCameraDevice: CameraDevice.front, // Ön kamera tercih edilsin
-      );
-
-      if (image == null) {
-        AppLogger.i('Görüntü seçimi iptal edildi');
-        return;
-      }
-
-      // Dosya kontrolü
-      final File imageFile = File(image.path);
-      if (!imageFile.existsSync()) {
-        AppLogger.e('Seçilen dosya bulunamadı: ${image.path}');
+      if (imageFile == null) {
         if (mounted) {
-          _showSnackBar(
-              context, 'file_not_found_or_accessible'.locale(context));
+          setState(() {
+            _isUploading = false;
+          });
         }
         return;
       }
 
-      // Dosya boyutu kontrolü (5MB sınırı)
-      final fileSize = await imageFile.length();
-      AppLogger.i(
-          'Seçilen resim: ${image.path}, boyut: ${(fileSize / 1024).toStringAsFixed(2)} KB');
-
-      // 5MB'dan büyükse kullanıcıya hata mesajı gösterelim
-      if (fileSize > 5 * 1024 * 1024) {
-        if (mounted) {
-          _showSnackBar(context, 'file_too_large'.locale(context));
-        }
-        return;
-      }
-
-      // Yüklemeye geç
+      // UI'da seçilen fotoğrafı göster
       if (mounted) {
         setState(() {
           _selectedProfileImage = imageFile;
-          _isUploading = true;
         });
+      }
 
-        // Firebase Token'ını yenile ve yükleme durumunu ayarla
-        await profileCubit.prepareForImageUpload();
+      try {
+        // ProfileCubit'in updateUserPhotoAndRefresh metodunu kullanarak fotoğrafı işle
+        final imageUrl =
+            await profileCubit.updateUserPhotoAndRefresh(imageFile);
 
-        try {
-          // Resmi Firebase Storage'a yükle
-          final String imageUrl =
-              await _uploadProfileImage(_selectedProfileImage!);
-
-          // Kullanıcı profilini güncelle
-          await profileCubit.updateProfile(photoURL: imageUrl);
-
-          // Başarılı mesajı göster
-          if (mounted) {
-            _showSnackBar(context, 'photo_updated'.locale(context));
-          }
-        } catch (e) {
-          AppLogger.e('Profil fotoğrafı yükleme hatası', e.toString());
-          if (mounted) {
-            String errorMsg = _getErrorMessage(e);
-            _showSnackBar(context, errorMsg);
-          }
-        } finally {
-          if (mounted) {
-            setState(() {
-              _isUploading = false;
-            });
-
-            // ProfileCubit'e yükleme durumunu bildir
-            profileCubit.setImageUploading(false);
-          }
+        if (imageUrl != null && mounted) {
+          _showSnackBar(context, 'photo_updated'.locale(context));
+          HapticFeedback.lightImpact();
+        }
+      } catch (e) {
+        AppLogger.e('Profil fotoğrafı işleme hatası', e.toString());
+        if (mounted) {
+          String errorMsg = profileCubit.getPhotoUploadErrorMessage(e);
+          _showSnackBar(context, errorMsg);
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isUploading = false;
+          });
         }
       }
     } catch (e) {
-      setState(() {
-        _isUploading = false;
-      });
-      context.read<ProfileCubit>().setImageUploading(false);
-
-      // Çeşitli hata tiplerini ele alalım
-      AppLogger.e('Profil fotoğrafı seçme hatası', e.toString());
-
+      AppLogger.e('Profil fotoğrafı seçme hatası: ${e.toString()}');
       if (mounted) {
-        _showSnackBar(context, _getPlatformErrorMessage(e));
-      }
-    }
-  }
-
-  // Kaynak türüne göre izin kontrolü yapar
-  Future<bool> _checkPermission(ImageSource source) async {
-    try {
-      final permissionType = source == ImageSource.camera
-          ? AppPermissionType.camera
-          : AppPermissionType.photos;
-
-      return await PermissionManager.requestPermission(
-        permissionType,
-        context: context,
-      );
-    } catch (e) {
-      AppLogger.e('İzin kontrolü hatası', e.toString());
-      return false;
-    }
-  }
-
-  // Hata mesajlarını kullanıcı dostu hale getir
-  String _getErrorMessage(dynamic error) {
-    String errorMsg = 'upload_error'.locale(context);
-
-    // Hata mesajını kullanıcı dostu hale getirelim
-    if (error.toString().contains('storage/unauthorized')) {
-      errorMsg = 'auth_error'.locale(context);
-    } else if (error.toString().contains('storage/quota-exceeded')) {
-      errorMsg = 'storage_full'.locale(context);
-    } else if (error.toString().contains('storage/retry-limit-exceeded')) {
-      errorMsg = 'connection_error'.locale(context);
-    } else if (error.toString().contains('dosya bulunamadı')) {
-      errorMsg = 'file_not_found'.locale(context);
-    } else if (error.toString().contains('dosya boyutu')) {
-      errorMsg = 'file_size_error'.locale(context);
-    } else if (error.toString().contains('network')) {
-      errorMsg = 'network_error'.locale(context);
-    }
-
-    return errorMsg;
-  }
-
-  // Platform hatalarını kullanıcı dostu hale getir
-  String _getPlatformErrorMessage(dynamic error) {
-    if (error is PlatformException) {
-      switch (error.code) {
-        case 'photo_access_denied':
-        case 'camera_access_denied':
-          return 'access_denied'.locale(context);
-        case 'camera_not_available':
-          return 'camera_not_available'.locale(context);
-        case 'camera_in_use':
-          return 'camera_in_use'.locale(context);
-        case 'invalid_image':
-          return 'invalid_image'.locale(context);
-        default:
-          return 'error'.locale(context) + ': ${error.message}';
-      }
-    } else {
-      return 'unexpected_error'.locale(context);
-    }
-  }
-
-  /// Profil fotoğrafını Firebase Storage'a yükler
-  Future<String> _uploadProfileImage(File imageFile) async {
-    try {
-      AppLogger.i('Profil fotoğrafı yükleme başlatılıyor');
-
-      // Firebase Storage referansını al
-      final userId = context.read<ProfileCubit>().state.user?.id;
-      if (userId == null || userId.isEmpty) {
-        AppLogger.e('Kullanıcı ID bulunamadı veya boş');
-        throw Exception('Kullanıcı oturum açmamış veya ID bulunamadı');
-      }
-
-      AppLogger.i('Profil fotoğrafı yükleniyor, User ID: $userId');
-
-      // Dosya kontrolü
-      if (!imageFile.existsSync()) {
-        AppLogger.e('Dosya bulunamadı: ${imageFile.path}');
-        throw Exception('Seçilen dosya bulunamadı veya erişilemiyor');
-      }
-
-      final fileSize = await imageFile.length();
-      AppLogger.i('Dosya boyutu: ${(fileSize / 1024).toStringAsFixed(2)} KB');
-
-      if (fileSize > 5 * 1024 * 1024) {
-        // 5MB'dan büyük dosyaları reddet
-        AppLogger.e(
-            'Dosya çok büyük: ${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB');
-        throw Exception(
-            'Dosya boyutu çok büyük, lütfen daha küçük bir fotoğraf seçin (maks. 5MB)');
-      }
-
-      // Kullanıcı oturum açık mı kontrol et ve token yenile
-      final firebaseUser = FirebaseAuth.instance.currentUser;
-      if (firebaseUser == null) {
-        AppLogger.e('Firebase kullanıcısı null, oturum açık değil');
-        throw Exception(
-            'Oturum süresi dolmuş olabilir, lütfen tekrar giriş yapın');
-      }
-
-      // Token yenileme denemesi
-      try {
-        await firebaseUser.getIdToken(true);
-        AppLogger.i('Firebase token yenilendi');
-      } catch (tokenError) {
-        AppLogger.w('Token yenilenemedi: $tokenError');
-        // Token yenilenemese bile devam et
-      }
-
-      // Firebase Storage'a profil fotoğrafını yükle
-      final storageRef = FirebaseStorage.instance.ref();
-
-      // Storage kurallarına göre yol belirleme
-      final profileImageRef = storageRef.child(
-          'profile_images/$userId/profile_${DateTime.now().millisecondsSinceEpoch}.jpg');
-
-      AppLogger.i('Storage referansı oluşturuldu: ${profileImageRef.fullPath}');
-
-      // İmajı sıkıştırmayı dene
-      Uint8List? imageData;
-      try {
-        AppLogger.i('Görüntü sıkıştırma başlıyor');
-        final compressedImage = await FlutterImageCompress.compressWithFile(
-          imageFile.absolute.path,
-          quality: 85,
-          minWidth: 500,
-          minHeight: 500,
-        );
-
-        if (compressedImage != null) {
-          imageData = compressedImage;
-          AppLogger.i('Görüntü sıkıştırıldı: ${imageData.length} bytes');
-        } else {
-          AppLogger.w('Sıkıştırma başarısız, orijinal görüntü kullanılacak');
-          imageData = await imageFile.readAsBytes();
-          AppLogger.i('Orijinal görüntü: ${imageData.length} bytes');
-        }
-      } catch (compressError) {
-        AppLogger.w(
-            'Sıkıştırma hatası: $compressError, orijinal görüntü kullanılacak');
-        imageData = await imageFile.readAsBytes();
-      }
-
-      // Yüklemeyi başlat
-      try {
-        // Metadata ile içerik tipini belirle
-        final metadata = SettableMetadata(
-          contentType: 'image/jpeg',
-          customMetadata: {'userId': userId},
-        );
-
-        // Yükleme işlemini başlat
-        final uploadTask = profileImageRef.putData(imageData!, metadata);
-
-        // İlerleme takibi
-        uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
-          final progress = snapshot.bytesTransferred / snapshot.totalBytes;
-          AppLogger.i(
-              'Yükleme ilerlemesi: ${(progress * 100).toStringAsFixed(1)}%');
-        }, onError: (e) {
-          AppLogger.e('Yükleme takibi sırasında hata', e.toString());
+        setState(() {
+          _isUploading = false;
         });
-
-        // Yükleme bitene kadar bekle
-        final snapshot = await uploadTask
-            .whenComplete(() => AppLogger.i('Yükleme tamamlandı'));
-
-        // İndirme URL'sini al
-        final downloadUrl = await snapshot.ref.getDownloadURL();
-        AppLogger.i('Profil fotoğrafı başarıyla yüklendi: $downloadUrl');
-        return downloadUrl;
-      } on FirebaseException catch (storageError) {
-        AppLogger.e(
-            'Firebase Storage hatası: ${storageError.code}', storageError);
-
-        switch (storageError.code) {
-          case 'storage/unauthorized':
-            throw Exception('Yetki hatası: Dosyayı yükleme izniniz yok');
-          case 'storage/canceled':
-            throw Exception('Yükleme iptal edildi');
-          case 'storage/retry-limit-exceeded':
-            throw Exception(
-                'Bağlantı hatası: İnternet bağlantınızı kontrol edin');
-          case 'storage/invalid-checksum':
-            throw Exception('Dosya bozuk veya transfer sırasında hata oluştu');
-          case 'storage/server-file-wrong-size':
-            throw Exception(
-                'Dosya boyutu hataları, lütfen daha küçük bir dosya deneyin');
-          case 'storage/quota-exceeded':
-            throw Exception('Depolama kotası aşıldı');
-          default:
-            throw Exception('Firebase Storage hatası: ${storageError.code}');
-        }
-      } catch (error) {
-        AppLogger.e('Dosya yükleme işlemi başarısız', error.toString());
-        throw Exception(
-            'Dosya yüklenirken beklenmeyen bir hata oluştu: ${error.toString()}');
+        _showSnackBar(context, 'unexpected_error'.locale(context));
       }
-    } catch (e) {
-      AppLogger.e('Profil fotoğrafı yükleme hatası', e.toString());
-      rethrow; // Asıl hatayı ilet
     }
-  }
-
-  /// Bildirim göster
-  void _showSnackBar(BuildContext context, String message) {
-    showCupertinoModalPopup(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          margin: EdgeInsets.only(bottom: 16, left: 16, right: 16),
-          decoration: BoxDecoration(
-            color: CupertinoColors.systemBackground.darkColor,
-            borderRadius: BorderRadius.circular(14),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 15,
-                offset: Offset(0, 5),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Icon(
-                message.contains('success') || message.contains('başarı')
-                    ? CupertinoIcons.check_mark_circled_solid
-                    : CupertinoIcons.info_circle_fill,
-                color: message.contains('success') || message.contains('başarı')
-                    ? CupertinoColors.activeGreen
-                    : CupertinoColors.activeBlue,
-                size: 20,
-              ),
-              SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  message,
-                  style: TextStyle(
-                    color: CupertinoColors.white,
-                    fontSize: 15,
-                  ),
-                ),
-              ),
-              CupertinoButton(
-                padding: EdgeInsets.zero,
-                minSize: 0,
-                child: Icon(
-                  CupertinoIcons.xmark,
-                  color: CupertinoColors.systemGrey,
-                  size: 16,
-                ),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLanguageSelectionTile(BuildContext context) {
-    return InkWell(
-      onTap: () => _showLanguageSelectionDialog(context),
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: context.dimensions.paddingM,
-          vertical: context.dimensions.paddingM,
-        ),
-        child: Row(
-          children: [
-            const Icon(
-              Icons.language_rounded,
-              color: AppColors.primary,
-            ),
-            SizedBox(width: context.dimensions.spaceM),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'language'.locale(context),
-                  style: AppTextTheme.headline5.copyWith(
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                SizedBox(height: context.dimensions.spaceXS),
-                Text(
-                  _getCurrentLanguageName(context),
-                  style: AppTextTheme.caption.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-            const Spacer(),
-            const Icon(
-              Icons.arrow_forward_ios,
-              size: 16,
-              color: AppColors.textSecondary,
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   String _getCurrentLanguageName(BuildContext context) {
@@ -2070,6 +1553,17 @@ class _ProfileScreenState extends State<ProfileScreen>
         LocalizationManager.instance.changeLocale(locale);
         Navigator.pop(context);
       },
+    );
+  }
+
+  /// Bildirim göster
+  void _showSnackBar(BuildContext context, String message) {
+    if (!mounted) return;
+
+    // AppDialogManager'daki adaptif metodu kullan
+    AppDialogManager.showSnackBar(
+      context: context,
+      message: message,
     );
   }
 }

@@ -15,6 +15,7 @@ import 'package:tatarai/core/widgets/app_button.dart';
 import 'package:tatarai/features/plant_analysis/cubits/plant_analysis_cubit.dart';
 import 'package:tatarai/features/plant_analysis/models/plant_analysis_result.dart';
 import 'package:tatarai/features/plant_analysis/views/widgets/font_size_control.dart';
+import 'package:tatarai/features/plant_analysis/views/widgets/info_card_item.dart';
 
 part 'analysis_result_screen_mixin.dart';
 
@@ -147,44 +148,6 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
   // Simge, etiket, değer ve değer rengini parametre olarak alır.
   // Bu metot, _AnalysisResultScreenState sınıfının bir parçasıdır.
   //#####
-  Widget _buildInfoRow({
-    required IconData icon,
-    required String label,
-    required String value,
-    Color? valueColor,
-  }) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final textTheme = theme.textTheme;
-    final dim = context.dimensions;
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, color: colors.primary, size: 20),
-        SizedBox(width: dim.spaceS),
-        Text(
-          label,
-          style: AppTextTheme.bodyText2.copyWith(
-            color: AppColors.textSecondary,
-            fontWeight: FontWeight.w500,
-            fontSize: _currentFontSize,
-          ),
-        ),
-        SizedBox(width: dim.spaceXS),
-        Expanded(
-          child: Text(
-            value,
-            style: AppTextTheme.bodyText2.copyWith(
-              color: valueColor ?? AppColors.textPrimary,
-              fontWeight: FontWeight.w600,
-              fontSize: _currentFontSize,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 
   // Fonksiyon _fontSizeLevel'a göre dinamik olarak fontSize döndürür.
   // Bu, uygulamanızın genel text ölçeklendirme mantığına göre ayarlanabilir.
@@ -385,14 +348,14 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildInfoCardItem(
+                    InfoCardItem(
                       icon: CupertinoIcons.calendar,
                       title: 'Son Analiz',
                       value: 'Bugün',
                       iconColor: CupertinoColors.systemTeal,
                     ),
                     SizedBox(height: dim.spaceM),
-                    _buildInfoCardItem(
+                    InfoCardItem(
                       icon: CupertinoIcons.leaf_arrow_circlepath,
                       title: 'Bitki Türü',
                       value: result.plantName,
@@ -401,7 +364,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                     if (result.growthStage != null &&
                         result.growthStage!.isNotEmpty) ...[
                       SizedBox(height: dim.spaceM),
-                      _buildInfoCardItem(
+                      InfoCardItem(
                         icon: CupertinoIcons.chart_bar_alt_fill,
                         title: 'Gelişim Aşaması',
                         value: result.growthStage!,
@@ -1429,16 +1392,15 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                   size: dim.iconSizeM,
                 ),
                 SizedBox(width: dim.spaceS),
-                Expanded(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Gelişim Aşaması: ${result.growthStage}',
-                      style: AppTextTheme.bodyText1.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                Flexible(
+                  child: Text(
+                    'Gelişim Aşaması: ${result.growthStage}',
+                    style: AppTextTheme.bodyText1.copyWith(
+                      fontWeight: FontWeight.w600,
                     ),
+                    softWrap: true,
+                    overflow: TextOverflow.visible,
+                    maxLines: 2,
                   ),
                 ),
               ],
@@ -1765,55 +1727,5 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
   // Tarih formatlamak için yardımcı metot
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';
-  }
-
-  // Bilgi kartı içinde ikon, başlık ve değer içeren satır elementi
-  Widget _buildInfoCardItem({
-    required IconData icon,
-    required String title,
-    required String value,
-    Color? iconColor,
-  }) {
-    final dim = context.dimensions;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Container(
-          padding: EdgeInsets.all(dim.paddingS),
-          decoration: BoxDecoration(
-            color: (iconColor ?? AppColors.primary).withOpacity(0.1),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            icon,
-            size: dim.iconSizeS,
-            color: iconColor ?? AppColors.primary,
-          ),
-        ),
-        SizedBox(width: dim.spaceM),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: AppTextTheme.captionL.copyWith(
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w500,
-                fontSize: _currentFontSize * 0.9,
-              ),
-            ),
-            SizedBox(height: dim.spaceXXS),
-            Text(
-              value,
-              style: AppTextTheme.bodyText2.copyWith(
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-                fontSize: _currentFontSize,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
   }
 }

@@ -241,35 +241,50 @@ class PermissionManager {
   /// Sistem izin ayarları sayfasını açar
   static Future<void> _openAppSettings() async {
     try {
+      AppLogger.i('İzin ayarları açılıyor...');
+
       if (Platform.isIOS) {
-        // iOS platform için optimize edilmiş yaklaşım
         try {
-          // İzin ayarlarına doğrudan erişim
-          AppLogger.i('iOS izin ayarları açılıyor (öncelikli yöntem)');
-          await AppSettings.openAppSettings(asAnotherTask: true);
+          AppLogger.i('iOS: Ayarlar uygulaması açılıyor...');
+
+          // iOS için en güvenli yöntem: doğrudan ayarlar uygulamasını açma
+          await AppSettings.openAppSettings();
+          AppLogger.i('iOS: Ayarlar uygulaması açıldı');
+          return;
         } catch (e) {
-          // Birincil yöntem başarısız olursa yedek yöntem kullanılır
-          AppLogger.w(
-              'İOS için birincil izin ayarları yöntemi başarısız oldu, alternatif deneniyor',
-              e);
-          try {
-            // Alternatif yaklaşım - doğrudan ayarlar
-            await AppSettings.openAppSettings();
-          } catch (e2) {
-            AppLogger.e('iOS izin ayarları açılamadı', e2);
-            // Son çare yaklaşımı
-            await AppSettings.openAppSettings();
-          }
+          AppLogger.e('iOS: Ayarlar uygulaması açılamadı', e);
+
+          // Kullanıcıya manuel talimatlar verelim
+          AppLogger.i('iOS: Kullanıcıya manuel yönergeler veriliyor');
         }
       } else {
         // Android platform için standart yaklaşım
-        AppLogger.i('Android izin ayarları açılıyor');
+        AppLogger.i('Android: İzin ayarları açılıyor');
         await AppSettings.openAppSettings();
+        AppLogger.i('Android: İzin ayarları açıldı');
       }
     } catch (e) {
-      AppLogger.e('Sistem izin ayarları açılamadı: $e', e);
-      // Kullanıcıya geri bildirim sağla
+      AppLogger.e('Sistem izin ayarları açılamadı', e);
       AppLogger.i('Kullanıcıya manuel izin ayarları talimatları gösteriliyor');
+    }
+  }
+
+  /// iOS için gallery/camera izin kontrolü (daha güvenilir)
+  static Future<bool> checkIOSMediaPermission(AppPermissionType type) async {
+    try {
+      if (!Platform.isIOS) return true;
+
+      AppLogger.i(
+          'iOS: ${_getPermissionName(type)} izni doğrudan kontrol ediliyor');
+
+      final Permission permission = _getPermissionFromType(type);
+      final status = await permission.status;
+
+      AppLogger.i('iOS: ${_getPermissionName(type)} izin durumu: $status');
+      return status.isGranted;
+    } catch (e) {
+      AppLogger.e('iOS izin kontrolü hatası', e);
+      return false;
     }
   }
 
