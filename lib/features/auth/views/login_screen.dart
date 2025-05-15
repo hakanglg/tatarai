@@ -16,6 +16,7 @@ import 'package:tatarai/features/auth/cubits/auth_state.dart';
 import 'package:sprung/sprung.dart';
 import 'package:flutter_signin_button/flutter_signin_button.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tatarai/core/widgets/app_dialog_manager.dart';
 
 part 'login_screen_mixin.dart';
 
@@ -32,6 +33,8 @@ class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin, _LoginScreenMixin {
   // Hata mesajlarının tekrarını önlemek için son gösterilen hata
   String? _lastShownError;
+  // Hesap silindi mesajının tekrar gösterilmesini önlemek için flag
+  bool _accountDeletedShown = false;
 
   @override
   void dispose() {
@@ -47,10 +50,12 @@ class _LoginScreenState extends State<LoginScreen>
 
     return BlocListener<AuthCubit, AuthState>(
       listenWhen: (previous, current) {
-        // Sadece hata mesajı değiştiğinde ya da yeni bir hata eklendiğinde dinle
+        // Hata mesajı, kimlik durumu veya hesap silindi durumu değiştiğinde dinle
         return (previous.errorMessage != current.errorMessage &&
                 current.errorMessage != null) ||
-            previous.isAuthenticated != current.isAuthenticated;
+            previous.isAuthenticated != current.isAuthenticated ||
+            (previous.accountDeleted != current.accountDeleted &&
+                current.accountDeleted);
       },
       listener: (context, state) async {
         // Widget kaldırıldı mı kontrolü
@@ -67,7 +72,18 @@ class _LoginScreenState extends State<LoginScreen>
           AppLogger.i('Giriş yükleniyor durumu: ${state.isLoading}');
         }
 
-        if (state.isAuthenticated) {
+        // Hesap silindi durumunu kontrol et
+        if (state.accountDeleted && !_accountDeletedShown) {
+          _accountDeletedShown = true;
+          _showAccountDeletedDialog(context);
+
+          // Dialog gösterildikten sonra accountDeleted durumunu temizle
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (mounted) {
+              context.read<AuthCubit>().clearAccountDeletedState();
+            }
+          });
+        } else if (state.isAuthenticated) {
           // Başarılı girişte e-posta kaydet/sil
           if (_rememberMe) {
             await _saveRememberedEmail(_emailController.text.trim());

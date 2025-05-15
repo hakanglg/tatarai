@@ -391,6 +391,46 @@ mixin _LoginScreenMixin on State<LoginScreen> {
     );
   }
 
+  /// Hesap silindi dialogunu gösterir
+  void _showAccountDeletedDialog(BuildContext context) {
+    showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              CupertinoIcons.checkmark_circle,
+              color: CupertinoColors.activeGreen,
+              size: 20,
+            ),
+            SizedBox(width: 8),
+            Text(
+              "Hesap Silindi",
+              style: AppTextTheme.body.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 8.0),
+          child: Text(
+            "Hesabınız ve tüm verileriniz başarıyla silindi.",
+            style: AppTextTheme.captionL,
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            child: Text("Tamam"),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
+      ),
+    );
+  }
+
   // Beni hatırla toggle'ı değiştiğinde e-posta kaydını yönet
   void onRememberMeChanged(bool value) async {
     AppLogger.i('[Beni Hatırla] Toggle değişti: $value');

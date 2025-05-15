@@ -211,5 +211,8 @@
   "password_reset": "Şifre Sıfırlama",
   "password_reset_desc": "Şifre sıfırlama bağlantısı gönderilecek e-posta adresinizi giriniz:",
   "password_reset_error": "Şifre sıfırlama işlemi sırasında bir hata oluştu.",
-  "password_reset_link_sent": "Şifre sıfırlama bağlantısı e-posta adresinize gönderildi. Lütfen e-postanızı kontrol edin ve bağlantıya tıklayarak şifrenizi sıfırlayın."
+  "password_reset_link_sent": "Şifre sıfırlama bağlantısı e-posta adresinize gönderildi. Lütfen e-postanızı kontrol edin ve bağlantıya tıklayarak şifrenizi sıfırlayın.",
+  
+  "account_deleted_title": "Hesap Silindi",
+  "account_deleted_message": "Hesabınız ve tüm verileriniz başarıyla silindi."
 } 

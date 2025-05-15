@@ -211,5 +211,8 @@
   "password_reset": "Password Reset",
   "password_reset_desc": "Enter your email address to receive a password reset link:",
   "password_reset_error": "An error occurred during the password reset process.",
-  "password_reset_link_sent": "A password reset link has been sent to your email address. Please check your email and click the link to reset your password."
+  "password_reset_link_sent": "A password reset link has been sent to your email address. Please check your email and click the link to reset your password.",
+  
+  "account_deleted_title": "Account Deleted",
+  "account_deleted_message": "Your account and all your data have been successfully deleted."
 } 

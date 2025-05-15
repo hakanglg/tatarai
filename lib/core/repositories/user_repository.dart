@@ -1097,12 +1097,8 @@ class UserRepository extends BaseRepository with CacheableMixin {
         final userId = currentUser.id;
         AppLogger.i('🔄 Hesap silme işlemi başlatıldı: $userId');
 
-        // 1. Önce Authentication hesabını silmeye çalış
         try {
-          await _authService.deleteAccount();
-          AppLogger.i('✅ Authentication hesabı silindi');
-
-          // 2. Auth başarılı olduktan sonra Firestore verilerini sil
+          // 1. Önce Firestore verilerini sil
           bool firestoreSuccess = await _deleteAllUserData(userId);
           if (firestoreSuccess) {
             AppLogger.i('✅ Firestore verileri başarıyla silindi');
@@ -1111,6 +1107,10 @@ class UserRepository extends BaseRepository with CacheableMixin {
                 '⚠️ Bazı Firestore verileri silinemedi, devam ediliyor');
           }
 
+          // 2. Sonra Authentication hesabını sil
+          await _authService.deleteAccount();
+          AppLogger.i('✅ Authentication hesabı silindi');
+
           // 3. Başarılı olursa oturumu kapat ve bitir
           await signOut();
           AppLogger.i('✅ İşlem tamamlandı: Hesap silindi ve oturum kapatıldı');
@@ -1118,7 +1118,10 @@ class UserRepository extends BaseRepository with CacheableMixin {
           logSuccess('Hesap başarıyla silindi', 'Kullanıcı: $userId');
           return;
         } catch (e) {
-          // Hata durumlarını işle
+          // Hata durumları
+          AppLogger.e('❌ Hesap silme hatası: $e');
+
+          // Yeniden kimlik doğrulama gerekiyorsa
           if (e.toString().contains('REQUIRES_REAUTH')) {
             await signOut();
             AppLogger.i('⚠️ Yeniden giriş gerekli');
