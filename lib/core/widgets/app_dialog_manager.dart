@@ -286,12 +286,6 @@ class AppDialogManager {
             padding: const EdgeInsets.only(top: 12.0),
             child: Text(message ?? 'loading'.locale(context)),
           ),
-          actions: [
-            CupertinoDialogAction(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(buttonText ?? 'ok'.locale(context)),
-            ),
-          ],
         );
       },
     );

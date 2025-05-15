@@ -1097,18 +1097,19 @@ class UserRepository extends BaseRepository with CacheableMixin {
         final userId = currentUser.id;
         AppLogger.i('🔄 Hesap silme işlemi başlatıldı: $userId');
 
-        // 1. Firestore verilerini sil
-        bool firestoreSuccess = await _deleteAllUserData(userId);
-        if (firestoreSuccess) {
-          AppLogger.i('✅ Firestore verileri başarıyla silindi');
-        } else {
-          AppLogger.w('⚠️ Bazı Firestore verileri silinemedi, devam ediliyor');
-        }
-
-        // 2. Authentication hesabını silmeye çalış
+        // 1. Önce Authentication hesabını silmeye çalış
         try {
           await _authService.deleteAccount();
           AppLogger.i('✅ Authentication hesabı silindi');
+
+          // 2. Auth başarılı olduktan sonra Firestore verilerini sil
+          bool firestoreSuccess = await _deleteAllUserData(userId);
+          if (firestoreSuccess) {
+            AppLogger.i('✅ Firestore verileri başarıyla silindi');
+          } else {
+            AppLogger.w(
+                '⚠️ Bazı Firestore verileri silinemedi, devam ediliyor');
+          }
 
           // 3. Başarılı olursa oturumu kapat ve bitir
           await signOut();
@@ -1117,7 +1118,7 @@ class UserRepository extends BaseRepository with CacheableMixin {
           logSuccess('Hesap başarıyla silindi', 'Kullanıcı: $userId');
           return;
         } catch (e) {
-          // Yeniden giriş gerektiren özel durum
+          // Hata durumlarını işle
           if (e.toString().contains('REQUIRES_REAUTH')) {
             await signOut();
             AppLogger.i('⚠️ Yeniden giriş gerekli');
@@ -1128,17 +1129,9 @@ class UserRepository extends BaseRepository with CacheableMixin {
           // Diğer authentication hataları
           if (e.toString().contains('AUTH_DELETE_ERROR')) {
             await signOut();
-
-            // Firestore verileri silindiyse kısmi başarı mesajı
-            if (firestoreSuccess) {
-              AppLogger.w('⚠️ Veriler silindi ama hesap silinemedi');
-              throw Exception(
-                  'Hesap verileriniz silindi ancak kimlik hesabınız silinemedi. Lütfen daha sonra tekrar deneyin.');
-            } else {
-              AppLogger.e('❌ Hesap silme işlemi tamamen başarısız');
-              throw Exception(
-                  'Hesap silme işlemi sırasında bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
-            }
+            AppLogger.e('❌ Hesap silme işlemi başarısız oldu');
+            throw Exception(
+                'Hesap silme işlemi sırasında bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
           }
 
           // Beklenmeyen hatalar
@@ -1153,8 +1146,8 @@ class UserRepository extends BaseRepository with CacheableMixin {
               'Hesap silme işlemi sırasında beklenmeyen bir hata oluştu.');
         }
       },
-      ignoreConnectionCheck: false,
-      throwError: true,
+      ignoreConnectionCheck: false, // Çevrimdışı durumda çalışmayacak
+      throwError: true, // Hataları yukarı fırlat
     );
   }
 

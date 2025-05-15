@@ -403,10 +403,18 @@ class _ProfileScreenState extends State<ProfileScreen>
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        onPressed: () {
+                        onPressed: () async {
                           HapticFeedback.mediumImpact();
-                          context.read<ProfileCubit>().sendEmailVerification();
-                          _checkEmailVerification(context);
+
+                          // Önce doğrulama e-postasını gönder
+                          await context
+                              .read<ProfileCubit>()
+                              .sendEmailVerification();
+
+                          // Sonra e-posta gönderildi dialog'unu göster
+                          if (mounted) {
+                            _showVerificationEmailSentDialog(context);
+                          }
                         },
                       ),
                       onTap: () {
@@ -1288,9 +1296,15 @@ class _ProfileScreenState extends State<ProfileScreen>
 
       // Dialog'u kapat
       if (!mounted) return;
-      Navigator.of(context).pop();
+
+      // Navigator'ın mevcut olduğundan emin ol
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
 
       // Sonuç dialoglarını göster
+      if (!mounted) return;
+
       if (isVerified) {
         _showSuccessDialog(context);
       } else {
@@ -1299,7 +1313,13 @@ class _ProfileScreenState extends State<ProfileScreen>
     } catch (error) {
       // Hata durumunda
       if (!mounted) return;
-      Navigator.of(context).pop(); // Dialog'u kapat
+
+      // Navigator'ın mevcut olduğundan emin ol
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop(); // Dialog'u kapat
+      }
+
+      if (!mounted) return;
       _showErrorDialog(context, error.toString());
     }
   }
@@ -1317,8 +1337,17 @@ class _ProfileScreenState extends State<ProfileScreen>
       buttonText: 'done'.locale(context),
       onPressed: () {
         if (!mounted) return;
-        // State'i yenile
-        context.read<ProfileCubit>().refreshUserData();
+
+        // Önce dialog'u kapat
+        Navigator.of(context).pop();
+
+        // Kısa bir gecikme ile kullanıcı verilerini yenile
+        Future.delayed(Duration(milliseconds: 100), () {
+          if (mounted) {
+            // State'i yenile
+            context.read<ProfileCubit>().refreshUserData();
+          }
+        });
       },
     );
   }
@@ -1333,10 +1362,23 @@ class _ProfileScreenState extends State<ProfileScreen>
       message: 'email_not_verified_message'.locale(context),
       confirmText: 'resend'.locale(context),
       cancelText: 'cancel'.locale(context),
-      onConfirmPressed: () {
+      onConfirmPressed: () async {
         if (!mounted) return;
+
+        // Önce mevcut dialog'u kapat
+        Navigator.of(context).pop();
+
+        // Kısa bir gecikme ekle
+        await Future.delayed(Duration(milliseconds: 100));
+
+        if (!mounted) return;
+
         // Yeni doğrulama e-postası gönder
-        context.read<ProfileCubit>().sendEmailVerification();
+        await context.read<ProfileCubit>().sendEmailVerification();
+
+        if (!mounted) return;
+
+        // E-posta gönderildi dialog'unu göster
         _showVerificationEmailSentDialog(context);
       },
     );
@@ -1356,7 +1398,17 @@ class _ProfileScreenState extends State<ProfileScreen>
       cancelText: 'done'.locale(context),
       onConfirmPressed: () {
         if (!mounted) return;
-        _checkEmailVerification(context);
+
+        // Önce mevcut dialog'u kapat ve ardından durumu kontrol et
+        // Bu sayede navigator stack'i düzgün bir şekilde yönetilir
+        Navigator.of(context).pop();
+
+        // Kısa bir gecikme ile yeni kontrolü başlat
+        Future.delayed(Duration(milliseconds: 100), () {
+          if (mounted) {
+            _checkEmailVerification(context);
+          }
+        });
       },
     );
   }
