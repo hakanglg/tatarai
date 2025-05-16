@@ -66,4 +66,5 @@ class DefaultFirebaseOptions {
     iosClientId: '15603377427-d682f3kgdrsfparkncpm45sstdmked9b.apps.googleusercontent.com',
     iosBundleId: 'com.xovasoftware.tatarai',
   );
+
 }

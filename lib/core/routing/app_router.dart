@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:tatarai/core/routing/route_names.dart';
 import 'package:tatarai/core/routing/route_paths.dart';
 import 'package:tatarai/core/utils/logger.dart';
+import 'package:tatarai/core/utils/update_config.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
 import 'package:tatarai/features/auth/views/login_screen.dart';
 import 'package:tatarai/features/auth/views/register_screen.dart';
@@ -15,6 +16,7 @@ import 'package:tatarai/features/plant_analysis/views/analyses_result/analysis_r
 import 'package:tatarai/features/plant_analysis/views/analysis/analysis_screen.dart';
 import 'package:tatarai/features/profile/views/profile_screen.dart';
 import 'package:tatarai/features/splash/views/splash_screen.dart';
+import 'package:tatarai/features/update/views/force_update_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Uygulama router sınıfı
@@ -83,6 +85,14 @@ class AppRouter {
           path: RoutePaths.premium,
           name: RouteNames.premium,
           builder: (context, state) => const PremiumScreen(),
+        ),
+        GoRoute(
+          path: RoutePaths.forceUpdate,
+          name: RouteNames.forceUpdate,
+          builder: (context, state) {
+            final config = state.extra as UpdateConfig;
+            return ForceUpdateScreen(config: config);
+          },
         ),
       ];
 

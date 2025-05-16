@@ -28,4 +28,7 @@ class RouteNames {
 
   /// Premium ekranının adı
   static const String premium = 'premium';
+
+  /// Force Update ekranının adı
+  static const String forceUpdate = 'forceUpdate';
 }

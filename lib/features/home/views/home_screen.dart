@@ -8,6 +8,7 @@ import 'package:tatarai/features/navbar/navigation_manager.dart';
 import 'package:tatarai/features/navbar/widgets/app_bottom_navigation_bar.dart';
 import 'package:tatarai/features/plant_analysis/views/analysis/analysis_screen.dart';
 import 'package:tatarai/features/profile/views/profile_screen.dart';
+import 'package:tatarai/features/update/views/update_dialog.dart';
 
 /// Ana ekran widget'ı - TabBar içeren ana sayfa
 class HomeScreen extends StatefulWidget {
@@ -25,7 +26,21 @@ class _HomeScreenState extends State<HomeScreen> {
     if (NavigationManager.instance == null) {
       NavigationManager.initialize(initialIndex: 0);
     }
+
+    // // İsteğe bağlı güncelleme kontrolü
+    // WidgetsBinding.instance.addPostFrameCallback((_) {
+    //   _checkForOptionalUpdate();
+    // });
   }
+
+  // /// İsteğe bağlı güncelleme kontrolü yapar
+  // Future<void> _checkForOptionalUpdate() async {
+  //   try {
+  //     await UpdateDialog.showUpdateDialogIfNeeded(context);
+  //   } catch (e) {
+  //     AppLogger.e('Güncelleme kontrolü sırasında hata oluştu', e);
+  //   }
+  // }
 
   @override
   Widget build(BuildContext context) {

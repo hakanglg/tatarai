@@ -28,4 +28,7 @@ class RoutePaths {
 
   /// Premium ekranı yolu
   static const String premium = '/premium';
+
+  /// Force Update ekranı yolu
+  static const String forceUpdate = '/force_update';
 }

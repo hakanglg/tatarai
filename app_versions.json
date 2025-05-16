@@ -1,0 +1,33 @@
+{
+  "ios": {
+    "min_version": "1.0.0",
+    "latest_version": "1.2.0",
+    "custom_messages": {
+      "tr": {
+        "force_update_details": "Bu güncelleme kritik güvenlik sorunlarını çözer ve yeni özellikler ekler.",
+        "optional_update_details": "Bu güncellemede yeni görsel iyileştirmeler ve performans düzenlemeleri bulunmaktadır."
+      },
+      "en": {
+        "force_update_details": "This update fixes critical security issues and adds new features.",
+        "optional_update_details": "This update includes visual improvements and performance enhancements."
+      }
+    },
+    "store_url": "https://apps.apple.com/app/idXXXXXXXXXX"
+  },
+  "android": {
+    "min_version": "1.0.0",
+    "latest_version": "1.2.0",
+    "custom_messages": {
+      "tr": {
+        "force_update_details": "Bu güncelleme kritik güvenlik sorunlarını çözer ve yeni özellikler ekler.",
+        "optional_update_details": "Bu güncellemede yeni görsel iyileştirmeler ve performans düzenlemeleri bulunmaktadır."
+      },
+      "en": {
+        "force_update_details": "This update fixes critical security issues and adds new features.",
+        "optional_update_details": "This update includes visual improvements and performance enhancements."
+      }
+    },
+    "store_url": "https://play.google.com/store/apps/details?id=com.tatarai.app"
+  },
+  "last_update": "2024-06-15T12:00:00Z"
+} 

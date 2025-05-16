@@ -203,7 +203,7 @@
   "or": "OR",
   "no_account": "Don't have an account?",
   "signup_title": "Create Account",
-  "signup_subtitle": "Create an account to use the TatarAI AI agricultural assistant",
+  "signup_subtitle": "Create an account to use TatarAI AI farming assistant",
   "confirm_password": "Confirm Password",
   "accept_terms": "I accept the terms of use and privacy policy",
   "have_account": "Already have an account?",
@@ -214,5 +214,16 @@
   "password_reset_link_sent": "A password reset link has been sent to your email address. Please check your email and click the link to reset your password.",
   
   "account_deleted_title": "Account Deleted",
-  "account_deleted_message": "Your account and all your data have been successfully deleted."
+  "account_deleted_message": "Your account and all your data have been successfully deleted.",
+
+  "update_required_title": "Update Required",
+  "update_available_title": "Update Available",
+  "current_version": "Current version",
+  "required_version": "Required version",
+  "latest_version": "Latest version",
+  "force_update_message": "You need to update the app to continue using it.",
+  "optional_update_message": "A new update is available. Would you like to update?",
+  "update_now": "Update Now",
+  "update_later": "Later",
+  "update_version_info": "Version Information"
 } 

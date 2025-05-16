@@ -214,5 +214,16 @@
   "password_reset_link_sent": "Şifre sıfırlama bağlantısı e-posta adresinize gönderildi. Lütfen e-postanızı kontrol edin ve bağlantıya tıklayarak şifrenizi sıfırlayın.",
   
   "account_deleted_title": "Hesap Silindi",
-  "account_deleted_message": "Hesabınız ve tüm verileriniz başarıyla silindi."
+  "account_deleted_message": "Hesabınız ve tüm verileriniz başarıyla silindi.",
+
+  "update_required_title": "Güncelleme Gerekli",
+  "update_available_title": "Güncelleme Mevcut",
+  "current_version": "Mevcut sürüm",
+  "required_version": "Gerekli sürüm",
+  "latest_version": "Yeni sürüm",
+  "force_update_message": "Uygulamayı kullanmaya devam etmek için güncelleme yapmanız gerekmektedir.",
+  "optional_update_message": "Yeni bir güncelleme mevcut. Güncellemek ister misiniz?",
+  "update_now": "Şimdi Güncelle",
+  "update_later": "Daha Sonra",
+  "update_version_info": "Sürüm Bilgisi"
 } 

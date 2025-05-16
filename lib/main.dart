@@ -17,6 +17,7 @@ import 'package:tatarai/core/init/store_config.dart' as store;
 import 'package:tatarai/core/repositories/plant_analysis_repository.dart';
 import 'package:tatarai/core/routing/app_router.dart';
 import 'package:tatarai/core/services/firebase_manager.dart';
+import 'package:tatarai/core/services/remote_config_service.dart';
 import 'package:tatarai/core/theme/app_theme.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
@@ -33,6 +34,8 @@ import 'package:flutter/rendering.dart';
 import 'package:tatarai/core/utils/network_util.dart';
 import 'package:tatarai/core/utils/firebase_test_utils.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
+import 'package:tatarai/core/utils/version_util.dart';
+import 'package:firebase_remote_config/firebase_remote_config.dart';
 
 /// Uygulama başlangıç noktası
 Future<void> main() async {
@@ -100,6 +103,17 @@ Future<void> main() async {
         };
 
         AppLogger.i('Crashlytics başarıyla yapılandırıldı');
+
+        // Remote Config'i başlat (Main'de Bir Kez)
+        try {
+          AppLogger.i('Main: Remote Config başlatılıyor...');
+          await RemoteConfigService().initialize();
+          AppLogger.i('Main: Remote Config başarıyla başlatıldı');
+        } catch (rcError) {
+          AppLogger.e(
+              'Main: Remote Config başlatma hatası (yoksayılıyor)', rcError);
+          // Hata olsa bile devam ediyoruz
+        }
 
         // Firebase testlerini çalıştır
         try {
