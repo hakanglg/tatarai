@@ -24,6 +24,7 @@ import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
 import 'package:tatarai/core/repositories/user_repository.dart';
 import 'package:tatarai/features/auth/services/auth_service.dart';
 import 'package:tatarai/features/home/cubits/home_cubit.dart';
+import 'package:tatarai/features/payment/cubits/payment_cubit.dart';
 import 'package:tatarai/features/plant_analysis/cubits/plant_analysis_cubit.dart';
 import 'package:tatarai/features/plant_analysis/services/gemini_service.dart';
 import 'package:tatarai/features/plant_analysis/services/plant_analysis_service.dart';
@@ -390,6 +391,9 @@ class _TatarAIState extends State<TatarAI> {
                     userRepository: userRepository,
                     authService: authService,
                   ),
+                ),
+                BlocProvider<PaymentCubit>(
+                  create: (context) => PaymentCubit(),
                 ),
                 BlocProvider<PlantAnalysisCubit>(
                   create: (context) => PlantAnalysisCubit(

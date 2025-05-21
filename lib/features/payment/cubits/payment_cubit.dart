@@ -1,8 +1,11 @@
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:tatarai/core/utils/logger.dart';
+import 'package:tatarai/core/constants/app_constants.dart';
+import 'dart:io';
 
 part 'payment_state.dart';
 
@@ -26,21 +29,45 @@ class PaymentCubit extends Cubit<PaymentState> {
         bool isConfigured = await Purchases.isConfigured;
         if (!isConfigured) {
           AppLogger.e(
-              'PaymentCubit: RevenueCat henüz yapılandırılmamış! main.dart dosyasında initRevenueCat() çağrılmamış olabilir.');
-          emit(state.copyWith(
-            isLoading: false,
-            hasError: true,
-            errorMessage: 'RevenueCat yapılandırılmamış',
-          ));
-          return null;
+              'PaymentCubit: RevenueCat henüz yapılandırılmamış! Tekrar yapılandırılmaya çalışılacak.');
+
+          // RevenueCat'i tekrar yapılandırmaya çalış
+          await _reconfigureRevenueCat();
+
+          // Tekrar kontrol et
+          isConfigured = await Purchases.isConfigured;
+          if (!isConfigured) {
+            emit(state.copyWith(
+              isLoading: false,
+              hasError: true,
+              errorMessage: 'RevenueCat yapılandırılamadı',
+            ));
+            return null;
+          }
         }
 
         // Paketleri getir
-        // offerings = await Purchases.getOfferings();
+        AppLogger.i('PaymentCubit: getOfferings() çağrılıyor...');
+        try {
+          offerings = await Purchases.getOfferings();
+          AppLogger.i('>> Offerings All: ${offerings.all}');
+          AppLogger.i('>> Current Offering: ${offerings.current}');
 
-        offerings = await Purchases.getOfferings();
-        AppLogger.i('TEST Offerings: ${offerings.all}');
-        AppLogger.i('TEST Current offering: ${offerings.current?.identifier}');
+          AppLogger.i('TEST Offerings: ${offerings.all}');
+          AppLogger.i(
+              'TEST Current offering: ${offerings.current?.identifier}');
+        } catch (offeringsError) {
+          AppLogger.e('PaymentCubit: getOfferings() hatası: $offeringsError');
+
+          if (retry) {
+            // Kısa bir bekleme sonrası RevenueCat'i yeniden yapılandır ve tekrar dene
+            await Future.delayed(const Duration(milliseconds: 500));
+            await _reconfigureRevenueCat();
+            return fetchOfferings(retry: false);
+          } else {
+            throw offeringsError;
+          }
+        }
 
         if (offerings.all.isEmpty) {
           AppLogger.w('PaymentCubit: Hiç paket bulunamadı!');
@@ -70,6 +97,7 @@ class PaymentCubit extends Cubit<PaymentState> {
         }
       } catch (e) {
         AppLogger.e('PaymentCubit: Paketleri getirme hatası: $e');
+
         emit(state.copyWith(
           isLoading: false,
           hasError: true,
@@ -106,10 +134,11 @@ class PaymentCubit extends Cubit<PaymentState> {
       return offerings;
     } catch (e) {
       AppLogger.e('Paketleri alma genel hatası: $e');
+
       emit(state.copyWith(
         isLoading: false,
         hasError: true,
-        errorMessage: 'Bilinmeyen bir hata oluştu',
+        errorMessage: 'Bilinmeyen bir hata oluştu: ${e.toString()}',
       ));
 
       // Otomatik yeniden deneme (sadece ilk çağrıda)
@@ -120,6 +149,67 @@ class PaymentCubit extends Cubit<PaymentState> {
       }
 
       return null;
+    }
+  }
+
+  /// RevenueCat'i yeniden yapılandırır
+  Future<void> _reconfigureRevenueCat() async {
+    try {
+      AppLogger.i('RevenueCat yeniden yapılandırılıyor...');
+
+      // API anahtarını al
+      String apiKey = '';
+      if (Platform.isIOS) {
+        apiKey = AppConstants.revenueiOSApiKey;
+        if (apiKey.isEmpty) {
+          throw Exception('iOS RevenueCat API anahtarı bulunamadı!');
+        }
+      } else if (Platform.isAndroid) {
+        apiKey = AppConstants
+            .revenueiOSApiKey; // Şimdilik iOS anahtarını kullanıyoruz
+        if (apiKey.isEmpty) {
+          throw Exception('Android RevenueCat API anahtarı bulunamadı!');
+        }
+      } else {
+        throw Exception('Desteklenmeyen platform!');
+      }
+
+      // RevenueCat'i yapılandır
+      PurchasesConfiguration configuration = PurchasesConfiguration(apiKey);
+
+      // StoreKit Configuration dosyası ile ilgili log kaydı
+      if (Platform.isIOS) {
+        AppLogger.i(
+            'RevenueCat: StoreKit yapılandırma dosyası kullanılıyor (TatarAI.storekit)');
+      }
+
+      await Purchases.configure(configuration);
+      AppLogger.i('RevenueCat yeniden yapılandırma başarılı');
+
+      // Debug logları etkinleştir
+      await Purchases.setLogLevel(LogLevel.debug);
+
+      // Sandbox modda yardımcı seçenekleri ayarla
+      if (Platform.isIOS) {
+        try {
+          await Purchases.setSimulatesAskToBuyInSandbox(true);
+          AppLogger.i('RevenueCat: iOS için sandbox ayarları yapılandırıldı');
+
+          // RevenueCat özel ayarları
+          await Purchases.setAttributes({
+            'platform': 'iOS',
+            'app_version': AppConstants.appVersion,
+            'using_storekit_config': 'true',
+          });
+
+          AppLogger.i('RevenueCat: Özel özellikler ayarlandı');
+        } catch (e) {
+          AppLogger.w('RevenueCat: iOS için ek seçenekler ayarlanamadı: $e');
+        }
+      }
+    } catch (e) {
+      AppLogger.e('RevenueCat yeniden yapılandırma hatası: $e');
+      throw e;
     }
   }
 

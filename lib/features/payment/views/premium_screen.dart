@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
+import 'package:tatarai/core/constants/app_constants.dart';
 import 'package:tatarai/core/routing/route_names.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
 import 'package:tatarai/core/theme/dimensions.dart';
@@ -12,76 +13,290 @@ import 'package:tatarai/core/widgets/app_button.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
 import 'package:tatarai/features/auth/cubits/auth_state.dart';
 import 'package:tatarai/features/payment/cubits/payment_cubit.dart';
+import 'dart:io';
 
-class PremiumScreen extends StatelessWidget {
+class PremiumScreen extends StatefulWidget {
   const PremiumScreen({super.key});
 
   @override
+  State<PremiumScreen> createState() => _PremiumScreenState();
+}
+
+class _PremiumScreenState extends State<PremiumScreen> {
+  bool _isLoading = true;
+  bool _hasError = false;
+  String? _errorMessage;
+  final PaymentCubit _paymentCubit = PaymentCubit();
+
+  @override
+  void initState() {
+    super.initState();
+    _initPaywall();
+  }
+
+  @override
+  void dispose() {
+    _paymentCubit.close();
+    super.dispose();
+  }
+
+  // Paywall'u hazırla
+  Future<void> _initPaywall() async {
+    try {
+      setState(() => _isLoading = true);
+
+      // RevenueCat konfigürasyonu doğru yapılmış mı kontrol et
+      final isConfigured = await Purchases.isConfigured;
+      if (!isConfigured) {
+        // RevenueCat yapılandırılmamışsa, paymentCubit ile offerings'i çağırarak yapılandırılmasını sağla
+        await _paymentCubit.fetchOfferings();
+      }
+
+      // StoreKit yapılandırma dosyasıyla çalışıyor muyuz kontrol et
+      AppLogger.i('PremiumScreen: StoreKit yapılandırma dosyası kullanılıyor');
+
+      // Doğrudan RevenueCat UI paywall'u göster
+      await _showRevenueCatPaywall();
+    } catch (e) {
+      AppLogger.e('PremiumScreen: Offerings getirme hatası: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+          _errorMessage =
+              'Ödeme paketleri yüklenirken bir hata oluştu: ${e.toString()}';
+        });
+      }
+    }
+  }
+
+  // RevenueCat'in kendi paywall'unu göster
+  Future<void> _showRevenueCatPaywall() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final entitlementID = AppConstants.entitlementId; // "premium"
+      AppLogger.i('PremiumScreen: RevenueCat UI paywall gösteriliyor...');
+
+      // Direct RevenueCat UI kullanımı - StoreKit yapılandırma dosyasıyla çalışacak
+      try {
+        final paywallResult =
+            await RevenueCatUI.presentPaywallIfNeeded(entitlementID);
+        AppLogger.i('PremiumScreen: RevenueCat UI sonucu: $paywallResult');
+
+        // Satın alma başarılı olup olmadığını kontrol et
+        final customerInfo = await Purchases.getCustomerInfo();
+        final isPremium =
+            customerInfo.entitlements.active.containsKey(entitlementID);
+
+        if (isPremium && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Premium satın alma işlemi başarılı!')),
+          );
+          if (context.mounted) {
+            context.pop();
+          }
+        }
+
+        // Her durumda yükleme durumunu kapat
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+      } catch (paywallError) {
+        AppLogger.e('PremiumScreen: RevenueCat UI hatası: $paywallError');
+
+        // RevenueCat UI başarısız olursa offerings ile manuel yaklaşımı dene
+        final offerings = await _paymentCubit.fetchOfferings();
+
+        if (offerings != null && offerings.current != null) {
+          AppLogger.i(
+              'PremiumScreen: Offerings başarıyla alındı, paketler manuel gösterilecek');
+          if (mounted) {
+            setState(() => _isLoading = false);
+          }
+        } else {
+          // Offerings de başarısız olursa hata durumunu güncelle
+          throw Exception('RevenueCat UI ve manual offerings alınamadı');
+        }
+      }
+    } catch (e) {
+      AppLogger.e('PremiumScreen: RevenueCat işlemi hatası: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+          _errorMessage =
+              'Ödeme işlemi başlatılırken bir hata oluştu: ${e.toString()}';
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) {
-        AppLogger.i(
-            'PremiumScreen: PaymentCubit oluşturuluyor ve fetchOfferings çağrılıyor.');
-        return PaymentCubit()..fetchOfferings();
-      },
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Premium'),
-          centerTitle: true,
-        ),
-        body: BlocBuilder<AuthCubit, AuthState>(
-          builder: (context, authState) {
-            final bool isLoggedIn =
-                authState.isAuthenticated && authState.user != null;
-            AppLogger.d('PremiumScreen AuthCubit: isLoggedIn: $isLoggedIn');
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Premium'),
+        centerTitle: true,
+      ),
+      body: BlocBuilder<AuthCubit, AuthState>(
+        builder: (context, authState) {
+          final bool isLoggedIn =
+              authState.isAuthenticated && authState.user != null;
+          AppLogger.d('PremiumScreen AuthCubit: isLoggedIn: $isLoggedIn');
 
-            return BlocBuilder<PaymentCubit, PaymentState>(
-              builder: (context, paymentState) {
-                AppLogger.d(
-                    'PremiumScreen PaymentCubit: isLoading: ${paymentState.isLoading}, hasError: ${paymentState.hasError}, offerings: ${paymentState.offerings?.current?.identifier}');
+          // Kullanıcı giriş yapmamışsa giriş seçeneklerini göster
+          if (!isLoggedIn) {
+            AppLogger.i(
+                'PremiumScreen: Kullanıcı giriş yapmamış, _buildLoginSection gösteriliyor.');
+            return _buildLoginSection(context);
+          }
 
-                if (paymentState.isLoading && paymentState.offerings == null) {
-                  AppLogger.i(
-                      'PremiumScreen: İlk yükleme, CircularProgressIndicator gösteriliyor.');
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                if (!isLoggedIn) {
-                  AppLogger.i(
-                      'PremiumScreen: Kullanıcı giriş yapmamış, _buildLoginSection gösteriliyor.');
-                  return _buildLoginSection(context);
-                }
-
-                // PaymentCubit'teki _useMockData aktifse ve offerings null ise bu bir sorundur.
-                // Veya _useMockData false ama yine de hata varsa.
-                // Mock data özelliği kaldırıldığı için direkt hata durumunu kontrol ediyoruz
-                if (paymentState.hasError || paymentState.offerings == null) {
-                  AppLogger.w(
-                      'PremiumScreen: Hata durumu. Hata: ${paymentState.hasError}, OfferingsNull: ${paymentState.offerings == null}');
-                  return _buildErrorDisplay(context, () {
-                    AppLogger.i(
-                        'PremiumScreen: Hata ekranından "Tekrar Dene" tıklandı.');
-                    context.read<PaymentCubit>().fetchOfferings();
-                  });
-                }
-
-                AppLogger.i('PremiumScreen: PaywallView gösteriliyor.');
-                return PaywallView(
-                  offering: paymentState.offerings
-                      ?.current, // Her zaman state'teki offering'i kullan
-                );
-              },
+          // Yükleniyor durumu
+          if (_isLoading) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Ödeme seçenekleri yükleniyor...'),
+                ],
+              ),
             );
-          },
-        ),
+          }
+
+          // Hata durumu
+          if (_hasError) {
+            return _buildErrorDisplay(context, () {
+              AppLogger.i(
+                  'PremiumScreen: Hata ekranından "Tekrar Dene" tıklandı.');
+              setState(() => _isLoading = true);
+              _initPaywall(); // Paywall'u tekrar başlat
+            });
+          }
+
+          // Normal durum - RevenueCat UI paywall'unu göster butonu ve manuel butonlar
+          return BlocBuilder<PaymentCubit, PaymentState>(
+            bloc: _paymentCubit,
+            builder: (context, state) {
+              return Center(
+                child: Padding(
+                  padding: EdgeInsets.all(context.dimensions.paddingM),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.workspace_premium, size: 80),
+                      const SizedBox(height: 24),
+                      Text(
+                        'Premium paketlerimiz',
+                        style: AppTextTheme.headlineMedium,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Premium özelliklerden yararlanmak için paketlerimizi inceleyebilirsiniz.',
+                        style: AppTextTheme.bodyLarge,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 32),
+
+                      // RevenueCat Paywall'unu direkt açan buton
+                      AppButton(
+                        text: 'Premium Satın Al',
+                        onPressed: () => _showRevenueCatPaywall(),
+                        type: AppButtonType.primary,
+                        isFullWidth: true,
+                      ),
+
+                      const SizedBox(height: 24),
+                      Text('veya', style: AppTextTheme.bodyLarge),
+                      const SizedBox(height: 24),
+
+                      // Eğer offerings varsa, mevcut tüm paketleri listele
+                      if (state.offerings != null &&
+                          state.offerings!.current != null &&
+                          state
+                              .offerings!.current!.availablePackages.isNotEmpty)
+                        ..._buildPackageButtons(
+                            state.offerings!.current!.availablePackages),
+
+                      // Paketleri yenileme butonu
+                      const SizedBox(height: 16),
+                      AppButton(
+                        text: 'Paketleri Yenile',
+                        onPressed: () {
+                          setState(() => _isLoading = true);
+                          _initPaywall();
+                        },
+                        type: AppButtonType.secondary,
+                        isFullWidth: true,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
       ),
     );
+  }
+
+  // Satın alma paketleri için butonlar oluştur
+  List<Widget> _buildPackageButtons(List<Package> packages) {
+    final List<Widget> buttons = [];
+
+    for (var i = 0; i < packages.length; i++) {
+      final package = packages[i];
+      buttons.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12.0),
+          child: AppButton(
+            text:
+                '${package.storeProduct.title} - ${package.storeProduct.priceString}',
+            onPressed: () async {
+              setState(() => _isLoading = true);
+              try {
+                await _paymentCubit.purchasePackage(package);
+                if (mounted) {
+                  setState(() => _isLoading = false);
+
+                  // Başarılı satın alma durumunu kontrol et
+                  if (_paymentCubit.state.isPremium) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text('Premium satın alma işlemi başarılı!')),
+                    );
+                    if (context.mounted) {
+                      context.pop();
+                    }
+                  }
+                }
+              } catch (e) {
+                if (mounted) {
+                  setState(() {
+                    _isLoading = false;
+                    _hasError = true;
+                    _errorMessage =
+                        'Satın alma işlemi sırasında bir hata oluştu.';
+                  });
+                }
+              }
+            },
+            type: i == 0 ? AppButtonType.primary : AppButtonType.secondary,
+            isFullWidth: true,
+          ),
+        ),
+      );
+    }
+
+    return buttons;
   }
 
   // Giriş yapılmamış kullanıcılar için giriş/kayıt seçeneklerini gösteren bölüm
   Widget _buildLoginSection(BuildContext context) {
     final colorScheme = AppColors.colorScheme;
-    // Bu fonksiyon önceki versiyondan alındı ve hala geçerli.
     return SingleChildScrollView(
       padding: EdgeInsets.all(context.dimensions.paddingM),
       child: Column(
@@ -140,7 +355,8 @@ class PremiumScreen extends StatelessWidget {
           ),
           SizedBox(height: context.dimensions.spaceS),
           Text(
-            'Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin. Sorun devam ederse destek ekibimizle iletişime geçebilirsiniz.',
+            _errorMessage ??
+                'Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin. Sorun devam ederse destek ekibimizle iletişime geçebilirsiniz.',
             textAlign: TextAlign.center,
             style: AppTextTheme.bodyMedium,
           ),
