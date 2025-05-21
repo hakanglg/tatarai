@@ -225,5 +225,20 @@
   "optional_update_message": "A new update is available. Would you like to update?",
   "update_now": "Update Now",
   "update_later": "Later",
-  "update_version_info": "Version Information"
+  "update_version_info": "Version Information",
+
+  "error_title": "Error",
+  "districts_load_error": "An error occurred while loading districts. Please try again later.",
+  "provinces_load_error": "An error occurred while loading provinces. Please try again later.",
+  "provinces_not_loaded": "Provinces not loaded yet. Please select a province first or check your internet connection.",
+  "select_province_first": "Please select a province first.",
+  "districts_not_loaded": "Districts not loaded yet. Please select a district first or check your internet connection.",
+  "select_district_first": "Please select a district first.",
+  "neighborhoods_load_error": "An error occurred while loading neighborhoods. Please try again later.",
+  "neighborhoods_not_loaded": "Neighborhoods not loaded yet. Please select a neighborhood first or check your internet connection.",
+  "select_photo_first": "Please select a photo first.",
+  "select_location_first": "Please select location information (province, district, neighborhood) first.",
+  "provinces_loading": "Loading provinces...",
+  "districts_loading": "Loading districts...",
+  "neighborhoods_loading": "Loading neighborhoods..."
 } 

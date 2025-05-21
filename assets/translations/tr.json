@@ -225,5 +225,20 @@
   "optional_update_message": "Yeni bir güncelleme mevcut. Güncellemek ister misiniz?",
   "update_now": "Şimdi Güncelle",
   "update_later": "Daha Sonra",
-  "update_version_info": "Sürüm Bilgisi"
+  "update_version_info": "Sürüm Bilgisi",
+
+  "error_title": "Hata",
+  "districts_load_error": "İlçeler yüklenirken bir sorun oluştu. Lütfen daha sonra tekrar deneyin.",
+  "provinces_load_error": "İller yüklenirken bir sorun oluştu. Lütfen daha sonra tekrar deneyin.",
+  "provinces_not_loaded": "İller henüz yüklenmedi. Lütfen önce il seçin veya internet bağlantınızı kontrol edin.",
+  "select_province_first": "Lütfen önce il seçin.",
+  "districts_not_loaded": "İlçeler henüz yüklenmedi. Lütfen önce ilçe seçin veya internet bağlantınızı kontrol edin.",
+  "select_district_first": "Lütfen önce ilçe seçin.",
+  "neighborhoods_load_error": "Mahalleler yüklenirken bir sorun oluştu. Lütfen daha sonra tekrar deneyin.",
+  "neighborhoods_not_loaded": "Mahalleler henüz yüklenmedi. Lütfen önce mahalle seçin veya internet bağlantınızı kontrol edin.",
+  "select_photo_first": "Lütfen önce bir fotoğraf seçin.",
+  "select_location_first": "Lütfen önce konum bilgilerini (il, ilçe, mahalle) seçin.",
+  "provinces_loading": "İller yükleniyor...",
+  "districts_loading": "İlçeler yükleniyor...",
+  "neighborhoods_loading": "Mahalleler yükleniyor..."
 } 

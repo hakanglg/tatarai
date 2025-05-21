@@ -14,6 +14,7 @@ class UserModel extends Equatable {
   final DateTime createdAt;
   final DateTime lastLoginAt;
   final UserRole role; // Enum kullanılıyor
+  final bool isPremium; // RevenueCat ile senkronize edilecek
   final int analysisCredits; // Kalan analiz kredisi
   final List<String> favoriteAnalysisIds; // Favori analizlerin ID'leri
 
@@ -26,6 +27,7 @@ class UserModel extends Equatable {
     required this.createdAt,
     required this.lastLoginAt,
     required this.role,
+    this.isPremium = false, // Varsayılan olarak false
     required this.analysisCredits,
     required this.favoriteAnalysisIds,
   });
@@ -42,6 +44,7 @@ class UserModel extends Equatable {
       createdAt: user.metadata.creationTime ?? DateTime.now(),
       lastLoginAt: user.metadata.lastSignInTime ?? DateTime.now(),
       role: UserRole.free, // Varsayılan rol
+      isPremium: false, // Varsayılan olarak false
       analysisCredits: AppConstants
           .FREE_ANALYSIS_CREDITS, // Yeni kullanıcılar için ücretsiz krediler
       favoriteAnalysisIds: const [],
@@ -62,6 +65,7 @@ class UserModel extends Equatable {
       lastLoginAt:
           (data['lastLoginAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       role: UserRole.fromString(data['role']), // String'ten enum'a dönüştürme
+      isPremium: data['isPremium'] ?? false, // Firestore'dan isPremium oku
       analysisCredits: data['analysisCredits'] ?? 0,
       favoriteAnalysisIds: List<String>.from(data['favoriteAnalysisIds'] ?? []),
     );
@@ -77,6 +81,7 @@ class UserModel extends Equatable {
       'createdAt': Timestamp.fromDate(createdAt),
       'lastLoginAt': Timestamp.fromDate(lastLoginAt),
       'role': role.toString(), // Enum'dan string'e dönüştürme
+      'isPremium': isPremium, // isPremium'u Firestore'a yaz
       'analysisCredits': analysisCredits,
       'favoriteAnalysisIds': favoriteAnalysisIds,
       'updatedAt': FieldValue.serverTimestamp(),
@@ -91,6 +96,7 @@ class UserModel extends Equatable {
     bool? isEmailVerified,
     DateTime? lastLoginAt,
     UserRole? role,
+    bool? isPremium,
     int? analysisCredits,
     List<String>? favoriteAnalysisIds,
   }) {
@@ -103,6 +109,7 @@ class UserModel extends Equatable {
       createdAt: createdAt,
       lastLoginAt: lastLoginAt ?? this.lastLoginAt,
       role: role ?? this.role,
+      isPremium: isPremium ?? this.isPremium,
       analysisCredits: analysisCredits ?? this.analysisCredits,
       favoriteAnalysisIds: favoriteAnalysisIds ?? this.favoriteAnalysisIds,
     );
@@ -122,12 +129,13 @@ class UserModel extends Equatable {
   UserModel upgradeToPremium() {
     return copyWith(
       role: UserRole.premium,
+      isPremium: true, // isPremium'u true yap
       analysisCredits: analysisCredits + 10,
     );
   }
 
   /// Kullanıcının premium olup olmadığını kontrol eder
-  bool get isPremium => role.isPremium;
+  // bool get isPremium => role.isPremium; // Bu getter'ı doğrudan isPremium alanına yönlendireceğiz
 
   /// Kullanıcının admin olup olmadığını kontrol eder
   bool get isAdmin => role.isAdmin;
@@ -145,6 +153,7 @@ class UserModel extends Equatable {
         createdAt,
         lastLoginAt,
         role,
+        isPremium,
         analysisCredits,
         favoriteAnalysisIds,
       ];

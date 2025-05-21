@@ -287,7 +287,7 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
       // Normal hata mesajı göster
       AppDialogManager.showErrorDialog(
         context: context,
-        title: 'Hata',
+        title: 'error_title'.locale(context),
         message: message,
       );
     }

@@ -14,6 +14,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
 
 /// Kullanıcı repository'si - Firebase Auth ve Firestore işlemlerini birleştirir
 class UserRepository extends BaseRepository with CacheableMixin {
@@ -1418,7 +1419,31 @@ class UserRepository extends BaseRepository with CacheableMixin {
                   .get(GetOptions(source: Source.server));
 
               if (docSnapshot.exists) {
-                final user = UserModel.fromFirestore(docSnapshot);
+                UserModel user = UserModel.fromFirestore(docSnapshot);
+
+                // RevenueCat'ten CustomerInfo al
+                try {
+                  final customerInfo = await Purchases.getCustomerInfo();
+                  final isPremium =
+                      customerInfo.entitlements.active.containsKey('premium');
+                  // TODO: entitlementId'yi AppConstants gibi merkezi bir yerden almayı düşünün.
+
+                  // Kullanıcı modelini RevenueCat bilgileriyle güncelle
+                  // Örneğin, analysisCredits ve premium son kullanma tarihi gibi bilgiler eklenebilir
+                  user = user.copyWith(
+                    isPremium: isPremium,
+                    // premiumExpirationDate: customerInfo.entitlements.active['premium']?.expirationDate,
+                    // analysisCredits: _calculateAnalysisCredits(customerInfo, user.analysisCredits), // Gerekirse kredi hesaplama mantığı
+                  );
+
+                  AppLogger.i(
+                      'RevenueCat CustomerInfo alındı. isPremium: $isPremium');
+                } catch (e) {
+                  AppLogger.e('RevenueCat CustomerInfo alınırken hata: $e');
+                  // Hata durumunda Firestore'dan gelen kullanıcıyı olduğu gibi döndür,
+                  // ancak isPremium durumu RevenueCat'ten alınamadığı için yanlış olabilir.
+                  // Bu durumu loglayıp, belki de kullanıcıya bir uyarı göstermek gerekebilir.
+                }
 
                 // Önbelleği de güncelle
                 await cacheData(_userCachePrefix + userId, user.toFirestore());

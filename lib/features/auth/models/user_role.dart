@@ -7,7 +7,13 @@ enum UserRole {
   premium('premium'),
 
   /// Admin kullanıcı - yönetim özellikleri
-  admin('admin');
+  admin('admin'),
+
+  /// Editor kullanıcı - editör özellikleri
+  editor('editor'),
+
+  /// Destek kullanıcı - destek özellikleri
+  support('support');
 
   /// Role değeri
   final String value;
@@ -16,20 +22,17 @@ enum UserRole {
   const UserRole(this.value);
 
   /// String'ten UserRole oluşturur
-  static UserRole fromString(String? value) {
-    return switch (value) {
-      'premium' => UserRole.premium,
-      'admin' => UserRole.admin,
-      _ => UserRole.free,
-    };
+  static UserRole fromString(String? roleString) {
+    if (roleString == null) return UserRole.free;
+    return UserRole.values.firstWhere(
+      (role) => role.value == roleString.toLowerCase(),
+      orElse: () => UserRole.free,
+    );
   }
 
   /// UserRole'ü String'e dönüştürür
   @override
   String toString() => value;
-
-  /// Kullanıcının premium olup olmadığını kontrol eder
-  bool get isPremium => this == UserRole.premium || this == UserRole.admin;
 
   /// Kullanıcının admin olup olmadığını kontrol eder
   bool get isAdmin => this == UserRole.admin;
