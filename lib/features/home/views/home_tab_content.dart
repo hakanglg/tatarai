@@ -11,15 +11,10 @@ import 'package:tatarai/features/auth/cubits/auth_state.dart';
 import 'package:tatarai/features/home/cubits/home_cubit.dart';
 import 'package:tatarai/features/home/cubits/home_state.dart';
 import 'package:tatarai/features/navbar/navigation_manager.dart';
-import 'package:tatarai/features/plant_analysis/cubits/plant_analysis_cubit.dart';
-import 'package:tatarai/features/plant_analysis/models/plant_analysis_result.dart';
-import 'package:tatarai/features/plant_analysis/cubits/plant_analysis_state.dart';
-import 'package:tatarai/features/plant_analysis/views/analyses_result/analysis_result_screen.dart';
 import 'package:tatarai/features/plant_analysis/views/all_analysis/all_analyses_screen.dart';
 import 'package:tatarai/core/theme/dimensions.dart';
 import 'package:sprung/sprung.dart';
 import 'package:flutter/foundation.dart';
-import 'dart:io';
 import 'package:tatarai/features/plant_analysis/views/widgets/analysis_card.dart';
 
 /// Ana ekran tab içeriği - Modern tasarım, hızlı erişim seçenekleri ve bitki analiz geçmişi

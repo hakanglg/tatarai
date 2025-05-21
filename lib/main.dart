@@ -11,6 +11,7 @@ import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
 import 'package:tatarai/core/constants/app_constants.dart';
 import 'package:tatarai/core/constants/locale_constants.dart';
 import 'package:tatarai/core/extensions/string_extension.dart';
+import 'package:tatarai/core/extensions/context_extensions.dart';
 import 'package:tatarai/core/init/localization/language_manager.dart';
 import 'package:tatarai/core/init/localization/localization_manager.dart';
 import 'package:tatarai/core/init/store_config.dart' as store;
@@ -461,9 +462,7 @@ class _TatarAIState extends State<TatarAI> {
 // Premium ekranını açmak için kullanılabilecek yardımcı fonksiyon
 Future<PaywallResult?> openPremiumPaywall(BuildContext context) async {
   try {
-    final paywallResult =
-        await RevenueCatUI.presentPaywallIfNeeded(AppConstants.entitlementId);
-    return paywallResult;
+    return await context.showPaywall();
   } catch (e) {
     AppLogger.e('Premium ekranı açılırken hata oluştu: $e');
     return null;

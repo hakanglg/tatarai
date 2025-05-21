@@ -11,7 +11,6 @@ import 'package:tatarai/features/auth/views/register_screen.dart';
 import 'package:tatarai/features/home/views/home_screen.dart';
 import 'package:tatarai/features/navbar/navigation_manager.dart';
 import 'package:tatarai/features/onboarding/views/onboarding_screen.dart';
-import 'package:tatarai/features/payment/views/premium_screen.dart';
 import 'package:tatarai/features/plant_analysis/views/analyses_result/analysis_result_screen.dart';
 import 'package:tatarai/features/plant_analysis/views/analysis/analysis_screen.dart';
 import 'package:tatarai/features/profile/views/profile_screen.dart';
@@ -81,11 +80,11 @@ class AppRouter {
           name: RouteNames.profile,
           builder: (context, state) => const ProfileScreen(),
         ),
-        GoRoute(
-          path: RoutePaths.premium,
-          name: RouteNames.premium,
-          builder: (context, state) => const PremiumScreen(),
-        ),
+        // GoRoute(
+        //   path: RoutePaths.premium,
+        //   name: RouteNames.premium,
+        //   builder: (context, state) => const PremiumScreen(),
+        // ),
         GoRoute(
           path: RoutePaths.forceUpdate,
           name: RouteNames.forceUpdate,

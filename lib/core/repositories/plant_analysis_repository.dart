@@ -1,8 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:convert';
-import 'dart:math' as math; // Math için eklendi
-// Base64 için eklendi
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_core/firebase_core.dart';

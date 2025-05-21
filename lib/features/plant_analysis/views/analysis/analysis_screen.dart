@@ -19,7 +19,8 @@ import 'package:tatarai/features/plant_analysis/models/location_models.dart';
 import 'package:tatarai/features/plant_analysis/cubits/plant_analysis_state.dart';
 import 'package:tatarai/features/plant_analysis/services/location_service.dart';
 import 'package:tatarai/features/plant_analysis/views/analyses_result/analysis_result_screen.dart';
-import 'package:tatarai/features/payment/views/premium_screen.dart';
+import 'package:tatarai/core/extensions/context_extensions.dart';
+import 'package:tatarai/features/profile/cubits/profile_cubit.dart';
 
 part 'analysis_screen_mixin.dart';
 

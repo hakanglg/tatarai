@@ -13,12 +13,13 @@ import 'package:tatarai/core/theme/dimensions.dart';
 import 'package:tatarai/core/theme/text_theme.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/core/widgets/app_button.dart';
+import 'package:tatarai/core/extensions/context_extensions.dart';
 import 'package:tatarai/features/plant_analysis/cubits/plant_analysis_cubit.dart';
 import 'package:tatarai/features/plant_analysis/models/location_models.dart';
 import 'package:tatarai/features/plant_analysis/cubits/plant_analysis_state.dart';
 import 'package:tatarai/features/plant_analysis/services/location_service.dart';
 import 'package:tatarai/features/plant_analysis/views/analyses_result/analysis_result_screen.dart';
-import 'package:tatarai/features/payment/views/premium_screen.dart';
+import 'package:tatarai/features/profile/cubits/profile_cubit.dart';
 
 /// Bitki analizi ekranı
 /// Fotoğraf çekme, yükleme ve yapay zeka analizini başlatma
@@ -694,7 +695,17 @@ class _AnalysisScreenState extends State<AnalysisScreen>
       final result = await AppDialogManager.showPremiumRequiredDialog(
         context: context,
         message: message,
-        onPremiumButtonPressed: _navigateToPremiumScreen,
+        onPremiumButtonPressed: () {
+          // Context extension'ı kullanarak paywall'ı aç
+          context.showPaywall(
+            onComplete: (_) {
+              // Paywall kapandıktan sonra kullanıcı bilgilerini yenile
+              if (mounted) {
+                context.read<ProfileCubit>().refreshUserData();
+              }
+            },
+          );
+        },
       );
     } else {
       // Normal hata mesajı göster
@@ -704,17 +715,6 @@ class _AnalysisScreenState extends State<AnalysisScreen>
         message: message,
       );
     }
-  }
-
-  // Premium satın alma sayfasına yönlendir
-  void _navigateToPremiumScreen() {
-    // Premium sayfasına yönlendirme
-    AppLogger.i('Premium satın alma sayfasına yönlendiriliyor');
-    Navigator.of(context).push(
-      CupertinoPageRoute(
-        builder: (context) => const PremiumScreen(),
-      ),
-    );
   }
 
   // İzin isteme işlemi

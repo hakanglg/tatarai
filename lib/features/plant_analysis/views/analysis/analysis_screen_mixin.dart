@@ -266,29 +266,31 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
       {bool needsPremium = false}) async {
     if (!mounted) return;
 
-    await showCupertinoDialog(
-      context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: Text('error'.locale(context)),
-        content: Text(message),
-        actions: [
-          if (needsPremium)
-            CupertinoDialogAction(
-              child: Text('upgrade_to_premium'.locale(context)),
-              onPressed: () {
-                Navigator.pop(context);
-                if (mounted) {
-                  _navigateToPremium();
-                }
-              },
-            ),
-          CupertinoDialogAction(
-            child: Text('ok'.locale(context)),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ],
-      ),
-    );
+    if (needsPremium) {
+      // Premium satın alma diyaloğunu göster
+      final result = await AppDialogManager.showPremiumRequiredDialog(
+        context: context,
+        message: message,
+        onPremiumButtonPressed: () {
+          // Context extension'ı kullanarak paywall'ı aç
+          context.showPaywall(
+            onComplete: (_) {
+              // Paywall kapandıktan sonra kullanıcı bilgilerini yenile
+              if (mounted) {
+                context.read<ProfileCubit>().refreshUserData();
+              }
+            },
+          );
+        },
+      );
+    } else {
+      // Normal hata mesajı göster
+      AppDialogManager.showErrorDialog(
+        context: context,
+        title: 'Hata',
+        message: message,
+      );
+    }
   }
 
   /// İl seçim diyaloğunu göster
@@ -552,17 +554,6 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
         );
   }
 
-  /// Premium sayfasına yönlendir
-  void _navigateToPremium() {
-    if (!mounted) return;
-
-    Navigator.of(context).push(
-      CupertinoPageRoute(
-        builder: (context) => const PremiumScreen(),
-      ),
-    );
-  }
-
   /// İlleri API'den yükle
   Future<void> _loadProvinces() async {
     if (!mounted) return;
@@ -673,5 +664,20 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
     }
 
     _locationController.text = locationText;
+  }
+
+  /// Premium sayfasına yönlendir
+  void _navigateToPremium() {
+    if (!mounted) return;
+
+    // Context extension'ı kullanarak paywall'ı aç
+    context.showPaywall(
+      onComplete: (_) {
+        // Paywall kapandıktan sonra kullanıcı bilgilerini yenile
+        if (mounted) {
+          context.read<ProfileCubit>().refreshUserData();
+        }
+      },
+    );
   }
 }

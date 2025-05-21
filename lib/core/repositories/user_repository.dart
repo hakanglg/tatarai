@@ -612,7 +612,7 @@ class UserRepository extends BaseRepository with CacheableMixin {
               return null;
             }
 
-            if (throwError) throw lastError!;
+            if (throwError) throw lastError;
             return null;
           }
         } else {
@@ -620,7 +620,7 @@ class UserRepository extends BaseRepository with CacheableMixin {
           AppLogger.e(
               '$operationName işlemi ağ ile ilgisi olmayan bir hata nedeniyle başarısız oldu - $e');
 
-          if (throwError) throw lastError!;
+          if (throwError) throw lastError;
           return null;
         }
       }

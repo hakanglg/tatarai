@@ -4,7 +4,6 @@ import 'package:tatarai/core/extensions/string_extension.dart';
 import 'package:tatarai/core/theme/app_theme.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
 import 'package:tatarai/core/theme/text_theme.dart';
-import 'package:tatarai/features/payment/views/premium_screen.dart';
 
 /// Uygulama genelinde tüm diyalogları yönetmek için kullanılan yardımcı sınıf
 class AppDialogManager {
