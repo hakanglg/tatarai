@@ -15,6 +15,7 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
+import 'package:tatarai/core/constants/app_constants.dart';
 
 /// Kullanıcı repository'si - Firebase Auth ve Firestore işlemlerini birleştirir
 class UserRepository extends BaseRepository with CacheableMixin {
@@ -1416,90 +1417,59 @@ class UserRepository extends BaseRepository with CacheableMixin {
               final docSnapshot = await _firestore
                   .collection(_userCollection)
                   .doc(userId)
-                  .get(GetOptions(source: Source.server));
+                  .get(const GetOptions(source: Source.server));
 
               if (docSnapshot.exists) {
-                UserModel user = UserModel.fromFirestore(docSnapshot);
+                UserModel userModelFromFirestore =
+                    UserModel.fromFirestore(docSnapshot);
 
-                // RevenueCat'ten CustomerInfo al
+                // RevenueCat'ten güncel abonelik durumunu al
                 try {
                   final customerInfo = await Purchases.getCustomerInfo();
-                  final isPremium =
-                      customerInfo.entitlements.active.containsKey('premium');
-                  // TODO: entitlementId'yi AppConstants gibi merkezi bir yerden almayı düşünün.
+                  final isPremium = customerInfo.entitlements.active
+                      .containsKey(AppConstants.entitlementId);
 
-                  // Kullanıcı modelini RevenueCat bilgileriyle güncelle
-                  // Örneğin, analysisCredits ve premium son kullanma tarihi gibi bilgiler eklenebilir
-                  user = user.copyWith(
+                  // Firestore verisini RevenueCat durumuyla güncelle
+                  userModelFromFirestore = userModelFromFirestore.copyWith(
                     isPremium: isPremium,
-                    // premiumExpirationDate: customerInfo.entitlements.active['premium']?.expirationDate,
-                    // analysisCredits: _calculateAnalysisCredits(customerInfo, user.analysisCredits), // Gerekirse kredi hesaplama mantığı
+                    // Gerekirse diğer RevenueCat alanları da eklenebilir
+                    // premiumExpirationDate: customerInfo.entitlements.active[AppConstants.entitlementId]?.expirationDate,
                   );
 
                   AppLogger.i(
-                      'RevenueCat CustomerInfo alındı. isPremium: $isPremium');
+                      'RevenueCat bilgisi alındı ve kullanıcı modeli güncellendi.',
+                      'Kullanıcı ID: $userId, Premium Durumu: $isPremium');
+
+                  // Güncellenmiş modeli Firestore'a geri yaz (isteğe bağlı, ama senkronizasyon için iyi)
+                  // Eğer sadece okuma yapıyorsanız bu adıma gerek yok.
+                  // await updateUser(userModelFromFirestore); // Bu satır gerekliyse açılabilir.
                 } catch (e) {
-                  AppLogger.e('RevenueCat CustomerInfo alınırken hata: $e');
-                  // Hata durumunda Firestore'dan gelen kullanıcıyı olduğu gibi döndür,
+                  AppLogger.e('RevenueCat bilgisi alınırken hata oluştu.',
+                      e.toString());
+                  // RevenueCat'ten bilgi alınamazsa bile Firestore'dan gelen veriyle devam et,
                   // ancak isPremium durumu RevenueCat'ten alınamadığı için yanlış olabilir.
                   // Bu durumu loglayıp, belki de kullanıcıya bir uyarı göstermek gerekebilir.
                 }
 
-                // Önbelleği de güncelle
-                await cacheData(_userCachePrefix + userId, user.toFirestore());
-
-                logSuccess(
-                    'Taze kullanıcı verisi alındı', 'Kullanıcı ID: $userId');
-                return user;
+                return userModelFromFirestore;
               } else {
-                logWarning('Taze kullanıcı verisi bulunamadı',
-                    'Kullanıcı ID: $userId');
+                logWarning('Firestore\'da kullanıcı bulunamadı (taze veri).',
+                    'ID: $userId');
                 return null;
               }
             } catch (e) {
-              retryCount++;
-
-              // Son denemede başarısız olunca yedek mekanizmayı kullan
-              if (retryCount > maxRetries) {
-                logError('Taze kullanıcı verisi alma hatası', e.toString());
-
-                // Önbellekten veri almayı dene
-                try {
-                  final cachedData =
-                      await getCachedData(_userCachePrefix + userId);
-                  if (cachedData != null) {
-                    final Map<String, dynamic> userData;
-                    if (cachedData is String) {
-                      userData = jsonDecode(cachedData) as Map<String, dynamic>;
-                    } else {
-                      userData = cachedData as Map<String, dynamic>;
-                    }
-
-                    final user = _createUserModelFromData(userData, userId);
-                    logSuccess(
-                        'Önbellekten kullanıcı verisi alındı (yedek çözüm)');
-                    return user;
-                  }
-                } catch (cacheError) {
-                  logError(
-                      'Önbellekten veri alma hatası', cacheError.toString());
-                }
-
-                return null;
+              logError('Taze kullanıcı verisi getirilirken hata.',
+                  'ID: $userId, Hata: $e');
+              if (retryCount >= maxRetries) {
+                rethrow; // Son denemede hata devam ediyorsa fırlat
               }
-
-              // Exponential backoff (üstel geri çekilme) ile bekleme süresi
-              final delayMs =
-                  initialDelayMs * (1 << (retryCount - 1)); // 1s, 2s, 4s, 8s...
-              logInfo('Yeniden deneniyor...', '$delayMs ms sonra');
-              await Future.delayed(Duration(milliseconds: delayMs));
+              retryCount++;
+              await Future.delayed(
+                  Duration(milliseconds: initialDelayMs * retryCount));
             }
           }
-
-          return null;
-        },
-        ignoreConnectionCheck: false,
-        throwError: true);
+          return null; // Buraya teorik olarak gelinmemeli
+        });
   }
 
   /// Firestore'a kullanıcı verilerini ekler
