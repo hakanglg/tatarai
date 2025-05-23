@@ -1,5 +1,6 @@
 import 'package:tatarai/core/base/base_state.dart';
 import 'package:tatarai/features/plant_analysis/models/plant_analysis_result.dart';
+import 'package:equatable/equatable.dart';
 
 /// Hata türleri
 enum ErrorType {
@@ -38,7 +39,7 @@ enum ErrorType {
 }
 
 /// Bitki analizi durum sınıfı
-class PlantAnalysisState extends BaseState {
+class PlantAnalysisState extends BaseState with EquatableMixin {
   /// Tüm analizler
   final List<PlantAnalysisResult> analysisList;
 
@@ -54,6 +55,15 @@ class PlantAnalysisState extends BaseState {
   /// Hata türü
   final ErrorType? errorType;
 
+  /// Ekran seçimi için
+  final bool isSelectionMode;
+
+  /// Paywall göstermek için
+  final bool showPaywall;
+
+  /// Paywall mesajı için
+  final String? paywallMessage;
+
   /// Constructor
   const PlantAnalysisState({
     this.analysisList = const [],
@@ -63,6 +73,9 @@ class PlantAnalysisState extends BaseState {
     super.errorMessage,
     this.needsPremium = false,
     this.errorType,
+    this.isSelectionMode = false,
+    this.showPaywall = false,
+    this.paywallMessage,
   });
 
   /// Başlangıç durumu
@@ -116,6 +129,9 @@ class PlantAnalysisState extends BaseState {
     String? errorMessage,
     bool? needsPremium,
     ErrorType? errorType,
+    bool? isSelectionMode,
+    bool? showPaywall,
+    String? paywallMessage,
   }) {
     return PlantAnalysisState(
       analysisList: analysisList ?? this.analysisList,
@@ -126,6 +142,9 @@ class PlantAnalysisState extends BaseState {
       errorMessage: errorMessage ?? this.errorMessage,
       needsPremium: needsPremium ?? this.needsPremium,
       errorType: errorType ?? this.errorType,
+      isSelectionMode: isSelectionMode ?? this.isSelectionMode,
+      showPaywall: showPaywall ?? this.showPaywall,
+      paywallMessage: paywallMessage ?? this.paywallMessage,
     );
   }
 
@@ -137,6 +156,9 @@ class PlantAnalysisState extends BaseState {
         status,
         needsPremium,
         errorType,
+        isSelectionMode,
+        showPaywall,
+        paywallMessage,
       ];
 }
 

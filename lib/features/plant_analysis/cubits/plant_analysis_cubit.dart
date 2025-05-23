@@ -11,20 +11,24 @@ import 'package:tatarai/core/utils/validation_util.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
 import 'package:tatarai/features/auth/models/user_model.dart';
 import 'package:tatarai/features/plant_analysis/cubits/plant_analysis_state.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 /// Plant Analysis Cubit - Bitki analizi iş mantığını yönetir
 class PlantAnalysisCubit extends BaseCubit<PlantAnalysisState> {
   final PlantAnalysisRepository _repository;
   final AuthCubit _authCubit;
   final UserRepository _userRepository;
+  final FirebaseAuth _firebaseAuth;
 
   PlantAnalysisCubit({
     required PlantAnalysisRepository repository,
     required AuthCubit authCubit,
     required UserRepository userRepository,
+    required FirebaseAuth firebaseAuth,
   })  : _repository = repository,
         _authCubit = authCubit,
         _userRepository = userRepository,
+        _firebaseAuth = firebaseAuth,
         super(PlantAnalysisState.initial());
 
   @override
@@ -478,5 +482,91 @@ class PlantAnalysisCubit extends BaseCubit<PlantAnalysisState> {
 
     // Bilinmeyen hata
     return ErrorType.unknown;
+  }
+
+  /// Görüntüyü analiz eder
+  Future<void> analyzeImageV2({
+    required File imageFile,
+    required String location,
+    String? fieldName,
+  }) async {
+    try {
+      emit(state.copyWith(status: AnalysisStatus.loading, errorMessage: null));
+
+      // 1. Kullanıcı bilgilerini al (en güncel haliyle)
+      final firebaseUser = _firebaseAuth.currentUser;
+      if (firebaseUser == null) {
+        AppLogger.e('Analiz için kullanıcı oturumu bulunamadı.');
+        emit(state.copyWith(
+            status: AnalysisStatus.error, errorMessage: 'Lütfen giriş yapın.'));
+        return;
+      }
+
+      AppLogger.i('Güncel kullanıcı verileri çekiliyor: ${firebaseUser.uid}');
+      final UserModel? currentUser =
+          await _userRepository.fetchFreshUserData(firebaseUser.uid);
+
+      if (currentUser == null) {
+        AppLogger.e('Kullanıcı bilgileri alınamadı.');
+        emit(state.copyWith(
+            status: AnalysisStatus.error,
+            errorMessage: 'Kullanıcı bilgileriniz yüklenemedi.'));
+        return;
+      }
+      AppLogger.i(
+          'Güncel kullanıcı verileri alındı: ${currentUser.email}, Premium: ${currentUser.isPremium}, Kredi: ${currentUser.analysisCredits}');
+
+      // 2. Kredi ve Premium durumunu kontrol et
+      final validationResult =
+          await ValidationUtil.checkUserCredits(currentUser);
+
+      if (!validationResult.isValid) {
+        AppLogger.w(
+            'Kredi/Premium kontrolü başarısız: ${validationResult.message}');
+        if (validationResult.needsPremium) {
+          AppLogger.i('Paywall gösterilecek.');
+          // UI'a özel bir state emit ederek paywall'u açmasını sağlayabilirsiniz.
+          // PlantAnalysisState içinde showPaywall ve paywallMessage alanları olmalı.
+          emit(state.copyWith(
+              status: AnalysisStatus
+                  .error, // Veya özel bir status: AnalysisStatus.needsPaywall
+              errorMessage: validationResult.message,
+              showPaywall: true,
+              paywallMessage: validationResult.message));
+        } else {
+          emit(state.copyWith(
+              status: AnalysisStatus.error,
+              errorMessage: validationResult.message));
+        }
+        return;
+      }
+
+      AppLogger.i('Kullanıcı analiz yapabilir. Analiz işlemi başlatılıyor...');
+
+      // Görüntü URL'sini yükle
+      final imageUrl = await _repository.uploadImage(imageFile);
+      if (imageUrl.isEmpty) {
+        emitErrorState('Görüntü yüklenemedi.');
+        return;
+      }
+
+      final result = await _repository.analyzeImage(
+        imageUrl: imageUrl,
+        location: location,
+        fieldName: fieldName,
+      );
+
+      final allAnalyses = await _repository.getPastAnalyses();
+      emit(
+        PlantAnalysisState.success(allAnalyses, selectedAnalysisResult: result),
+      );
+
+      logSuccess(
+        'Bitki analizi',
+        'Bitki analizi tamamlandı - ID: ${result.id}',
+      );
+    } catch (error) {
+      handleError('Bitki analizi', error);
+    }
   }
 }

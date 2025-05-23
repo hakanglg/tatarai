@@ -1056,9 +1056,35 @@ class UserRepository extends BaseRepository with CacheableMixin {
       success = false;
     }
 
+    // Kullanıcının yaptığı analizleri sil (users/{userId}/analyses)
+    try {
+      final analysesSnapshot = await _firestore
+          .collection(_userCollection)
+          .doc(userId)
+          .collection(AppConstants
+              .userAnalysesCollection) // AppConstants.userAnalysesCollection KULLANILDI
+          .get();
+
+      if (analysesSnapshot.docs.isNotEmpty) {
+        final batch = _firestore.batch();
+        for (var doc in analysesSnapshot.docs) {
+          batch.delete(doc.reference);
+        }
+        await batch.commit();
+        AppLogger.i(
+            '✅ Kullanıcının ${AppConstants.userAnalysesCollection} koleksiyonundan ${analysesSnapshot.docs.length} analiz silindi');
+      } else {
+        AppLogger.i('ℹ️ Kullanıcının silinecek analizi bulunmuyor.');
+      }
+    } catch (e) {
+      AppLogger.e(
+          '❌ Kullanıcının ${AppConstants.userAnalysesCollection} koleksiyonu silinirken hata: $e');
+      success = false;
+    }
+
     // Koleksiyon listesi - her birini sil
     final collections = [
-      'analyses',
+      // 'analyses', // Zaten yukarıda users/{userId}/analyses olarak silindi
       'favorites',
       'history',
       'user_settings',
@@ -1124,17 +1150,24 @@ class UserRepository extends BaseRepository with CacheableMixin {
           AppLogger.e('❌ Hesap silme hatası: $e');
 
           // Yeniden kimlik doğrulama gerekiyorsa
-          if (e.toString().contains('REQUIRES_REAUTH')) {
-            await signOut();
-            AppLogger.i('⚠️ Yeniden giriş gerekli');
-            throw Exception(
-                'Güvenlik nedeniyle hesabınızı silmek için yeniden giriş yapmanız gerekiyor.');
+          if (e is FirebaseException && e.code == 'requires-recent-login') {
+            AppLogger.i(
+                '⚠️ Yeniden giriş gerekli (FirebaseException: requires-recent-login)');
+            // Kullanıcıyı bilgilendirmek ve yeniden kimlik doğrulamaya yönlendirmek için spesifik bir hata fırlat.
+            // UI katmanı bu hatayı yakalayıp uygun şekilde işlemeli.
+            throw FirebaseException(
+                plugin: 'AuthService',
+                code: 'requires-recent-login',
+                message:
+                    'Güvenlik nedeniyle hesabınızı silmek için yeniden giriş yapmanız gerekiyor.');
           }
 
           // Diğer authentication hataları
-          if (e.toString().contains('AUTH_DELETE_ERROR')) {
-            await signOut();
-            AppLogger.e('❌ Hesap silme işlemi başarısız oldu');
+          // if (e.toString().contains('AUTH_DELETE_ERROR')) { // Bu kontrol çok genel, FirebaseException kodlarına bakalım
+          if (e is FirebaseException) {
+            // Diğer Firebase Auth hataları için genel bir mesaj
+            AppLogger.e(
+                '❌ Hesap silme işlemi başarısız oldu (FirebaseException: ${e.code})');
             throw Exception(
                 'Hesap silme işlemi sırasında bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
           }
@@ -1432,17 +1465,17 @@ class UserRepository extends BaseRepository with CacheableMixin {
                   // Firestore verisini RevenueCat durumuyla güncelle
                   userModelFromFirestore = userModelFromFirestore.copyWith(
                     isPremium: isPremium,
+                    role: isPremium ? UserRole.premium : UserRole.free,
                     // Gerekirse diğer RevenueCat alanları da eklenebilir
                     // premiumExpirationDate: customerInfo.entitlements.active[AppConstants.entitlementId]?.expirationDate,
                   );
 
                   AppLogger.i(
                       'RevenueCat bilgisi alındı ve kullanıcı modeli güncellendi.',
-                      'Kullanıcı ID: $userId, Premium Durumu: $isPremium');
+                      'Kullanıcı ID: $userId, Premium Durumu: $isPremium, Rol: ${userModelFromFirestore.role}');
 
-                  // Güncellenmiş modeli Firestore'a geri yaz (isteğe bağlı, ama senkronizasyon için iyi)
-                  // Eğer sadece okuma yapıyorsanız bu adıma gerek yok.
-                  // await updateUser(userModelFromFirestore); // Bu satır gerekliyse açılabilir.
+                  // Güncellenmiş modeli Firestore'a geri yaz
+                  await updateUserData(userModelFromFirestore);
                 } catch (e) {
                   AppLogger.e('RevenueCat bilgisi alınırken hata oluştu.',
                       e.toString());
