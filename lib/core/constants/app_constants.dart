@@ -20,7 +20,7 @@ class AppConstants {
   static const String entitlementId = 'premium';
 
   // Ücretsiz kullanıcı için analiz kredisi
-  static const int FREE_ANALYSIS_CREDITS = 1;
+  static const int FREE_ANALYSIS_CREDITS = 3;
 
   // Firebase collection isimleri
   static const String usersCollection = 'users';

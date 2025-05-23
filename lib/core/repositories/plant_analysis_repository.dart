@@ -1350,8 +1350,13 @@ Lütfen yukarıdaki analizi Türkçe olarak yap ve JSON formatında döndür. Ha
   /// Kullanıcının analizlerini gerçek zamanlı olarak dinle
   Stream<List<PlantAnalysisResult>> streamUserAnalyses() {
     final userId = _getCurrentUserId();
+    // Log the user ID used for streaming analyses
+    AppLogger.i(
+        'PlantAnalysisRepository: Streaming analyses for user ID: $userId');
     if (userId == null) {
       // Kullanıcı giriş yapmamışsa boş liste döndür
+      AppLogger.w(
+          'PlantAnalysisRepository: No user logged in, returning empty stream for analyses.');
       return Stream.value([]);
     }
 
