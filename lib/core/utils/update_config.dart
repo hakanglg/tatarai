@@ -27,4 +27,17 @@ class UpdateConfig {
     required this.forceUpdateMessage,
     required this.optionalUpdateMessage,
   });
+
+  /// Varsayılan güncelleme yapılandırması
+  static UpdateConfig defaultConfig() {
+    return UpdateConfig(
+      latestVersion: '1.0.0',
+      minVersion: '1.0.0',
+      storeUrl: 'https://apps.apple.com/app/id1234567890',
+      forceUpdateMessage:
+          'Yeni bir güncelleme mevcut. Uygulamayı kullanmaya devam etmek için lütfen güncelleyin.',
+      optionalUpdateMessage:
+          'Yeni bir güncelleme mevcut. Güncellemek ister misiniz?',
+    );
+  }
 }

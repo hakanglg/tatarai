@@ -49,8 +49,6 @@ class AppColors {
       outlineVariant: disabled,
       tertiary: primary,
       onTertiary: onSecondary,
-      background: background,
-      onBackground: onBackground,
     );
   }
 }

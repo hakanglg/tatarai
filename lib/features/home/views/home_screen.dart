@@ -2,13 +2,14 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:tatarai/core/extensions/string_extension.dart';
+import 'package:tatarai/core/theme/color_scheme.dart';
+import 'package:tatarai/core/theme/text_theme.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/features/home/views/home_tab_content.dart';
 import 'package:tatarai/features/navbar/navigation_manager.dart';
 import 'package:tatarai/features/navbar/widgets/app_bottom_navigation_bar.dart';
-import 'package:tatarai/features/plant_analysis/views/analysis/analysis_screen.dart';
+import 'package:tatarai/features/plant_analysis/presentation/views/analysis/analysis_screen.dart';
 import 'package:tatarai/features/profile/views/profile_screen.dart';
-import 'package:tatarai/features/update/views/update_dialog.dart';
 
 /// Ana ekran widget'ı - TabBar içeren ana sayfa
 class HomeScreen extends StatefulWidget {
@@ -44,25 +45,49 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // NavigationManager örneğini doğrudan statik instance'dan al
-    var navManager = NavigationManager.instance;
+    AppLogger.i('🏠 HomeScreen build() çağrıldı');
 
-    // NavigationManager örneği yoksa oluştur
+    final navManager = NavigationManager.instance;
     if (navManager == null) {
+      AppLogger.e('NavigationManager null, yeniden başlatılıyor');
       NavigationManager.initialize(initialIndex: 0);
-      navManager = NavigationManager.instance;
 
-      // Hala null ise, bir hata meydana gelmiş demektir
-      if (navManager == null) {
-        AppLogger.e('NavigationManager oluşturulamadı');
-        return const Scaffold(
-          body: Center(
-            child: Text(
-              'NavigationManager başlatılamadı. Uygulamayı yeniden başlatın.',
-            ),
+      // NavigationManager olmadan basit bir home ekranı göster
+      return Scaffold(
+        appBar: AppBar(
+          title: Text('TatarAI'),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                CupertinoIcons.leaf_arrow_circlepath,
+                size: 64,
+                color: AppColors.primary,
+              ),
+              SizedBox(height: 16),
+              Text(
+                'TatarAI Yükleniyor...',
+                style: AppTextTheme.headline2,
+              ),
+              SizedBox(height: 16),
+              CupertinoActivityIndicator(),
+              SizedBox(height: 24),
+              TextButton(
+                onPressed: () {
+                  // NavigationManager'ı tekrar başlatmayı dene
+                  NavigationManager.initialize(initialIndex: 0);
+                  setState(() {});
+                },
+                child: Text('Yenile'),
+              ),
+            ],
           ),
-        );
-      }
+        ),
+      );
     }
 
     // NavigationManager'ı ChangeNotifierProvider ile sarmalayarak alt widget'lara sağla
@@ -118,8 +143,8 @@ class _HomeScreenState extends State<HomeScreen> {
         return const HomeTabContent();
       case 1:
         return const AnalysisScreen();
-      case 2:
-        return const ProfileScreen();
+      // case 2:
+      // return const ProfileScreen();
       default:
         return Center(child: Text('page_not_found'.locale(context)));
     }

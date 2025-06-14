@@ -1,0 +1,111 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Flutter Development Rules
+General Principles
+Use English for all code (identifiers, comments) and documentation.
+Always explicitly specify types for variables, function parameters, and return values.
+Avoid using the any type; prefer precise types or generics to maintain type safety.
+Define custom types or classes as needed rather than overusing primitive types.
+Do not leave unnecessary blank lines within function bodies – keep code blocks compact.
+Limit each source file to a single responsibility (e.g. one public class or one widget per file).
+Naming Conventions
+Use PascalCase for class names (e.g. MyAwesomeWidget).
+Use camelCase for variable, function, and method names (e.g. isLoading, fetchData()).
+Use snake_case (all lowercase, words separated by _) for file and directory names.
+Use UPPER_SNAKE_CASE for constant values and environment variables.
+Avoid magic numbers or strings in code; define them as named constants for clarity.
+Use descriptive, complete words in identifiers. Avoid abbreviations unless they are standard (e.g. use “application” not “app” in names). Accepted exceptions are common acronyms (API, URL, HTTP) or conventional short names (i, j for loop indices; err for error objects; ctx for context; req, res, next in middleware, etc.).
+Functions and Methods
+Keep functions short and focused, ideally under 20 lines of code and doing one specific task.
+Name functions as verbs or verb phrases that clearly describe their action (e.g. calculateTotal, sendRequest).
+If a function returns a boolean, start its name with is, has, or can to indicate a yes/no question (e.g. isAuthenticated()).
+If a function performs an action and returns void, use an imperative verb in its name (e.g. initiateUpload(), saveData()).
+Avoid deeply nested logic inside functions. Use early returns, guard clauses, or split out helper functions to keep the nesting shallow.
+Use higher-order functions and collection methods (like map, filter, reduce) instead of manual loops to make code more declarative and avoid nesting.
+Use arrow function syntax for simple single-expression functions. Use a standard function definition for more complex or multi-step functions.
+Use default parameter values for optional parameters instead of requiring null checks inside the function.
+Reduce the number of parameters a function takes by grouping related parameters into an object. Likewise, if a function needs to return multiple values, return them as an object or class.
+Maintain a single level of abstraction within a function; a function should not mix high-level logic with low-level implementation details.
+Data and State Management
+Encapsulate related data into composite types (classes/structs) instead of passing around lots of individual primitives.
+Avoid scattered data validation logic. Validate inputs at boundaries or within data classes themselves, rather than in every function that uses the data.
+Prefer immutability for data objects. Use final (or equivalent) for variables that should not change after initialization.
+Mark literal values and collections as const wherever possible so they are compile-time constants and won’t be rebuilt unnecessarily.
+Use immutable data classes or patterns (e.g. the Freezed package in Flutter) to represent UI state or model objects, ensuring they cannot be modified after creation.
+Classes and Object-Oriented Design
+Follow SOLID object-oriented design principles when structuring classes (Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion).
+Favor composition over inheritance: use mixins, extensions, or helper classes to share functionality rather than deep class hierarchies when possible.
+Use abstract classes or interfaces to define clear contracts for your classes’ behavior. Program to interfaces to allow different implementations.
+Keep classes small and focused on a single purpose or responsibility.
+Aim to keep each class under ~200 lines of code.
+Limit the public API of a class to around 10 methods or fewer, and avoid having more than about 10 fields in a class. If a class grows beyond this, consider refactoring or splitting it into smaller classes.
+Error Handling and Exceptions
+Use exceptions for unexpected error conditions only. Do not use exceptions for normal control flow or expected results.
+When you throw an exception, provide a clear message or use a specific exception type to make debugging easier.
+Only catch exceptions if you can handle the error or need to add context. For example, catch an exception to recover from a known issue or to wrap it in a more contextual exception.
+If an exception cannot be meaningfully handled in place, allow it to propagate up to a higher-level error handler (or a global exception handler) rather than catching it and doing nothing.
+Testing
+Write unit tests for every public function or critical piece of logic. Each unit test should isolate the function and verify it works for various inputs.
+Structure test code using the Arrange-Act-Assert pattern for clarity (set up inputs and preconditions, perform the action, then assert the outcomes).
+Name test variables and mocks clearly so their purpose is obvious. For example, use names like inputUser, mockService, expectedResult to distinguish parts of the test.
+Use test doubles (mocks, stubs, fakes) to simulate external dependencies or side effects in tests. This ensures tests run quickly and reliably. (It’s acceptable to call real implementations of trivial dependencies that are lightweight and deterministic.)
+Write higher-level integration or acceptance tests for each module or feature to cover the interactions between components. Ensure the system as a whole works as expected.
+When writing behavior-driven tests or documenting scenarios, use the Given-When-Then convention to clearly delineate setup, action, and expected outcome.
+Flutter-Specific Best Practices
+Architectural Pattern: Use Clean Architecture principles to organize your Flutter project. Separate code into layers or modules such as presentation (UI), domain (business logic), and data. Group related code into directories (e.g. features, services, controllers, repositories, models) for clarity and maintainability.
+State Management: Use Riverpod (or a similar state management solution) to manage application state in Flutter. Leverage Riverpod’s capabilities (like keepAlive) to preserve state across widget life-cycles when needed.
+Controller/ViewModel: Employ a controller or ViewModel pattern for business logic. Keep widget UI classes lean by moving logic into controller classes that update state (for example, updating Riverpod providers or streams) which the UI listens to. This keeps the UI reactive and the logic testable.
+Repository Pattern: Use the repository pattern for data access and persistence. Create repository classes to abstract away API calls or database access. Implement caching in repositories (or use a separate cache layer) to avoid unnecessary network or disk calls.
+Dependency Injection: Use a service locator or dependency injection tool (e.g. get_it in Flutter) to manage object creation and dependencies. Register long-lived services and repositories as singletons, so the same instance is used throughout the app. Register UI controllers or other lazily-initialized objects as lazy singletons, so they are created only when first needed.
+Factory Pattern: Use factory constructors or factory classes to create complex objects or to initialize classes that require significant setup. This promotes cleaner code in the UI and allows swapping implementations if needed.
+Navigation: Use a routing package like AutoRoute (or Flutter’s Navigator 2.0 with a router) to manage navigation declaratively. Define routes in a centralized place. Use route parameters or extra arguments to pass data between screens rather than global variables or singletons.
+Extensions: Use extension methods to add reusable functionality to existing classes (for example, extension methods on common widgets or utility classes) without cluttering the core classes. This helps keep code DRY and well-organized.
+Theming: Manage app theming with ThemeData and theming classes. Define common colors, text styles, and UI constants in the theme or a separate style constants file, so that the app’s look and feel is consistent and easily adjustable.
+Localization: Use Flutter’s internationalization tools (e.g. the AppLocalizations generated by flutter_localizations and ARB files) for managing all user-facing text. Avoid hardcoding strings in widgets; instead, retrieve them from localized resources.
+Constants: Centralize constant values (such as keys, URLs, magic numbers) in a dedicated constants file or class. This makes it easy to tweak configuration values and ensures they are used consistently across the codebase.
+Widget Tree Depth: Avoid overly deep widget hierarchies. If a widget tree becomes nested to the point of hurting readability or performance, refactor parts of the UI into smaller widgets or widgets that build pieces of the UI. A shallower widget tree improves rendering performance and makes the code easier to understand.
+Reusable Widgets: Break down large, complex widgets into smaller, reusable widgets. This not only aids readability and reuse, but also makes it easier to manage state and logic specific to those pieces of UI.
+Const Constructors: Wherever possible, declare your Flutter widgets as const. Using const constructors for widgets (and marking child widgets const) allows Flutter to short-circuit rebuilds for those widgets since they are immutable, improving performance.
+
+Folder Structure:
+lib/
+├── core/
+│   ├── constants/
+│   ├── theme/
+│   ├── services/
+│   ├── widgets/
+│   ├── utils/
+│   └── network/
+├── feature/
+│   ├── auth/
+│   ├── home/
+│   └── profile/
+└── main.dart
+Use Firebase CLI
+This document outlines the mandatory rules for ensuring readability, maintainability, and consistency across the codebase.
+Documentation Guidelines
+- All public classes, methods, properties, getters, and setters must include `///` DartDoc comments.
+- Comments must clearly describe the purpose, behavior, parameters (if any), and return values.
+- Comments should explain "why" something is done, not "what" is done
+Theming & Styling Rules
+- Do not use `TextStyle` directly in widgets.
+- Use `Theme.of(context).textTheme` or a centralized `AppTextStyles` class for all text styles.
+- Do not hardcode values for font size, font weight, letter spacing, or colors.
+Layout & Sizing Rules
+- Do not use hardcoded values for margin, padding, height, width, spacing, or radius.
+- Do not write raw values inside `EdgeInsets`, `SizedBox`, `Container`, etc.
+- Always use context extensions from the `kartal` package or centralized constants such as `AppSizes`, `AppPaddings`, `AppRadius`, etc.
+Constants Management
+All visual and structural constants must be defined under:
+Repository & Service Layer
+- All data access and external API logic must be handled via repository classes.
+- Implement caching inside the repository layer or a dedicated caching service.
+- Abstract services behind interfaces and avoid tightly coupled implementations.
+State Management
+- Use Cubit as the primary state management solution.
+- Keep UI code minimal and move all business logic to `ViewModel` classes.
+
+

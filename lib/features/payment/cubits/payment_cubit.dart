@@ -65,7 +65,7 @@ class PaymentCubit extends Cubit<PaymentState> {
             await _reconfigureRevenueCat();
             return fetchOfferings(retry: false);
           } else {
-            throw offeringsError;
+            rethrow;
           }
         }
 
@@ -119,7 +119,7 @@ class PaymentCubit extends Cubit<PaymentState> {
         return offerings; // Offerings alınmışsa bile döndür
       }
 
-      final isPremium = _checkIfUserIsPremium(customerInfo!);
+      final isPremium = _checkIfUserIsPremium(customerInfo);
 
       emit(state.copyWith(
         offerings: offerings,
@@ -209,7 +209,7 @@ class PaymentCubit extends Cubit<PaymentState> {
       }
     } catch (e) {
       AppLogger.e('RevenueCat yeniden yapılandırma hatası: $e');
-      throw e;
+      rethrow;
     }
   }
 

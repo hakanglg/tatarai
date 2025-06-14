@@ -27,9 +27,7 @@ class AppTheme {
   /// Koyu tema için ColorScheme
   static final ColorScheme darkColorScheme = AppColors.colorScheme.copyWith(
     brightness: Brightness.dark,
-    background: Colors.grey[900]!,
     surface: Colors.grey[850]!,
-    onBackground: Colors.white,
     onSurface: Colors.white,
   );
 

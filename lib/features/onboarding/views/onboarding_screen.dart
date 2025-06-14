@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sprung/sprung.dart';
@@ -10,6 +11,8 @@ import 'package:tatarai/core/theme/dimensions.dart';
 import 'package:tatarai/core/theme/text_theme.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/core/widgets/app_button.dart';
+import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
+import 'package:tatarai/features/auth/cubits/auth_state.dart';
 
 /// Onboarding ekranı - kullanıcıya uygulamayı tanıtır
 class OnboardingScreen extends StatefulWidget {
@@ -127,33 +130,32 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       ],
     ),
     OnboardingItem(
-      title: 'TatarAI Premium',
+      title: 'TatarAI\'ye Hoş Geldiniz!',
       description:
-          'Tam potansiyelinize ulaşın! Premium üyelikle TatarAI\'nin tüm gelişmiş özelliklerine sınırsız erişim kazanın.',
-      icon: CupertinoIcons.star_fill,
-      isPremium: true,
+          'Bitki sağlığı analizi için yapay zeka destekli uygulamanız hazır. Hemen başlayın ve bitkilerinizin sağlığını profesyonel düzeyde analiz edin.',
+      icon: CupertinoIcons.check_mark_circled_solid,
       backgroundOpacity: 0.35,
       mainColor: AppColors.primary,
       illustrationPath: 'assets/images/onboarding_4.png',
-      pricingInfo: 'Aylık sadece \$2.99 veya yıllık \$29.99 ödeyin',
-      specialOffer: 'Hemen başlayın ve %30 özel indirimden yararlanın',
+      pricingInfo: '',
+      specialOffer: 'Ücretsiz 5 analiz hakkı ile başlayın',
       bgElements: const [
         DecorationItem(
-          icon: Icons.star,
+          icon: Icons.check_circle,
           positionFactor: 0.1,
           size: 32,
           opacity: 0.2,
           rotationFactor: 0.2,
         ),
         DecorationItem(
-          icon: Icons.auto_awesome,
+          icon: Icons.agriculture,
           positionFactor: 0.5,
           size: 28,
           opacity: 0.25,
           rotationFactor: -0.2,
         ),
         DecorationItem(
-          icon: Icons.workspace_premium,
+          icon: Icons.smartphone,
           positionFactor: 0.85,
           size: 34,
           opacity: 0.2,
@@ -232,34 +234,109 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     });
 
     try {
-      AppLogger.i('Premium sayfasına yönlendiriliyor...');
+      AppLogger.i('🚀 Onboarding tamamlanıyor, anonim giriş başlatılıyor...');
+
       // Onboarding'i tamamlandı olarak işaretle
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('onboarding_completed', true);
+      AppLogger.i('✅ Onboarding completed flag set edildi');
 
       if (!mounted) return;
 
-      // Premium sayfasına yönlendir
-      context.goNamed(RouteNames.premium);
-    } catch (e) {
-      AppLogger.e('Premium sayfasına yönlendirme hatası', e);
+      // AuthCubit'i al ve durumunu kontrol et
+      final authCubit = context.read<AuthCubit>();
+      AppLogger.i(
+          '🔍 AuthCubit alındı, mevcut state: ${authCubit.state.runtimeType}');
+
+      // Anonim giriş yap
+      AppLogger.i('🔐 Anonim giriş başlatılıyor...');
+      await authCubit.signInAnonymously();
+
+      // Giriş sonrası state'i kontrol et
+      AppLogger.i(
+          '🔍 Anonim giriş sonrası state: ${authCubit.state.runtimeType}');
+
+      if (authCubit.state is AuthAuthenticated) {
+        final user = (authCubit.state as AuthAuthenticated).user;
+        AppLogger.i('✅ Anonim giriş başarılı - User ID: ${user.id}');
+        AppLogger.i('📊 User bilgileri: ${user.toString()}');
+      } else if (authCubit.state is AuthError) {
+        final authError = authCubit.state as AuthError;
+        final error = authError.errorMessage;
+        AppLogger.e('❌ Anonim giriş hatası: $error');
+
+        // Kullanıcı dostu hata mesajı göster
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Giriş yapılırken sorun oluştu: $error'),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+
+        throw Exception('Anonim giriş başarısız: $error');
+      } else {
+        AppLogger.w(
+            '⚠️ Beklenmeyen auth state: ${authCubit.state.runtimeType}');
+      }
 
       if (!mounted) return;
 
-      // Hata durumunda login sayfasına yönlendir
-      _redirectToLogin();
+      AppLogger.i('🏠 Ana sayfaya yönlendiriliyor...');
+      // Ana sayfaya yönlendir
+      context.goNamed(RouteNames.home);
+      AppLogger.i('✅ Ana sayfa yönlendirmesi tamamlandı');
+    } catch (e, stackTrace) {
+      AppLogger.e('❌ Onboarding tamamlama hatası', e, stackTrace);
+
+      if (!mounted) return;
+
+      // Hata durumunda yine ana sayfaya yönlendir ama kullanıcıyı bilgilendir
+      _showErrorAndRedirect(e.toString());
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCompleting = false;
+        });
+      }
     }
   }
 
-  Future<void> _redirectToLogin() async {
+  /// Hata gösterip ana sayfaya yönlendir
+  void _showErrorAndRedirect(String error) {
+    AppLogger.w('⚠️ Hata ile ana sayfaya yönlendiriliyor: $error');
+
+    // Kullanıcıya kısa bir hata mesajı göster
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Giriş sırasında bir sorun oluştu, tekrar deneyin'),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+
+      // Kısa bir delay sonra ana sayfaya git
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted) {
+          context.goNamed(RouteNames.home);
+        }
+      });
+    }
+  }
+
+  /// Ana sayfaya yönlendirme (fallback)
+  Future<void> _redirectToHome() async {
     try {
-      AppLogger.i('Login sayfasına yönlendiriliyor...');
+      AppLogger.i('Ana sayfaya yönlendiriliyor...');
       if (!mounted) return;
 
-      // Doğrudan giriş sayfasına git
-      context.goNamed(RouteNames.login);
+      // Ana sayfaya git
+      context.goNamed(RouteNames.home);
     } catch (e) {
-      AppLogger.e('Login sayfasına yönlendirme hatası', e);
+      AppLogger.e('Ana sayfa yönlendirme hatası', e);
     }
   }
 
@@ -344,7 +421,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     child: AppButton(
                       text: _currentPage < _onboardingItems.length - 1
                           ? 'Devam Et'
-                          : 'Başla',
+                          : 'Uygulamaya Başla',
                       onPressed: _isCompleting
                           ? null
                           : (_currentPage < _onboardingItems.length - 1
@@ -404,12 +481,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   Widget _buildPage(OnboardingItem item, Size screenSize) {
-    // Premium sayfası için özel görünüm
-    if (item.isPremium) {
-      return _buildPremiumPage(item, screenSize);
+    // Eğer son sayfaysa (hoş geldiniz sayfası), özel görünüm kullan
+    if (_currentPage == _onboardingItems.length - 1) {
+      return _buildWelcomePage(item, screenSize);
     }
 
-    // Eğer premium sayfasıysa, biraz daha küçük görsel boyutu kullan
+    // Diğer sayfalar için normal görünüm
     final imageSize = screenSize.width * 0.75;
 
     return Padding(
@@ -502,8 +579,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     );
   }
 
-  // Premium sayfası için özel tasarım
-  Widget _buildPremiumPage(OnboardingItem item, Size screenSize) {
+  /// Hoş geldiniz sayfası için özel tasarım
+  Widget _buildWelcomePage(OnboardingItem item, Size screenSize) {
     final imageSize = screenSize.width * 0.48;
 
     return Padding(
@@ -511,7 +588,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Premium rozeti
+          // Hoş geldiniz rozeti
           Container(
             margin: EdgeInsets.only(top: 0, bottom: context.dimensions.spaceM),
             padding: EdgeInsets.symmetric(
@@ -521,13 +598,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               gradient: LinearGradient(
                 colors: [
                   AppColors.primary,
-                  Colors.indigo.shade700,
+                  Colors.green.shade700,
                 ],
               ),
               borderRadius: BorderRadius.circular(context.dimensions.radiusL),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.indigo.withOpacity(0.4),
+                  color: AppColors.primary.withOpacity(0.4),
                   blurRadius: 8,
                   offset: const Offset(0, 3),
                 ),
@@ -537,13 +614,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  CupertinoIcons.sparkles,
+                  CupertinoIcons.checkmark_alt_circle_fill,
                   color: Colors.white,
                   size: context.dimensions.iconSizeXS,
                 ),
                 SizedBox(width: context.dimensions.spaceXXS),
                 Text(
-                  'PREMIUM',
+                  'HOŞ GELDİNİZ',
                   style: AppTextTheme.captionL.copyWith(
                     color: Colors.white,
                     letterSpacing: 1.2,
@@ -647,9 +724,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             },
           ),
 
-          Spacer(),
-          // Fiyat kartı
-          if (item.pricingInfo.isNotEmpty) ...[
+          const Spacer(),
+
+          // Özel teklif kartı (fiyat yerine)
+          if (item.specialOffer.isNotEmpty) ...[
             Container(
               margin: EdgeInsets.only(bottom: context.dimensions.spaceM),
               padding: EdgeInsets.symmetric(
@@ -673,13 +751,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        CupertinoIcons.tag_fill,
+                        CupertinoIcons.gift_fill,
                         color: AppColors.primary,
                         size: context.dimensions.iconSizeXS,
                       ),
                       SizedBox(width: context.dimensions.spaceXXS),
                       Text(
-                        'ÖZEL FİYATLANDIRMA',
+                        'BAŞLANGIC HEDİYESİ',
                         style: AppTextTheme.captionL.copyWith(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w600,
@@ -689,7 +767,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   ),
                   SizedBox(height: context.dimensions.spaceXXS),
                   Text(
-                    item.pricingInfo,
+                    item.specialOffer,
                     textAlign: TextAlign.center,
                     style: AppTextTheme.headline4.copyWith(
                       color: AppColors.primary,
@@ -699,7 +777,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               ),
             ),
           ],
-          Spacer(),
+
+          const Spacer(),
+
           // Güven oluşturucu etiket
           Container(
             margin: EdgeInsets.only(bottom: context.dimensions.spaceXS),
@@ -707,13 +787,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                  CupertinoIcons.lock_shield_fill,
+                  CupertinoIcons.shield_fill,
                   color: Colors.grey[600],
                   size: context.dimensions.iconSizeXS,
                 ),
                 SizedBox(width: context.dimensions.spaceXS),
                 Text(
-                  'Güvenli ödeme • İstediğiniz zaman iptal',
+                  'Güvenli • Hızlı • Kolay Kullanım',
                   style: AppTextTheme.captionL.copyWith(
                     color: Colors.grey[600],
                   ),
@@ -785,7 +865,6 @@ class OnboardingItem {
   final String title;
   final String description;
   final IconData icon;
-  final bool isPremium;
   final double backgroundOpacity;
   final Color mainColor;
   final String? illustrationPath;
@@ -798,7 +877,6 @@ class OnboardingItem {
     required this.title,
     required this.description,
     required this.icon,
-    this.isPremium = false,
     this.backgroundOpacity = 0.2,
     this.mainColor = AppColors.primary,
     this.illustrationPath,

@@ -240,5 +240,9 @@
   "select_location_first": "Please select location information (province, district, neighborhood) first.",
   "provinces_loading": "Loading provinces...",
   "districts_loading": "Loading districts...",
-  "neighborhoods_loading": "Loading neighborhoods..."
+  "neighborhoods_loading": "Loading neighborhoods...",
+
+  "splash_title": "TatarAI",
+  "splash_subtitle": "AI Farming Assistant",
+  "splash_loading": "Loading..."
 } 

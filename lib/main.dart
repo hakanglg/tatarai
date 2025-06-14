@@ -1,470 +1,334 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
+// Core imports
 import 'package:tatarai/core/constants/app_constants.dart';
 import 'package:tatarai/core/constants/locale_constants.dart';
-import 'package:tatarai/core/extensions/string_extension.dart';
-import 'package:tatarai/core/extensions/context_extensions.dart';
-import 'package:tatarai/core/init/localization/language_manager.dart';
+import 'package:tatarai/core/init/app_initializer.dart';
 import 'package:tatarai/core/init/localization/localization_manager.dart';
-import 'package:tatarai/core/init/store_config.dart' as store;
-import 'package:tatarai/core/repositories/plant_analysis_repository.dart';
 import 'package:tatarai/core/routing/app_router.dart';
-import 'package:tatarai/core/services/firebase_manager.dart';
-import 'package:tatarai/core/services/remote_config_service.dart';
+import 'package:tatarai/core/services/service_locator.dart';
 import 'package:tatarai/core/theme/app_theme.dart';
 import 'package:tatarai/core/utils/logger.dart';
+// Feature imports
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
-import 'package:tatarai/core/repositories/user_repository.dart';
-import 'package:tatarai/features/auth/services/auth_service.dart';
-import 'package:tatarai/features/home/cubits/home_cubit.dart';
+import 'package:tatarai/features/auth/cubits/auth_state.dart';
 import 'package:tatarai/features/payment/cubits/payment_cubit.dart';
-import 'package:tatarai/features/plant_analysis/cubits/plant_analysis_cubit.dart';
-import 'package:tatarai/features/plant_analysis/services/gemini_service.dart';
-import 'package:tatarai/features/plant_analysis/services/plant_analysis_service.dart';
-import 'package:tatarai/features/profile/cubits/profile_cubit.dart';
-import 'package:tatarai/firebase_options.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/rendering.dart';
-import 'package:tatarai/core/utils/network_util.dart';
-import 'package:tatarai/core/utils/firebase_test_utils.dart';
-import 'package:purchases_flutter/purchases_flutter.dart';
-import 'package:tatarai/core/utils/version_util.dart';
-import 'package:firebase_remote_config/firebase_remote_config.dart';
 
-/// Uygulama başlangıç noktası
+/// TatarAI uygulamasının ana giriş noktası
+///
+/// ApplicationBootstrap kullanarak temiz bir başlatma süreci sağlar.
+/// Clean Architecture prensiplerine uygun modüler yapı.
 Future<void> main() async {
-  // Hata yakalama
+  // Global hata yakalama mekanizması
   runZonedGuarded(() async {
+    // Flutter framework başlatma
     WidgetsFlutterBinding.ensureInitialized();
 
-    // Debug özellikleri kapatılıyor
-    debugPaintSizeEnabled = false;
-    debugPaintBaselinesEnabled = false;
-    debugPaintLayerBordersEnabled = false;
-    debugPaintPointersEnabled = false;
+    AppLogger.i('🚀 TatarAI başlatılıyor...');
+    AppLogger.i(
+        '📱 Platform: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}');
 
-    // Network bağlantı izlemeyi başlat (Firebase'den önce)
-    NetworkUtil().startMonitoring();
+    // AppInitializer ile core servisleri başlat
+    final initializer = AppInitializer.instance;
 
-    // Çevre değişkenlerini yükle (Firebase'den önce)
     try {
-      await dotenv.load(fileName: ".env");
-      AppLogger.i('Çevre değişkenleri yüklendi');
-    } catch (e) {
-      AppLogger.e('Çevre değişkenleri yükleme hatası: $e');
+      // Ana initialize işlemi
+      AppLogger.i('🔄 AppInitializer.initializeApplication çağrılıyor...');
+      final bool success = await initializer.initializeApplication();
 
-      // .env dosyası yoksa veya yüklenemezse kullanıcıyı bilgilendir
-      if (kDebugMode) {
-        print('-------------------------------------------------------');
-        print('⚠️ .env DOSYASI BULUNAMADI VEYA YÜKLENEMEDİ! ⚠️');
-        print(
-            'Ödeme işlemleri çalışmayacak. .env dosyasını oluşturup aşağıdaki değeri eklediğinizden emin olun:');
-        print('REVENUECAT_IOS_API_KEY=your_api_key_here');
-        print('-------------------------------------------------------');
+      AppLogger.i('📊 Initialization sonucu: $success');
+      AppLogger.i('📊 IsInitialized: ${initializer.isInitialized}');
+      AppLogger.i('📊 LastError: ${initializer.lastError}');
+
+      if (success) {
+        AppLogger.i('✅ Application başlatma başarılı');
+      } else {
+        AppLogger.w(
+            '⚠️ Application kısmi başlatma - bazı servisler başarısız: ${initializer.lastError}');
       }
+
+      // Sistem ayarları
+      await initializer.configureSystemSettings();
+
+      // Debug ayarları
+      initializer.configureDebugSettings();
+
+      AppLogger.i('📊 Final IsInitialized: ${initializer.isInitialized}');
+    } catch (e, stackTrace) {
+      AppLogger.e('❌ Application başlatma hatası', e, stackTrace);
+      AppLogger.i(
+          '📊 Exception sonrası IsInitialized: ${initializer.isInitialized}');
+      // Hata olsa bile uygulamayı çalıştırmaya devam et
     }
-
-    // Localization Manager'ı başlat
-    await LocalizationManager.init();
-    AppLogger.i('Localization Manager başlatıldı');
-
-    // Firebase başlatma - daha sağlam hata yakalama ile
-    bool firebaseInitialized = false;
-    int retryCount = 0;
-    const int maxRetries = 3;
-
-    while (!firebaseInitialized && retryCount < maxRetries) {
-      try {
-        retryCount++;
-        AppLogger.i('Firebase başlatma denemesi $retryCount/$maxRetries');
-
-        await Firebase.initializeApp(
-          options: DefaultFirebaseOptions.currentPlatform,
-        );
-        AppLogger.i('Firebase Core başarıyla başlatıldı');
-
-        // Crashlytics'i başlat
-        await FirebaseCrashlytics.instance
-            .setCrashlyticsCollectionEnabled(!kDebugMode);
-
-        // Yakalanmayan Flutter hatalarını Crashlytics'e yönlendir
-        FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterError;
-
-        // Async hataları için Firebase Crashlytics entegrasyonu
-        PlatformDispatcher.instance.onError = (error, stack) {
-          FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-          return true;
-        };
-
-        AppLogger.i('Crashlytics başarıyla yapılandırıldı');
-
-        // Remote Config'i başlat (Main'de Bir Kez)
-        try {
-          AppLogger.i('Main: Remote Config başlatılıyor...');
-          await RemoteConfigService().initialize();
-          AppLogger.i('Main: Remote Config başarıyla başlatıldı');
-        } catch (rcError) {
-          AppLogger.e(
-              'Main: Remote Config başlatma hatası (yoksayılıyor)', rcError);
-          // Hata olsa bile devam ediyoruz
-        }
-
-        // Firebase testlerini çalıştır
-        try {
-          final testResults =
-              await FirebaseTestUtils.testAllFirebaseConnections();
-          if (testResults['success']) {
-            AppLogger.i('Firebase bağlantı testleri başarılı: $testResults');
-          } else {
-            AppLogger.w(
-                'Firebase bağlantı testlerinde sorunlar tespit edildi: $testResults');
-
-            if (!testResults['firestore_tatar-ai'] &&
-                testResults['firestore_default']) {
-              AppLogger.w(
-                  "'tatar-ai' veritabanına erişilemedi ancak varsayılan veritabanı çalışıyor. Uygulamaya devam ediliyor.");
-            }
-          }
-        } catch (testError) {
-          AppLogger.e('Firebase test hatası', testError);
-        }
-
-        firebaseInitialized = true;
-
-        // Firestore veritabanı bilgilerini kontrol et
-        try {
-          // "tatarai" veritabanı testi
-          final tatarDbSuccess =
-              await FirebaseTestUtils.testFirestoreConnection('tatarai');
-          if (tatarDbSuccess) {
-            AppLogger.i("'tatarai' veritabanı bağlantısı başarılı");
-          } else {
-            AppLogger.w(
-                "'tatarai' veritabanına bağlanılamadı, varsayılan veritabanı kullanılacak");
-
-            // Varsayılan veritabanını dene
-            final defaultDbSuccess =
-                await FirebaseTestUtils.testFirestoreConnection('');
-            if (defaultDbSuccess) {
-              AppLogger.i("Varsayılan veritabanı bağlantısı başarılı");
-            } else {
-              AppLogger.e("Hiçbir Firestore veritabanına bağlanılamadı!");
-            }
-          }
-        } catch (dbTestError) {
-          AppLogger.e('Veritabanı test hatası', dbTestError);
-        }
-
-        // Firebase yöneticisini başlat
-        final firebaseManager = FirebaseManager();
-        // Başlatılırken hataları yakala
-        await firebaseManager.initialize().catchError((e) {
-          AppLogger.e('FirebaseManager başlatma hatası', e);
-        });
-
-        // Kullanıcının kimlik doğrulama durumunu kontrol et
-        final _ = firebaseManager.auth;
-      } catch (e, stackTrace) {
-        AppLogger.e(
-            'Firebase Core başlatma hatası (deneme $retryCount/$maxRetries)',
-            e,
-            stackTrace);
-
-        if (retryCount >= maxRetries) {
-          // Maksimum yeniden deneme sayısına ulaşıldı, devam et
-          AppLogger.w(
-              'Firebase başlatılamadı, uygulama sınırlı modda çalışacak');
-        } else {
-          // Kısa bir bekleme süresi sonra tekrar dene
-          await Future.delayed(Duration(seconds: retryCount * 2));
-        }
-      }
-    }
-
-    // Sistem ayarları
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
-
-    // Hata ayıklama modunda performans optimizasyonları
-    if (kDebugMode) {
-      debugPrint = (String? message, {int? wrapWidth}) {
-        if (message != null) {
-          AppLogger.d(message);
-        }
-      };
-    }
-
-    // RevenueCat'i başlat
-    await initRevenueCat();
 
     // Uygulamayı başlat
+    AppLogger.i('🏁 TatarAI uygulaması çalıştırılıyor');
     runApp(const TatarAI());
-  }, (error, stack) {
-    AppLogger.e('Yakalanmamış hata', error, stack);
-
-    // Crashlytics'e yakalanmamış hataları bildir
-    try {
-      FirebaseCrashlytics.instance.recordError(error, stack,
-          reason: 'Yakalanmamış uygulama hatası', fatal: true);
-    } catch (e) {
-      // Firebase başlatılamamış olabilir, sessizce geç
-      AppLogger.e('Crashlytics\'e hata bildirilemedi', e);
-    }
+  }, (error, stackTrace) {
+    // Global hata işleme - AppInitializer'a delegate et
+    AppInitializer.instance.handleGlobalError(error, stackTrace);
   });
 }
 
-/// RevenueCat yapılandırmasını başlatır
-Future<bool> initRevenueCat() async {
-  try {
-    AppLogger.i('RevenueCat başlatılıyor...');
-
-    // Log seviyesini ayarla (Debug için faydalı)
-    await Purchases.setLogLevel(LogLevel.debug);
-    AppLogger.i('RevenueCat: Log seviyesi ayarlandı');
-
-    // API anahtarını al ve kontrol et
-    String apiKey = '';
-
-    if (Platform.isIOS) {
-      apiKey = AppConstants.revenueiOSApiKey;
-      if (apiKey.isEmpty) {
-        AppLogger.e(
-            'RevenueCat: iOS API anahtarı boş! .env dosyasında REVENUECAT_IOS_API_KEY tanımlanmamış.');
-        _showDevelopmentModeMissingKeyMessage('iOS');
-        return false;
-      }
-    } else if (Platform.isAndroid) {
-      // Şu an için iOS anahtarını kullanıyoruz, daha sonra Android için ayrı anahtar eklenebilir
-      apiKey = AppConstants.revenueiOSApiKey;
-      if (apiKey.isEmpty) {
-        AppLogger.e(
-            'RevenueCat: Android API anahtarı boş! .env dosyasında REVENUECAT_IOS_API_KEY tanımlanmamış.');
-        _showDevelopmentModeMissingKeyMessage('Android');
-        return false;
-      }
-    } else {
-      AppLogger.e(
-          'RevenueCat: Desteklenmeyen platform! (${Platform.operatingSystem})');
-      return false;
-    }
-
-    // RevenueCat'i yapılandır
-    PurchasesConfiguration configuration = PurchasesConfiguration(apiKey);
-    await Purchases.configure(configuration);
-    AppLogger.i('RevenueCat: Yapılandırma başarılı');
-
-    // Oturum açmış kullanıcı varsa RevenueCat'e bildir
-    _syncUserWithRevenueCat();
-
-    return true;
-  } catch (e) {
-    AppLogger.e('RevenueCat başlatma hatası: $e');
-    return false;
-  }
-}
-
-/// Kullanıcıyı RevenueCat ile senkronize eder
-Future<void> _syncUserWithRevenueCat() async {
-  try {
-    final auth = FirebaseManager().auth;
-    final currentUser = auth?.currentUser;
-
-    if (currentUser != null) {
-      final uid = currentUser.uid;
-      AppLogger.i(
-          'RevenueCat: Kullanıcı senkronizasyonu başlatılıyor (uid: $uid)');
-
-      try {
-        await Purchases.logIn(uid);
-        AppLogger.i('RevenueCat: Kullanıcı senkronizasyonu başarılı');
-      } catch (e) {
-        AppLogger.e('RevenueCat: Kullanıcı senkronizasyonu hatası: $e');
-      }
-    } else {
-      AppLogger.i(
-          'RevenueCat: Oturum açmış kullanıcı bulunmadığı için senkronizasyon atlanıyor');
-    }
-  } catch (e) {
-    AppLogger.w('RevenueCat: Kullanıcı kontrolü sırasında hata: $e');
-  }
-}
-
-/// Geliştirme modunda RevenueCat API anahtarı eksikliği için mesaj gösterir
-void _showDevelopmentModeMissingKeyMessage(String platform) {
-  if (kDebugMode) {
-    print('-------------------------------------------------------');
-    print('⚠️ REVENUECAT API ANAHTARI BULUNAMADI! ⚠️');
-    print('$platform için RevenueCat API anahtarı bulunamadı veya boş.');
-    print(
-        'Ödeme işlemleri çalışmayacak. .env dosyasını oluşturup aşağıdaki değeri eklediğinizden emin olun:');
-    print('REVENUECAT_IOS_API_KEY=your_api_key_here');
-    print('-------------------------------------------------------');
-  }
-}
-
-/// TatarAI uygulaması
+/// TatarAI ana widget - temiz ve sadeleştirilmiş yapı
 class TatarAI extends StatefulWidget {
-  /// Constructor
-  const TatarAI({Key? key}) : super(key: key);
+  const TatarAI({super.key});
 
   @override
   State<TatarAI> createState() => _TatarAIState();
 }
 
 class _TatarAIState extends State<TatarAI> {
-  final FirebaseManager _firebaseManager = FirebaseManager();
-  String? _firebaseError;
+  bool _forceBypass = false; // Debug için zorla bypass flag'i
 
   @override
   void initState() {
     super.initState();
-    _initializeFirebaseManager();
+    _waitForInitialization();
   }
 
-  Future<void> _initializeFirebaseManager() async {
-    try {
-      await _firebaseManager.initialize();
-    } catch (e) {
-      setState(() {
-        _firebaseError = e.toString();
-      });
-      AppLogger.e('Firebase Manager başlatma hatası', e);
+  /// AppInitializer'ın tamamlanmasını bekler ve UI'yi günceller
+  void _waitForInitialization() async {
+    AppLogger.i('🔄 AppInitializer tamamlanması bekleniyor...');
+
+    // Eğer zaten initialize edilmişse direkt devam et
+    if (AppInitializer.instance.isInitialized) {
+      AppLogger.i('✅ AppInitializer zaten hazır');
+      setState(() {});
+      return;
+    }
+
+    // Timeout mekanizması - maksimum 30 saniye bekle
+    const timeoutDuration = Duration(seconds: 30);
+    const checkInterval = Duration(milliseconds: 500);
+    final startTime = DateTime.now();
+
+    // Initialize edilene kadar bekle (polling)
+    while (!AppInitializer.instance.isInitialized && mounted) {
+      await Future.delayed(checkInterval);
+      final elapsed = DateTime.now().difference(startTime);
+      AppLogger.d(
+          '⏳ AppInitializer durumu kontrol ediliyor... (Geçen süre: ${elapsed.inSeconds}s)');
+      AppLogger.d(
+          '📊 Current isInitialized: ${AppInitializer.instance.isInitialized}');
+      AppLogger.d('📊 Current lastError: ${AppInitializer.instance.lastError}');
+
+      // Timeout kontrolü
+      if (elapsed > timeoutDuration) {
+        AppLogger.w(
+            '⚠️ AppInitializer timeout oluştu, hata ile devam ediliyor');
+        AppLogger.w(
+            '📊 Timeout sonrası isInitialized: ${AppInitializer.instance.isInitialized}');
+        AppLogger.w(
+            '📊 Timeout sonrası lastError: ${AppInitializer.instance.lastError}');
+
+        // Timeout durumunda hata mesajı ile UI'yi güncelle
+        if (mounted) {
+          setState(() {});
+        }
+        return;
+      }
+    }
+
+    // Initialize tamamlandıysa UI'yi güncelle
+    if (mounted) {
+      if (AppInitializer.instance.isInitialized) {
+        AppLogger.i('🎉 AppInitializer tamamlandı, UI güncelleniyor');
+      } else {
+        AppLogger.w('⚠️ AppInitializer tamamlanamadı');
+      }
+      setState(() {});
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<Locale>(
-      valueListenable: LocalizationManager.instance.currentLocaleNotifier,
-      builder: (context, locale, child) {
-        // Normal Firebase başlatılmış durum için uygulama UI'ı
-        // Bağımlılıklar - State içindeki _firebaseManager referansını kullan
-        final authService = AuthService(firebaseManager: _firebaseManager);
-        final userRepository = UserRepository(authService: authService);
+    AppLogger.i('🎨 TatarAI widget build başladı');
+    AppLogger.i(
+        '📊 Build sırasında isInitialized: ${AppInitializer.instance.isInitialized}');
 
-        // Gemini servisi
-        final geminiService = GeminiService();
+    // AppInitializer henüz hazır değilse loading göster (bypass kontrolü dahil)
+    if (!AppInitializer.instance.isInitialized && !_forceBypass) {
+      return _buildLoadingApp();
+    }
 
-        // Bitki analiz servisi
-        final plantAnalysisService = PlantAnalysisService(
-          geminiService: geminiService,
-          firestore: _firebaseManager.firestore,
-          storage: _firebaseManager.storage,
-          authService: authService,
-        );
+    // Ana uygulama yapısı
+    return _buildMainApp();
+  }
 
-        final plantAnalysisRepository = PlantAnalysisRepository(
-          geminiService: geminiService,
-          plantAnalysisService: plantAnalysisService,
-          authService: authService,
-        );
+  /// Loading ekranı
+  Widget _buildLoadingApp() {
+    AppLogger.i('⏳ AppInitializer henüz hazır değil, loading gösteriliyor');
 
-        // Önce AppLocalizations'ı yükleyip oluşturalım
-        final appLocalizations = AppLocalizations(locale);
+    // AppInitializer status kontrolü
+    final initializerStatus = AppInitializer.instance.getStatus();
+    final hasError = AppInitializer.instance.lastError != null;
 
-        return FutureBuilder<bool>(
-          // AppLocalizations yüklenmesini bekleyelim
-          future: appLocalizations.load(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              // Yüklenirken gösterilecek ekran
-              return const Material(
-                child: Center(
-                  child: CircularProgressIndicator(),
-                ),
-              );
-            }
+    return MaterialApp(
+      title: AppConstants.appName,
+      theme: AppTheme.materialTheme,
+      home: Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Logo veya ikon ekleyebiliriz
+                const CircularProgressIndicator(),
+                const SizedBox(height: 24),
 
-            return MultiBlocProvider(
-              providers: [
-                BlocProvider<AuthCubit>(
-                  create: (context) => AuthCubit(
-                    userRepository: userRepository,
-                    authService: authService,
+                // Ana başlık
+                Text(
+                  hasError ? 'Başlatma Sorunu' : 'TatarAI Başlatılıyor...',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
                   ),
+                  textAlign: TextAlign.center,
                 ),
-                BlocProvider<PaymentCubit>(
-                  create: (context) => PaymentCubit(),
-                ),
-                BlocProvider<PlantAnalysisCubit>(
-                  create: (context) => PlantAnalysisCubit(
-                    repository: plantAnalysisRepository,
-                    authCubit: BlocProvider.of<AuthCubit>(context),
-                    userRepository: userRepository,
+                const SizedBox(height: 12),
+
+                // Durum mesajı
+                Text(
+                  hasError
+                      ? 'Uygulama başlatılırken bir sorun oluştu.\nLütfen bekleyin veya uygulamayı yeniden başlatın.'
+                      : 'Servisler yükleniyor, lütfen bekleyin...',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: hasError ? Colors.red[600] : Colors.grey[600],
                   ),
+                  textAlign: TextAlign.center,
                 ),
-                BlocProvider<ProfileCubit>(
-                  create: (context) => ProfileCubit(
-                    userRepository: userRepository,
-                    authCubit: BlocProvider.of<AuthCubit>(context),
+
+                // Hata durumunda daha detaylı bilgi
+                if (hasError) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red[200]!),
+                    ),
+                    child: Text(
+                      'Hata: ${AppInitializer.instance.lastError}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.red[800],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
-                ),
-                BlocProvider<HomeCubit>(
-                  create: (context) => HomeCubit(
-                    userRepository: userRepository,
-                    plantAnalysisRepository: plantAnalysisRepository,
+                ],
+
+                // Debug için zorla devam etme butonu
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () {
+                    AppLogger.w('🚨 ZORLA DEVAM EDİLİYOR - Debug amaçlı');
+                    // Zorla bypass flag'ini aktif et
+                    _forceBypass = true;
+                    setState(() {});
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: hasError ? Colors.orange : Colors.blue,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: Text(
+                    hasError ? 'Zorla Devam Et' : 'Debug: Ana Sayfaya Git',
+                    style: const TextStyle(fontSize: 14),
                   ),
                 ),
               ],
-              child: Builder(builder: (context) {
-                // Buradan artık BlocProvider üzerinden AuthCubit'e erişebiliriz
-                return MaterialApp.router(
-                  title: AppConstants.appName,
-                  debugShowCheckedModeBanner: false,
-                  theme: AppTheme.materialTheme,
-                  darkTheme: AppTheme.materialTheme.copyWith(
-                    colorScheme: AppTheme.darkColorScheme,
-                    brightness: Brightness.dark,
-                  ),
-                  themeMode: ThemeMode.light,
-                  routerConfig: AppRouter(
-                    authCubit: BlocProvider.of<AuthCubit>(context),
-                  ).router,
-                  // Localization desteği ekle
-                  locale: locale,
-                  supportedLocales: LocaleConstants.supportedLocales,
-                  localizationsDelegates: const [
-                    AppLocalizations.delegate,
-                    GlobalMaterialLocalizations.delegate,
-                    GlobalWidgetsLocalizations.delegate,
-                    GlobalCupertinoLocalizations.delegate,
-                  ],
-                  localeResolutionCallback: (deviceLocale, supportedLocales) {
-                    // Cihaz dilini kontrol et
-                    for (var locale in supportedLocales) {
-                      if (locale.languageCode == deviceLocale?.languageCode) {
-                        return locale;
-                      }
-                    }
-                    // Desteklenmeyen dil ise varsayılan dil
-                    return LocaleConstants.fallbackLocale;
-                  },
-                );
-              }),
-            );
-          },
-        );
-      },
+            ),
+          ),
+        ),
+      ),
     );
   }
-}
 
-// Premium ekranını açmak için kullanılabilecek yardımcı fonksiyon
-Future<PaywallResult?> openPremiumPaywall(BuildContext context) async {
-  try {
-    return await context.showPaywall();
-  } catch (e) {
-    AppLogger.e('Premium ekranı açılırken hata oluştu: $e');
-    return null;
+  /// Ana uygulama yapısı
+  Widget _buildMainApp() {
+    AppLogger.i('🏗️ Ana uygulama yapısı oluşturuluyor');
+
+    // Kritik servislerin hazır olup olmadığını kontrol et
+    if (!AppInitializer.instance.isInitialized) {
+      AppLogger.w(
+          '⚠️ AppInitializer henüz tamamlanmadı ama ana uygulama başlatılıyor');
+    }
+
+    return MultiBlocProvider(
+      providers: _buildBlocProviders(),
+      child: BlocBuilder<AuthCubit, AuthState>(
+        builder: (context, authState) {
+          AppLogger.i(
+              '📱 MaterialApp build - Auth State: ${authState.runtimeType}');
+
+          return MaterialApp.router(
+            title: AppConstants.appName,
+            debugShowCheckedModeBanner: false,
+
+            // Theme configuration
+            theme: AppTheme.materialTheme,
+            darkTheme: AppTheme.materialTheme.copyWith(
+              colorScheme: AppTheme.darkColorScheme,
+              brightness: Brightness.dark,
+            ),
+            themeMode: ThemeMode.light,
+
+            // Router configuration
+            routerConfig: AppRouter(
+              authCubit: BlocProvider.of<AuthCubit>(context),
+            ).router,
+
+            // Localization configuration
+            locale: LocalizationManager.instance.currentLocaleNotifier.value,
+            supportedLocales: LocaleConstants.supportedLocales,
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  /// BlocProvider'ları oluştur - ServiceLocator tabanlı
+  List<BlocProvider> _buildBlocProviders() {
+    AppLogger.i('🔧 BlocProvider\'lar oluşturuluyor');
+
+    return [
+      // Auth Cubit - ServiceLocator'dan
+      BlocProvider<AuthCubit>(
+        create: (context) {
+          AppLogger.i('🏗️ AuthCubit ServiceLocator\'dan oluşturuluyor');
+          try {
+            final authCubit = AuthCubit();
+            AppLogger.i('✅ AuthCubit başarıyla oluşturuldu');
+            return authCubit;
+          } catch (e, stackTrace) {
+            AppLogger.e('❌ AuthCubit oluşturma hatası', e, stackTrace);
+            // Hata durumunda da AuthCubit döndür (fallback mekanizması devreye girecek)
+            return AuthCubit();
+          }
+        },
+        lazy: false, // Hemen başlat
+      ),
+
+      // Payment Cubit - ServiceLocator'dan
+      BlocProvider<PaymentCubit>(
+        create: (context) {
+          AppLogger.i('🏗️ PaymentCubit ServiceLocator\'dan oluşturuluyor');
+          return Services.paymentCubit;
+        },
+        lazy: true, // Gerektiğinde başlat
+      ),
+    ];
   }
 }

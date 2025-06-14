@@ -1,27 +1,39 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:tatarai/core/base/base_state_widget.dart';
-import 'package:tatarai/core/routing/route_names.dart';
-import 'package:tatarai/core/routing/route_paths.dart';
-import 'package:tatarai/core/theme/color_scheme.dart';
-import 'package:tatarai/core/theme/text_theme.dart';
-import 'package:tatarai/core/utils/logger.dart';
-import 'package:tatarai/core/services/remote_config_service.dart';
-import 'package:tatarai/core/utils/semantic_version.dart';
-import 'package:tatarai/core/utils/version_util.dart';
-import 'package:tatarai/features/auth/cubits/auth_state.dart';
-import 'package:tatarai/features/update/views/force_update_screen.dart';
-import 'package:tatarai/features/update/views/update_dialog.dart';
-import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
-import 'package:tatarai/features/navbar/navigation_manager.dart';
-import 'package:flutter/foundation.dart';
-import 'package:package_info_plus/package_info_plus.dart';
+import 'package:sprung/sprung.dart';
 
+import '../../../core/base/base_state_widget.dart';
+import '../../../core/extensions/string_extension.dart';
+import '../../../core/init/app_initializer.dart';
+import '../../../core/routing/route_names.dart';
+import '../../../core/routing/route_paths.dart';
+import '../../../core/theme/color_scheme.dart';
+import '../../../core/theme/text_theme.dart';
+import '../../../core/utils/logger.dart';
+import '../../auth/cubits/auth_cubit.dart';
+import '../../auth/cubits/auth_state.dart';
+import '../../update/views/force_update_screen.dart';
+import '../../update/views/update_dialog.dart';
+import '../constants/splash_constants.dart';
+import '../services/splash_service.dart';
+import '../widgets/splash_logo_widget.dart';
+
+/// TatarAI uygulamasının giriş ekranı
+///
+/// Bu ekran uygulama başlangıcında gösterilir ve aşağıdaki işlemleri gerçekleştirir:
+/// - AppInitializer durumu kontrolü
+/// - Versiyon kontrolü ve güncelleme yönlendirmesi
+/// - Authentication durumu kontrolü
+/// - Onboarding kontrolü ve yönlendirme
+/// - Animasyonlu logo gösterimi
+///
+/// Clean Architecture prensiplerine uygun olarak business logic
+/// SplashService'e taşınmış, UI sadece presentation layer'ı içerir.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -31,286 +43,466 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends BaseState<SplashScreen>
     with SingleTickerProviderStateMixin {
+  // ============================================================================
+  // ANIMATION PROPERTIES
+  // ============================================================================
+
   late AnimationController _animationController;
-  late Animation<double> _animation;
-  Timer? _timeoutTimer;
-  bool _navigationStarted = false;
-  StreamSubscription? _authSubscription;
+  late Animation<double> _scaleAnimation;
+
+  // ============================================================================
+  // SERVICE DEPENDENCIES
+  // ============================================================================
+
+  final SplashService _splashService = SplashService.instance;
+
+  // ============================================================================
+  // STREAM SUBSCRIPTIONS
+  // ============================================================================
+
+  StreamSubscription<AuthState>? _authSubscription;
 
   @override
   void initState() {
     super.initState();
+    AppLogger.i('🚀 SplashScreen başlatılıyor');
 
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    );
-
-    _animation = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeOutBack),
-    );
-
-    _animationController.forward();
-    _startInitialization();
-    _setupTimeoutTimer();
-  }
-
-  void _setupTimeoutTimer() {
-    _timeoutTimer?.cancel();
-    _timeoutTimer = Timer(const Duration(milliseconds: 2000), () {
-      AppLogger.w('Splash ekranı timeout - uygulamaya zorla devam ediliyor');
-      runIfMounted(_checkVersionAndNavigate, 'Timeout yönlendirme hatası');
-    });
+    _initializeAnimations();
+    _startSplashFlow();
   }
 
   @override
   void dispose() {
-    _animationController.dispose();
-    _timeoutTimer?.cancel();
-    _authSubscription?.cancel();
+    _disposeResources();
     super.dispose();
   }
 
-  Future<void> _checkVersionAndNavigate() async {
-    if (_navigationStarted) return;
+  // ============================================================================
+  // INITIALIZATION METHODS
+  // ============================================================================
 
-    setStateIfMounted(() {
-      _navigationStarted = true;
-    });
+  /// Animasyonları başlatır
+  void _initializeAnimations() {
+    _animationController = AnimationController(
+      duration: SplashConstants.logoAnimationDuration,
+      vsync: this,
+    );
 
-    final forceNavigateTimer = Timer(const Duration(seconds: 5), () {
-      AppLogger.w('Versiyon kontrol zaman aşımı – devam ediliyor.');
-      if (mounted) _navigateToNextScreen();
-    });
+    _scaleAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Sprung.underDamped,
+    ));
 
-    try {
-      AppLogger.i('Versiyon kontrolü yapılıyor...');
+    _animationController.forward();
+    AppLogger.i('✨ Splash animasyonları başlatıldı');
+  }
 
-      // Remote Config başlatma işlemi main.dart'ta yapıldığı için
-      // burada sadece config değerlerini alıyoruz
-      final packageInfo = await PackageInfo.fromPlatform();
-      final isAndroid = defaultTargetPlatform == TargetPlatform.android;
-      final locale = Localizations.localeOf(context).languageCode;
+  /// Ana splash flow'unu başlatır
+  void _startSplashFlow() {
+    // Timeout mekanizması başlat
+    _splashService.startInitializationTimeout(
+      onTimeout: _handleTimeout,
+    );
 
-      final config = RemoteConfigService().getUpdateConfig(
-        isAndroid: isAndroid,
-        locale: locale,
-      );
+    // AppInitializer durumunu kontrol et
+    _checkAppInitializerStatus();
+  }
 
-      // Debug mode kontrolü - geliştirme sırasında test için
-      if (kDebugMode) {
-        final testMode = false; // Test etmek için true yapın
+  /// Kaynakları temizler
+  void _disposeResources() {
+    _animationController.dispose();
+    _authSubscription?.cancel();
+    _splashService.dispose();
+    AppLogger.i('🧹 SplashScreen kaynakları temizlendi');
+  }
 
-        if (testMode) {
-          final testCase = 2; // 1: force update, 2: optional update
+  // ============================================================================
+  // APP INITIALIZER METHODS
+  // ============================================================================
 
-          AppLogger.i('DEBUG: Test modu etkin - Test case: $testCase');
-          forceNavigateTimer.cancel();
+  /// AppInitializer durumunu kontrol eder
+  void _checkAppInitializerStatus() {
+    if (_splashService.isAppReady) {
+      AppLogger.i('✅ AppInitializer hazır, auth kontrolüne geçiliyor');
+      _splashService.cancelTimeout();
+      _startAuthFlow();
+    } else {
+      AppLogger.i('⏳ AppInitializer bekleniyor...');
+      _waitForAppInitializer();
+    }
+  }
 
-          if (testCase == 1) {
-            if (!mounted) return;
-            context.pushReplacement(RoutePaths.forceUpdate, extra: config);
-            return;
-          } else if (testCase == 2) {
-            if (mounted) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) {
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (_) => UpdateDialog(config: config),
-                  ).then((_) {
-                    _navigateToNextScreen();
-                  });
-                }
-              });
-              return;
-            }
-          }
-        }
-      }
-
-      final currentVersion = SemanticVersion.fromString(packageInfo.version);
-      final minVersion = SemanticVersion.fromString(config.minVersion);
-      final latestVersion = SemanticVersion.fromString(config.latestVersion);
-
-      forceNavigateTimer.cancel();
-
-      // Tüm versiyon bilgilerini ve karşılaştırma sonuçlarını detaylı logla
-      final isForceRequired = VersionUtil.isForceUpdateRequired(
-          current: currentVersion, minRequired: minVersion);
-
-      final isOptionalAvailable = VersionUtil.isOptionalUpdateAvailable(
-          current: currentVersion, latest: latestVersion);
-
-      AppLogger.i(
-          'Versiyon karşılaştırması: mevcut=$currentVersion, minimum=$minVersion, en son=$latestVersion, ' +
-              'zorunlu güncelleme gerekli: $isForceRequired, opsiyonel güncelleme mevcut: $isOptionalAvailable');
-
-      if (isForceRequired) {
-        AppLogger.w('Zorunlu güncelleme gerekli');
-        if (!mounted) return;
-
-        // Navigator yerine GoRouter kullan
-        context.pushReplacement(RoutePaths.forceUpdate, extra: config);
+  /// AppInitializer'ın hazır olmasını bekler
+  void _waitForAppInitializer() {
+    Timer.periodic(const Duration(milliseconds: 100), (timer) {
+      if (!mounted) {
+        timer.cancel();
         return;
       }
 
-      if (isOptionalAvailable) {
-        AppLogger.i('Opsiyonel güncelleme mevcut, dialog gösteriliyor...');
-        if (mounted) {
-          // Ana ekrana geçmeden önce dialog göstermek için navigasyonu geciktir
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (_) => UpdateDialog(config: config),
-              ).then((_) {
-                // Dialog kapatıldıktan sonra ana ekrana git
-                _navigateToNextScreen();
-              });
-            }
-          });
-          return; // Dialog gösterildikten sonra burada dur, _navigateToNextScreen zaten dialog kapatılınca çağrılacak
-        }
+      if (_splashService.isAppReady) {
+        timer.cancel();
+        AppLogger.i('✅ AppInitializer hazır oldu');
+        _splashService.cancelTimeout();
+        _startAuthFlow();
       }
-
-      _navigateToNextScreen();
-    } catch (e, stack) {
-      forceNavigateTimer.cancel();
-      AppLogger.e('Versiyon kontrolü başarısız', e, stack);
-      _navigateToNextScreen();
-    }
+    });
   }
 
-  void _navigateToNextScreen() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final onboardingCompleted =
-          prefs.getBool('onboarding_completed') ?? false;
+  // ============================================================================
+  // AUTHENTICATION FLOW METHODS
+  // ============================================================================
 
-      if (!mounted) return;
-
-      if (!onboardingCompleted) {
-        AppLogger.i(
-            'Onboarding tamamlanmamış, onboarding ekranına yönlendiriliyor');
-        context.goNamed(RouteNames.onboarding);
-      } else {
-        final authState = context.read<AuthCubit>().state;
-        if (authState.isAuthenticated) {
-          AppLogger.i('Kullanıcı giriş yapmış, ana sayfaya yönlendiriliyor');
-          NavigationManager.initialize(initialIndex: 0);
-          context.goNamed(RouteNames.home);
-        } else {
-          AppLogger.i(
-              'Kullanıcı giriş yapmamış, giriş sayfasına yönlendiriliyor');
-          context.goNamed(RouteNames.login);
-        }
-      }
-    } catch (e) {
-      AppLogger.e('Yönlendirme hatası', e);
-      if (mounted) {
-        context.goNamed(RouteNames.login);
-      }
-    }
-  }
-
-  void _startInitialization() {
-    runFutureSafe<void>(
-      Future<void>(() async {
-        _authSubscription = context.read<AuthCubit>().stream.listen(
-          (authState) {
-            runIfMounted(() {
-              if (_navigationStarted) return;
-              if (authState.status != AuthStatus.initial) {
-                AppLogger.i('Auth durumu güncellendi: ${authState.status}');
-                _timeoutTimer?.cancel();
-                _checkVersionAndNavigate();
-              }
-            });
-          },
-          onError: (error, stack) {
-            AppLogger.e('Auth dinleme hatası', error, stack);
-            runIfMounted(_checkVersionAndNavigate);
-          },
+  /// Authentication flow'unu başlatır
+  void _startAuthFlow() {
+    _authSubscription = context.read<AuthCubit>().stream.listen(
+          _handleAuthStateChange,
+          onError: _handleAuthError,
         );
 
-        final currentState = context.read<AuthCubit>().state;
-        AppLogger.i('Mevcut auth durumu: ${currentState.status}');
-        if (currentState.status != AuthStatus.initial) {
-          AppLogger.i('Auth hazır: ${currentState.status}');
-          _timeoutTimer?.cancel();
-          _checkVersionAndNavigate();
-        }
-      }),
-      onError: (error, stack) {
-        AppLogger.e('Splash initialization error', error, stack);
-        _checkVersionAndNavigate();
-      },
-      errorMessage: 'Splash initialization error',
+    // Mevcut auth durumunu kontrol et
+    final currentAuthState = context.read<AuthCubit>().state;
+    _handleAuthStateChange(currentAuthState);
+  }
+
+  /// Auth state değişikliklerini işler
+  Future<void> _handleAuthStateChange(AuthState authState) async {
+    if (_splashService.isNavigationStarted) return;
+
+    await runFutureSafe<void>(
+      _processAuthStateChange(),
+      errorMessage: 'Auth state change işleme hatası',
     );
   }
 
+  /// Auth state değişikliğini işler
+  Future<void> _processAuthStateChange() async {
+    final authState = context.read<AuthCubit>().state;
+    final navigationType =
+        await _splashService.checkAuthAndGetNavigation(authState);
+
+    switch (navigationType) {
+      case SplashNavigationType.wait:
+        // Bekle, henüz hazır değil
+        break;
+
+      case SplashNavigationType.signInAnonymously:
+        await _performAnonymousSignIn();
+        break;
+
+      case SplashNavigationType.home:
+        await _checkVersionAndNavigate();
+        break;
+
+      default:
+        AppLogger.w('⚠️ Beklenmeyen navigation tipi: $navigationType');
+        await _checkVersionAndNavigate();
+        break;
+    }
+  }
+
+  /// Auth hatalarını işler
+  void _handleAuthError(dynamic error, StackTrace stackTrace) {
+    AppLogger.e('❌ Auth stream hatası', error, stackTrace);
+    runIfMounted(() async {
+      await _performAnonymousSignIn();
+    });
+  }
+
+  /// Anonim giriş gerçekleştirir
+  Future<void> _performAnonymousSignIn() async {
+    try {
+      AppLogger.i('🔐 Anonim giriş yapılıyor...');
+      final authCubit = context.read<AuthCubit>();
+      await authCubit.signInAnonymously();
+    } catch (e) {
+      AppLogger.e('❌ Anonim giriş hatası', e);
+      // Hata durumunda da devam et
+      await _checkVersionAndNavigate();
+    }
+  }
+
+  // ============================================================================
+  // VERSION CHECK AND NAVIGATION METHODS
+  // ============================================================================
+
+  /// Versiyon kontrolü yapar ve uygun ekrana yönlendirir
+  Future<void> _checkVersionAndNavigate() async {
+    try {
+      final locale = Localizations.localeOf(context).languageCode;
+      final isAndroid = defaultTargetPlatform == TargetPlatform.android;
+
+      final navigationType = await _splashService.checkVersionAndGetNavigation(
+        locale: locale,
+        isAndroid: isAndroid,
+      );
+
+      await _handleNavigationType(navigationType);
+    } catch (e, stackTrace) {
+      AppLogger.e('❌ Versiyon kontrolü hatası', e, stackTrace);
+      await _navigateToNextScreen();
+    }
+  }
+
+  /// Navigation tipine göre yönlendirme yapar
+  Future<void> _handleNavigationType(
+      SplashNavigationType navigationType) async {
+    if (!mounted) return;
+
+    switch (navigationType) {
+      case SplashNavigationType.forceUpdate:
+        await _showForceUpdateScreen();
+        break;
+
+      case SplashNavigationType.optionalUpdate:
+        await _showOptionalUpdateDialog();
+        break;
+
+      case SplashNavigationType.continueFlow:
+        await _navigateToNextScreen();
+        break;
+
+      default:
+        AppLogger.w('⚠️ Beklenmeyen navigation tipi: $navigationType');
+        await _navigateToNextScreen();
+        break;
+    }
+  }
+
+  /// Zorunlu güncelleme ekranını gösterir
+  Future<void> _showForceUpdateScreen() async {
+    try {
+      AppLogger.i('🔄 Zorunlu güncelleme ekranına yönlendiriliyor');
+      // TODO: Update config'i geç
+      context.pushReplacement(RoutePaths.forceUpdate);
+    } catch (e) {
+      AppLogger.e('❌ Force update screen hatası', e);
+      await _navigateToNextScreen();
+    }
+  }
+
+  /// Opsiyonel güncelleme dialog'unu gösterir
+  Future<void> _showOptionalUpdateDialog() async {
+    try {
+      AppLogger.i('📦 Opsiyonel güncelleme dialog\'u gösteriliyor');
+
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            showDialog<void>(
+              context: context,
+              barrierDismissible: false,
+              // TODO: Update config'i geç - şimdilik dialog kapatılınca devam et
+              builder: (_) => AlertDialog(
+                title: const Text('Güncelleme Mevcut'),
+                content: const Text(
+                    'Yeni bir sürüm mevcut. Güncellemek ister misiniz?'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Şimdi Değil'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Güncelle'),
+                  ),
+                ],
+              ),
+            ).then((_) {
+              _navigateToNextScreen();
+            });
+          }
+        });
+      }
+    } catch (e) {
+      AppLogger.e('❌ Optional update dialog hatası', e);
+      await _navigateToNextScreen();
+    }
+  }
+
+  // ============================================================================
+  // FINAL NAVIGATION METHODS
+  // ============================================================================
+
+  /// Sonraki ekrana yönlendirir (onboarding veya home)
+  Future<void> _navigateToNextScreen() async {
+    try {
+      AppLogger.i('🧭 Sonraki ekrana yönlendirme başlatılıyor');
+
+      // Navigation flag'ini set et
+      _splashService.setNavigationStarted();
+
+      final isOnboardingCompleted =
+          await _splashService.isOnboardingCompleted();
+
+      if (!mounted) return;
+
+      if (!isOnboardingCompleted) {
+        _navigateToOnboarding();
+      } else {
+        _navigateToHome();
+      }
+    } catch (e, stackTrace) {
+      AppLogger.e('❌ Final navigation hatası', e, stackTrace);
+      _handleNavigationError();
+    }
+  }
+
+  /// Onboarding ekranına yönlendirir
+  void _navigateToOnboarding() {
+    try {
+      AppLogger.i('📚 Onboarding ekranına yönlendiriliyor');
+
+      // Navigation flag'ini set et
+      _splashService.setNavigationStarted();
+
+      GoRouter.of(context).goNamed(RouteNames.onboarding);
+    } catch (e) {
+      AppLogger.e('❌ Onboarding navigation hatası', e);
+      _handleNavigationError();
+    }
+  }
+
+  /// Ana sayfaya yönlendirir
+  void _navigateToHome() {
+    try {
+      AppLogger.i('🏠 Ana sayfaya yönlendiriliyor');
+
+      // Navigation flag'ini set et
+      _splashService.setNavigationStarted();
+
+      _splashService.initializeNavigationManager();
+      GoRouter.of(context).goNamed(RouteNames.home);
+    } catch (e) {
+      AppLogger.e('❌ Home navigation hatası', e);
+      _handleNavigationError();
+    }
+  }
+
+  // ============================================================================
+  // ERROR HANDLING METHODS
+  // ============================================================================
+
+  /// Timeout durumunu işler
+  void _handleTimeout() {
+    AppLogger.w('⏰ Splash timeout gerçekleşti');
+    runIfMounted(() {
+      _splashService.forceNavigateToHome(GoRouter.of(context));
+    });
+  }
+
+  /// Navigation hatalarını işler
+  void _handleNavigationError() {
+    if (!mounted) return;
+
+    try {
+      AppLogger.e('🚨 Kritik navigation hatası, son çare yönlendirme');
+
+      // Son çare olarak home'a git
+      _splashService.forceNavigateToHome(GoRouter.of(context));
+
+      // Kullanıcıya hata mesajı göster
+      _showErrorSnackBar();
+    } catch (e) {
+      AppLogger.e('💥 Son çare navigation da başarısız', e);
+    }
+  }
+
+  /// Hata snackbar'ı gösterir
+  void _showErrorSnackBar() {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Uygulama başlatılırken bir sorun oluştu. Lütfen tekrar deneyin.',
+        ),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
+  // ============================================================================
+  // UI BUILD METHODS
+  // ============================================================================
+
   @override
   Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
+    AppLogger.i('🎨 SplashScreen build - mounted: $mounted');
 
     return Scaffold(
       body: CupertinoPageScaffold(
         child: SafeArea(
-          child: Center(
-            child: AnimatedBuilder(
-              animation: _animation,
-              builder: (context, child) {
-                return Transform.scale(
-                  scale: _animation.value,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: screenSize.width * 0.8,
-                      minWidth: 10.0,
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        SizedBox(
-                          width: 120,
-                          height: 120,
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.2),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Center(
-                              child: Icon(
-                                CupertinoIcons.leaf_arrow_circlepath,
-                                color: AppColors.primary,
-                                size: 70,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        const Text('TatarAI',
-                            textAlign: TextAlign.center,
-                            style: AppTextTheme.headline1),
-                        const SizedBox(height: 8),
-                        const Text('Yapay Zeka ile Tarım Asistanı',
-                            textAlign: TextAlign.center,
-                            style: AppTextTheme.body),
-                        const SizedBox(height: 48),
-                        const CupertinoActivityIndicator(),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
+          child: _buildSplashContent(),
         ),
       ),
     );
+  }
+
+  /// Splash içeriğini oluşturur
+  Widget _buildSplashContent() {
+    return Center(
+      child: AnimatedBuilder(
+        animation: _scaleAnimation,
+        builder: (context, child) {
+          return Transform.scale(
+            scale: _scaleAnimation.value,
+            child: _buildLogoSection(),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Logo bölümünü oluşturur
+  Widget _buildLogoSection() {
+    final screenSize = MediaQuery.of(context).size;
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: screenSize.width * SplashConstants.logoMaxWidthRatio,
+        minWidth: SplashConstants.logoMinWidth,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const SplashLogoWidget(),
+          const SizedBox(height: SplashConstants.spaceBelowLogo),
+          _buildAppTitle(),
+          const SizedBox(height: SplashConstants.spaceBelowSubtitle),
+          _buildAppSubtitle(),
+          const SizedBox(height: SplashConstants.spaceAboveLoader),
+          _buildLoadingIndicator(),
+        ],
+      ),
+    );
+  }
+
+  /// Uygulama başlığını oluşturur
+  Widget _buildAppTitle() {
+    return const Text(
+      'TatarAI',
+      textAlign: TextAlign.center,
+      style: AppTextTheme.headline1,
+    );
+  }
+
+  /// Uygulama alt başlığını oluşturur
+  Widget _buildAppSubtitle() {
+    return Text(
+      'splash_subtitle'.locale(context),
+      textAlign: TextAlign.center,
+      style: AppTextTheme.body,
+    );
+  }
+
+  /// Loading indicator'ı oluşturur
+  Widget _buildLoadingIndicator() {
+    return const CupertinoActivityIndicator();
   }
 }

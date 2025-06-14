@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:tatarai/core/constants/app_constants.dart';
 import 'package:tatarai/core/utils/logger.dart';
-import 'package:tatarai/features/auth/models/user_model.dart';
+import 'package:tatarai/core/models/user_model.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
 /// Doğrulama işlemleri için yardımcı sınıf
@@ -28,7 +28,7 @@ class ValidationUtil {
       }
 
       // Eğer kullanıcı premium ise veya kredisi varsa analiz yapılabilir
-      if (user.isPremium || user.hasAnalysisCredits) {
+      if (user.canAnalyze) {
         AppLogger.i('Kullanıcı analiz yapabilir',
             'Premium: ${user.isPremium}, Kalan kredi: ${user.analysisCredits}');
         return ValidationResult(isValid: true);
@@ -153,8 +153,9 @@ class ValidationUtil {
   /// @return ValidationResult - Doğrulama sonucu
   static Future<ValidationResult> checkConnectivity() async {
     try {
-      final connectivityResult = await Connectivity().checkConnectivity();
-      final bool isConnected = connectivityResult != ConnectivityResult.none;
+      final connectivityResults = await Connectivity().checkConnectivity();
+      final bool isConnected =
+          !connectivityResults.contains(ConnectivityResult.none);
 
       if (!isConnected) {
         AppLogger.w('Ağ bağlantısı bulunamadı');
@@ -166,13 +167,44 @@ class ValidationUtil {
         );
       }
 
-      AppLogger.i('Ağ bağlantısı mevcut', 'Bağlantı türü: $connectivityResult');
+      AppLogger.i(
+          'Ağ bağlantısı mevcut', 'Bağlantı türü: $connectivityResults');
       return ValidationResult(isValid: true);
     } catch (e) {
       AppLogger.w('Bağlantı durumu kontrol edilirken hata oluştu', e);
       // Bağlantı kontrolünde hata olsa bile devam etmeye çalışalım
       return ValidationResult(isValid: true);
     }
+  }
+
+  /// Dosya doğrulaması yapar
+  ///
+  /// @param file - Doğrulanacak dosya
+  /// @return bool - Dosya geçerli mi?
+  static bool isValidFile(File? file) {
+    if (file == null) return false;
+    if (!file.existsSync()) return false;
+    return true;
+  }
+
+  /// Kullanıcı kimliği doğrulaması yapar
+  ///
+  /// @param userId - Doğrulanacak kullanıcı kimliği
+  /// @return bool - Kullanıcı kimliği geçerli mi?
+  static bool isValidUserId(String? userId) {
+    if (userId == null || userId.isEmpty) return false;
+    if (userId.trim().isEmpty) return false;
+    return true;
+  }
+
+  /// ID doğrulaması yapar
+  ///
+  /// @param id - Doğrulanacak ID
+  /// @return bool - ID geçerli mi?
+  static bool isValidId(String? id) {
+    if (id == null || id.isEmpty) return false;
+    if (id.trim().isEmpty) return false;
+    return true;
   }
 }
 

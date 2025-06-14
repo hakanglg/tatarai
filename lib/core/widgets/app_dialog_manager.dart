@@ -31,8 +31,8 @@ class AppDialogManager {
         actions: [
           CupertinoDialogAction(
             isDefaultAction: true,
-            child: Text(buttonText ?? 'ok'.locale(context)),
             onPressed: onPressed ?? () => Navigator.pop(context),
+            child: Text(buttonText ?? 'ok'.locale(context)),
           ),
         ],
       ),
@@ -62,19 +62,19 @@ class AppDialogManager {
         ),
         actions: [
           CupertinoDialogAction(
-            child: Text(cancelText ?? 'no'.locale(context)),
             onPressed: onCancelPressed ??
                 () {
                   Navigator.pop(context, false);
                 },
+            child: Text(cancelText ?? 'no'.locale(context)),
           ),
           CupertinoDialogAction(
             isDefaultAction: true,
-            child: Text(confirmText ?? 'yes'.locale(context)),
             onPressed: onConfirmPressed ??
                 () {
                   Navigator.pop(context, true);
                 },
+            child: Text(confirmText ?? 'yes'.locale(context)),
           ),
         ],
       ),
@@ -116,8 +116,8 @@ class AppDialogManager {
         actions: [
           CupertinoDialogAction(
             isDefaultAction: true,
-            child: Text(buttonText ?? 'ok'.locale(context)),
             onPressed: onPressed ?? () => Navigator.pop(context),
+            child: Text(buttonText ?? 'ok'.locale(context)),
           ),
         ],
       ),
@@ -325,8 +325,8 @@ class AppDialogManager {
         actions: [
           CupertinoDialogAction(
             isDefaultAction: true,
-            child: Text(buttonText ?? 'ok'.locale(context)),
             onPressed: onPressed ?? () => Navigator.pop(context),
+            child: Text(buttonText ?? 'ok'.locale(context)),
           ),
         ],
       ),

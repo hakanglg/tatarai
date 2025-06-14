@@ -1,31 +1,31 @@
-/**
- * İzin Yöneticisi (Permission Manager)
- * 
- * Bu modül, uygulama genelinde izin isteklerini merkezi olarak yönetir.
- * Kullanıcı deneyimini iyileştirmek için profesyonel ve açıklayıcı izin
- * diyalogları sunar ve tüm izin işlemlerini standart bir şekilde ele alır.
- * 
- * Özellikleri:
- * - Tek izin veya birden fazla izin isteme
- * - Özelleştirilmiş ve kullanıcı dostu bilgi mesajları
- * - İzinlerin reddedilmesi veya kalıcı olarak reddedilmesi durumlarını yönetme
- * - iOS ve Android platformları için optimize edilmiş ayar açma yöntemleri
- * 
- * Kullanım Örnekleri:
- * ```dart
- * // Tek izin isteme
- * bool hasPermission = await PermissionManager.requestPermission(
- *   AppPermissionType.camera,
- *   context: context,
- * );
- * 
- * // Çoklu izin isteme
- * Map<AppPermissionType, bool> results = await PermissionManager.requestMultiplePermissions(
- *   [AppPermissionType.camera, AppPermissionType.location],
- *   context: context,
- * );
- * ```
- */
+/// İzin Yöneticisi (Permission Manager)
+///
+/// Bu modül, uygulama genelinde izin isteklerini merkezi olarak yönetir.
+/// Kullanıcı deneyimini iyileştirmek için profesyonel ve açıklayıcı izin
+/// diyalogları sunar ve tüm izin işlemlerini standart bir şekilde ele alır.
+///
+/// Özellikleri:
+/// - Tek izin veya birden fazla izin isteme
+/// - Özelleştirilmiş ve kullanıcı dostu bilgi mesajları
+/// - İzinlerin reddedilmesi veya kalıcı olarak reddedilmesi durumlarını yönetme
+/// - iOS ve Android platformları için optimize edilmiş ayar açma yöntemleri
+///
+/// Kullanım Örnekleri:
+/// ```dart
+/// // Tek izin isteme
+/// bool hasPermission = await PermissionManager.requestPermission(
+///   AppPermissionType.camera,
+///   context: context,
+/// );
+///
+/// // Çoklu izin isteme
+/// Map<AppPermissionType, bool> results = await PermissionManager.requestMultiplePermissions(
+///   [AppPermissionType.camera, AppPermissionType.location],
+///   context: context,
+/// );
+/// ```
+library;
+
 import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';

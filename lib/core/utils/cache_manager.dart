@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tatarai/core/utils/logger.dart';
-import 'package:tatarai/features/plant_analysis/models/plant_analysis_result.dart';
+import 'package:tatarai/features/plant_analysis/data/models/plant_analysis_result.dart';
 
 /// Uygulama verilerini önbelleğe almak için kullanılan yardımcı sınıf
 class CacheManager {

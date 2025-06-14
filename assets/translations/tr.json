@@ -240,5 +240,8 @@
   "select_location_first": "Lütfen önce konum bilgilerini (il, ilçe, mahalle) seçin.",
   "provinces_loading": "İller yükleniyor...",
   "districts_loading": "İlçeler yükleniyor...",
-  "neighborhoods_loading": "Mahalleler yükleniyor..."
+  "neighborhoods_loading": "Mahalleler yükleniyor...",
+  "splash_title": "TatarAI",
+  "splash_subtitle": "Yapay Zeka ile Tarım Asistanı",
+  "splash_loading": "Yükleniyor..."
 } 

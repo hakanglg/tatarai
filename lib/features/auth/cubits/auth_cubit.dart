@@ -1,1271 +1,551 @@
 import 'dart:async';
-
-import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
-import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:tatarai/core/base/base_cubit.dart';
-import 'package:tatarai/features/auth/cubits/auth_state.dart';
-import 'package:tatarai/features/auth/models/user_model.dart';
-import 'package:tatarai/core/repositories/user_repository.dart';
-import 'package:tatarai/features/auth/services/auth_service.dart';
-import 'package:tatarai/core/utils/logger.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:sign_in_with_apple/sign_in_with_apple.dart';
-import 'dart:io' show Platform;
+import 'package:firebase_core/firebase_core.dart';
+import '../../../core/base/base_cubit.dart';
+import '../../../core/services/service_locator.dart';
+import '../../../core/repositories/auth_repository.dart';
+import '../../../core/models/user_model.dart';
+import 'auth_state.dart';
 
-/// Kimlik doğrulama ve kullanıcı yönetimi için Cubit
+/// Authentication işlemlerini yöneten Cubit
+///
+/// BaseCubit'den türetilmiş auth state management sınıfıdır.
+/// Firebase Authentication ve Firestore entegrasyonunu yönetir.
+/// ServiceLocator ile dependency injection kullanır.
+///
+/// Özellikler:
+/// - ServiceLocator tabanlı dependency injection
+/// - Anonim authentication
+/// - Kullanıcı session takibi
+/// - Onboarding logic
+/// - Hata yönetimi ve loglama
+/// - Stream-based auth state changes
+/// - Döngüsel hata önleme mekanizması
 class AuthCubit extends BaseCubit<AuthState> {
-  final UserRepository _userRepository;
-  final AuthService _authService;
-  StreamSubscription<UserModel?>? _userSubscription;
-  Timer? _emailVerificationTimer;
-  StreamSubscription? _connectivitySubscription;
+  /// Auth repository instance (ServiceLocator'dan alınır)
+  late final AuthRepository _authRepository;
 
-  /// İnternet bağlantısı durumu
-  bool _hasNetworkConnection = true;
+  /// Firebase Auth stream subscription
+  StreamSubscription<User?>? _authSubscription;
 
-  /// Bekleyen işlem türleri
-  bool _hasPendingSignIn = false;
-  bool _hasPendingSignUp = false;
+  /// Anonim giriş deneme sayacı (döngüsel hata önleme için)
+  int _anonymousSignInAttempts = 0;
+  static const int _maxAnonymousSignInAttempts = 3;
 
-  /// Son bağlantı hatası zamanı - art arda çok fazla hata göstermeyi önlemek için
-  DateTime? _lastConnectionErrorTime;
-
-  /// Otomatik yeniden bağlanma timer'ı
-  Timer? _reconnectTimer;
-
-  AuthCubit({
-    required UserRepository userRepository,
-    required AuthService authService,
-  })  : _userRepository = userRepository,
-        _authService = authService,
-        super(AuthState.initial()) {
-    _init();
-  }
-
-  /// Kullanıcı verilerini gerçek zamanlı olarak dinleyen stream
-  Stream<UserModel?> get userStream => _userRepository.user;
-
-  @override
-  void emitErrorState(String errorMessage) {
-    emit(state.copyWith(
-      status: AuthStatus.error,
-      errorMessage: errorMessage,
-      isLoading: false,
-    ));
-  }
-
-  @override
-  void emitLoadingState() {
-    emit(state.copyWith(
-      status: AuthStatus.loading,
-      isLoading: true,
-      errorMessage: null,
-    ));
-  }
-
-  /// Hata uyarılarını işleme wrapper
-  void handleWarning(String operation, String message) {
-    AppLogger.w('$operation: $message');
-  }
-
-  /// Log Error wrapper
-  void logError(String message, String detail) {
-    handleError(message, Exception(detail));
-  }
-
-  /// Log Warning wrapper
-  void logWarning(String message, [dynamic detail]) {
-    if (detail != null) {
-      handleWarning(message, detail.toString());
-    } else {
-      handleWarning(message, '');
-    }
-  }
-
-  /// Cubit başlangıç fonksiyonu - user subscription'ı başlatır
-  void _init() {
+  /// Constructor - ServiceLocator kullanarak dependency injection
+  AuthCubit() : super(const AuthInitial()) {
     try {
-      logInfo('AuthCubit başlatılıyor');
-      _subscribeToUserChanges();
-      _setupConnectivityListener();
-    } catch (e, stack) {
-      handleError('AuthCubit başlatma', e, stack);
-      emitErrorState('Kimlik doğrulama servisi başlatılamadı');
-    }
-  }
-
-  /// Ağ bağlantısı değişikliklerini dinler
-  void _setupConnectivityListener() {
-    _connectivitySubscription?.cancel();
-
-    _connectivitySubscription =
-        Connectivity().onConnectivityChanged.listen((results) {
-      final previousState = _hasNetworkConnection;
-      _hasNetworkConnection =
-          results.any((result) => result != ConnectivityResult.none);
-
-      if (previousState != _hasNetworkConnection) {
-        logInfo('Ağ bağlantısı durumu değişti: $_hasNetworkConnection');
-
-        if (_hasNetworkConnection && !previousState) {
-          logInfo('Ağ bağlantısı geri geldi, yeniden bağlanmaya çalışılıyor');
-
-          // Bağlantı geri geldiğinde Firebase ile yeniden bağlantı kurmaya çalış
-          _reconnectToFirebase();
-
-          // Bekleyen işlemleri kontrol et
-          _checkPendingOperations();
-        }
-      }
-    });
-  }
-
-  /// Firebase ile yeniden bağlantı kurmaya çalışır
-  Future<void> _reconnectToFirebase() async {
-    try {
-      // Kullanıcı aboneliğini yenile
-      _subscribeToUserChanges();
-
-      // Eğer oturum açık ise, kullanıcı verilerini yenile
-      if (state.user != null) {
-        final userId = state.user!.id;
-        logInfo('Kullanıcı verilerini yenilemeye çalışılıyor: $userId');
-
-        try {
-          final freshUser = await _userRepository.fetchFreshUserData(userId);
-          if (freshUser != null) {
-            logSuccess('Kullanıcı verileri yenilendi',
-                'Kullanıcı: ${freshUser.email}');
-            emit(state.copyWith(user: freshUser));
-          }
-        } catch (e) {
-          logError('Kullanıcı verilerini yenileme hatası', e.toString());
-          // Kullanıcı deneyimi açısından hata mesajı göstermeyelim
-        }
-      }
-    } catch (e, stack) {
-      handleError('Firebase yeniden bağlantı', e, stack);
-    }
-  }
-
-  /// Bekleyen işlemleri kontrol eder
-  void _checkPendingOperations() {
-    // Bekleyen oturum açma işlemi varsa kullanıcıya bildir
-    if (_hasPendingSignIn) {
-      logInfo('Bekleyen oturum açma işlemi var, lütfen tekrar deneyin');
-      emit(state.copyWith(
-        pendingOperationMessage:
-            'İnternet bağlantınız geri geldi. Lütfen oturum açma işlemini tekrar deneyin.',
-      ));
-      _hasPendingSignIn = false;
-    }
-
-    // Bekleyen kayıt işlemi varsa kullanıcıya bildir
-    if (_hasPendingSignUp) {
-      logInfo('Bekleyen kayıt işlemi var, lütfen tekrar deneyin');
-      emit(state.copyWith(
-        pendingOperationMessage:
-            'İnternet bağlantınız geri geldi. Lütfen kayıt işlemini tekrar deneyin.',
-      ));
-      _hasPendingSignUp = false;
-    }
-  }
-
-  /// Kullanıcı değişikliklerini dinler
-  void _subscribeToUserChanges() {
-    _userSubscription?.cancel();
-    _userSubscription = _userRepository.user.listen(
-      _onUserChanged,
-      onError: _onUserError,
-    );
-  }
-
-  /// Kullanıcı değiştiğinde çağrılır
-  void _onUserChanged(UserModel? user) {
-    try {
-      if (user != null) {
-        logInfo('Kullanıcı oturum açtı: ${user.email}');
-
-        emit(
-          state.copyWith(
-            status: AuthStatus.authenticated,
-            user: user,
-            isLoading: false,
-            errorMessage: null,
-            pendingOperationMessage: null,
-          ),
-        );
-
-        if (!user.isEmailVerified) {
-          startEmailVerificationCheck();
-        }
-      } else {
-        logInfo('Kullanıcı oturum açmadı');
-        emit(
-          state.copyWith(
-            status: AuthStatus.unauthenticated,
-            user: null,
-            isLoading: false,
-            errorMessage: null,
-          ),
-        );
-        stopEmailVerificationCheck();
-      }
-    } catch (e, stack) {
-      handleError('Kullanıcı durumu işleme', e, stack);
-    }
-  }
-
-  /// Kullanıcı stream'inde hata olduğunda çağrılır
-  void _onUserError(Object error, StackTrace stack) {
-    handleError('Kullanıcı dinleme', error, stack);
-
-    // Ağ bağlantısıyla ilgili hataları daha kullanıcı dostu şekilde göster
-    String errorMessage = error.toString();
-
-    if (_isNetworkError(error)) {
-      // Son bağlantı hatası üzerinden 30 saniye geçtiyse göster
-      final now = DateTime.now();
-      final showError = _lastConnectionErrorTime == null ||
-          now.difference(_lastConnectionErrorTime!).inSeconds > 30;
-
-      if (showError) {
-        _lastConnectionErrorTime = now;
-        errorMessage =
-            'Sunucuya bağlanırken bir sorun oluştu. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.';
-
-        // Yeniden bağlantı timer'ı başlat (eğer zaten çalışmıyorsa)
-        _startReconnectTimer();
-      } else {
-        // Çok fazla hata mesajı göstermemek için sessizce devam et
-        logWarning('Ağ bağlantısı hatası (sessiz): ${error.toString()}');
+      // ServiceLocator'ın hazır olup olmadığını kontrol et
+      if (!ServiceLocator.isRegistered<AuthRepository>()) {
+        logWarning('ServiceLocator henüz hazır değil, fallback kullanılıyor');
+        _createFallbackRepository();
         return;
       }
-    }
 
-    emit(
-      state.copyWith(
-        status: AuthStatus.unauthenticated,
-        user: null,
-        isLoading: false,
-        errorMessage: errorMessage,
-      ),
-    );
-    stopEmailVerificationCheck();
+      // ServiceLocator'dan repository'yi al
+      _authRepository = ServiceLocator.get<AuthRepository>();
+
+      // Firebase Auth state changes'ı dinlemeye başla
+      _initializeAuthListener();
+    } catch (e, stackTrace) {
+      handleError('AuthCubit constructor hatası', e, stackTrace);
+
+      // Fallback: Manuel repository oluştur
+      _createFallbackRepository();
+    }
   }
 
-  /// Yeniden bağlantı kurmak için timer başlatır
-  void _startReconnectTimer() {
-    _reconnectTimer?.cancel();
+  /// ServiceLocator başarısız olursa fallback repository oluşturur
+  void _createFallbackRepository() {
+    try {
+      logWarning('ServiceLocator başarısız, fallback repository oluşturuluyor');
 
-    // 10 saniyede bir yeniden bağlanmayı dene
-    _reconnectTimer = Timer.periodic(
-      const Duration(seconds: 10),
-      (_) async {
-        if (_hasNetworkConnection) {
-          logInfo('Otomatik yeniden bağlanma deneniyor...');
-          await _reconnectToFirebase();
+      // Repository'yi manuel olarak oluştur (Firebase direkt kullanarak)
+      _authRepository = AuthRepository();
 
-          // Başarılı olduysa timer'ı durdur
-          if (state.status == AuthStatus.authenticated) {
-            logSuccess('Yeniden bağlantı başarılı');
-            _reconnectTimer?.cancel();
-            _reconnectTimer = null;
-          }
-        }
+      // Firebase Auth state changes'ı dinlemeye başla
+      _initializeAuthListener();
+
+      logInfo('Fallback AuthRepository başarıyla oluşturuldu');
+    } catch (e, stackTrace) {
+      handleError('Fallback repository oluşturma hatası', e, stackTrace);
+      emit(const AuthError(
+        message: 'Authentication servisi başlatılamadı',
+        isCritical: true,
+      ));
+    }
+  }
+
+  /// Firebase Auth state changes'ı dinlemeye başlar
+  void _initializeAuthListener() {
+    logInfo('Auth listener başlatılıyor');
+
+    _authSubscription = _authRepository.userStream.listen(
+      _onAuthStateChanged,
+      onError: (error, stackTrace) {
+        handleError('Auth listener hatası', error, stackTrace);
       },
     );
   }
 
-  /// Hatanın ağ bağlantısıyla ilgili olup olmadığını kontrol eder
-  bool _isNetworkError(Object error) {
-    final errorMessage = error.toString().toLowerCase();
-    return errorMessage.contains('network') ||
-        errorMessage.contains('connection') ||
-        errorMessage.contains('unavailable') ||
-        errorMessage.contains('timeout') ||
-        errorMessage.contains('offline') ||
-        errorMessage.contains('socket') ||
-        errorMessage.contains('internet');
-  }
-
-  /// Asenkron işlem başlatma
-  void _startLoading() {
-    emitLoadingState();
-  }
-
-  /// Hata durumlarını işleyen özel metod.
-  void _handleError(String operation, Object error, [StackTrace? stackTrace]) {
-    handleError(operation, error, stackTrace);
-
-    String userFriendlyMessage;
-
-    // Firebase hata mesajlarını özelleştir
-    if (error.toString().contains('firebase_auth') ||
-        error.toString().contains('FirebaseAuth')) {
-      if (error.toString().contains('network-request-failed')) {
-        userFriendlyMessage =
-            'İnternet bağlantınızda bir sorun var. Lütfen bağlantınızı kontrol edin ve tekrar deneyin.';
-      } else if (error.toString().contains('too-many-requests')) {
-        userFriendlyMessage =
-            'Çok fazla istek gönderildi. Lütfen bir süre bekleyip tekrar deneyin.';
-      } else if (error.toString().contains('email-already-in-use')) {
-        userFriendlyMessage =
-            'Bu e-posta adresi zaten kullanılıyor. Lütfen başka bir e-posta adresi deneyin.';
-      } else if (error.toString().contains('weak-password')) {
-        userFriendlyMessage =
-            'Şifreniz çok zayıf. Lütfen en az 6 karakter içeren daha güçlü bir şifre belirleyin.';
-      } else if (error.toString().contains('invalid-email')) {
-        userFriendlyMessage =
-            'Geçersiz e-posta adresi. Lütfen geçerli bir e-posta adresi girin.';
-      } else if (error.toString().contains('user-not-found') ||
-          error.toString().contains('wrong-password')) {
-        userFriendlyMessage =
-            'E-posta veya şifre hatalı. Lütfen bilgilerinizi kontrol edin.';
-      } else if (error.toString().contains('createUserWithEmailAndPassword')) {
-        userFriendlyMessage =
-            'Hesap oluşturulurken bir sorun oluştu. Lütfen bilgilerinizi kontrol edip tekrar deneyin.';
-      } else {
-        // Genel Firebase hatası
-        userFriendlyMessage =
-            'İşlem sırasında bir sorun oluştu. Lütfen daha sonra tekrar deneyin.';
-      }
-    } else if (error.toString().contains('timeout') ||
-        error.toString().contains('timed out')) {
-      userFriendlyMessage =
-          'İşlem zaman aşımına uğradı. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.';
-    } else if (_isNetworkError(error)) {
-      userFriendlyMessage =
-          'İnternet bağlantınızda bir sorun var. Lütfen bağlantınızı kontrol edin ve tekrar deneyin.';
-    } else {
-      // Genel hata
-      userFriendlyMessage =
-          'Bir sorun oluştu. Lütfen daha sonra tekrar deneyin.';
-    }
-
-    emit(state.copyWith(
-      status: state.user != null
-          ? AuthStatus.authenticated
-          : AuthStatus.unauthenticated,
-      isLoading: false,
-      errorMessage: userFriendlyMessage,
-    ));
-  }
-
-  /// E-posta ve şifre ile giriş yapar
-  Future<void> signInWithEmailAndPassword({
-    required String email,
-    required String password,
-    bool rememberMe = false,
-  }) async {
-    if (email.isEmpty || password.isEmpty) {
-      emitErrorState('E-posta veya şifre boş olamaz');
-      return;
-    }
-
-    // Bağlantı kontrolü
-    if (!_hasNetworkConnection) {
-      _handleNoConnectionError(true);
-      return;
-    }
-
-    emitLoadingState();
-
+  /// Firebase Auth state değişikliklerini işler
+  Future<void> _onAuthStateChanged(User? firebaseUser) async {
     try {
-      final credential = await _authService.signInWithEmailPassword(
-        email: email,
-        password: password,
-        rememberMe: rememberMe, // rememberMe parametresini AuthService'e geçir
-      );
+      logInfo('Auth state değişikliği algılandı', firebaseUser?.uid);
 
-      logSuccess('Giriş başarılı', 'Kullanıcı: ${credential.user?.email}');
-    } on firebase_auth.FirebaseAuthException catch (e, stack) {
-      handleError('E-posta girişi', e, stack);
-      _handleFirebaseAuthError(e);
-    } catch (e, stack) {
-      handleError('E-posta girişi', e, stack);
-      emitErrorState('Giriş yapılırken bir hata oluştu: ${e.toString()}');
-    }
-  }
+      if (firebaseUser == null) {
+        // Kullanıcı çıkış yapmış
+        logInfo('Kullanıcı çıkış yapmış');
+        emit(const AuthUnauthenticated());
+        return;
+      }
 
-  /// Google ile giriş yapar
-  Future<void> signInWithGoogle() async {
-    int retryCount = 0;
-    const maxRetries = 3;
+      // Mevcut state'i kontrol et - zaten loading ise tekrar loading'e geçme
+      if (state is AuthLoading) {
+        logInfo('Zaten loading state\'te, işlem atlanıyor');
+        return;
+      }
 
-    while (retryCount < maxRetries) {
+      // Loading state'e geç
+      emit(const AuthLoading(message: 'Kullanıcı bilgileri yükleniyor...'));
+
       try {
-        emit(state.copyWith(isLoading: true, errorMessage: null));
+        // Firestore'dan kullanıcı verilerini al
+        logInfo('Firestore\'dan kullanıcı verisi alınıyor', firebaseUser.uid);
+        final UserModel? userData = await _authRepository.getCurrentUserData();
 
-        // GoogleSignIn nesnesini oluşturma
-        final GoogleSignIn googleSignIn = GoogleSignIn(
-          scopes: [
-            'email',
-            'https://www.googleapis.com/auth/userinfo.profile',
-          ],
-          signInOption: SignInOption.standard, // Native platformu kullan
-          hostedDomain: null, // Tüm domain'lere izin ver
-        );
+        if (userData == null) {
+          // Firestore'da kullanıcı verisi yok, yeni kullanıcı olarak işle
+          logInfo(
+              'Firestore\'da kullanıcı verisi bulunamadı, yeni kullanıcı oluşturuluyor');
 
-        // Önce mevcut oturumu kapatmayı dene
-        try {
-          await googleSignIn.signOut();
-        } catch (e) {
-          // Sessizce devam et
-          logWarning('Google sign out sırasında hata: $e');
-        }
-
-        // Google ile giriş diyaloğunu göster
-        final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-
-        // Kullanıcı işlemi iptal ettiyse
-        if (googleUser == null) {
-          emit(state.copyWith(isLoading: false));
+          // Ancak döngüsel hatayı önlemek için attempt sayısını kontrol et
+          if (_anonymousSignInAttempts < _maxAnonymousSignInAttempts) {
+            logInfo(
+                'Yeni kullanıcı algılandı, direkt user oluşturuluyor (Deneme: ${_anonymousSignInAttempts + 1})');
+            // SignInAnonymously çağırmak yerine direkt user oluştur
+            await _createAnonymousUserDirectly(firebaseUser.uid);
+          } else {
+            logWarning(
+                'Maksimum anonim giriş denemesi aşıldı, fallback user oluşturuluyor');
+            await _createFallbackUser(firebaseUser.uid);
+          }
           return;
         }
 
-        logInfo('Google kullanıcısı seçildi: ${googleUser.email}');
+        // Başarılı durumda attempt sayısını sıfırla
+        _anonymousSignInAttempts = 0;
 
-        // Google kimlik doğrulama bilgilerini al
-        final GoogleSignInAuthentication googleAuth =
-            await googleUser.authentication;
+        // İlk kez giriş yapan kullanıcı mı kontrol et
+        final bool isFirstTime =
+            await _authRepository.isFirstTimeUser(userData.id);
 
-        logInfo(
-            'Google authentication alındı, accessToken: ${googleAuth.accessToken != null}');
+        logSuccess('Kullanıcı verisi başarıyla yüklendi', userData.id);
 
-        // Firebase kimlik bilgilerini oluştur
-        final credential = firebase_auth.GoogleAuthProvider.credential(
-          accessToken: googleAuth.accessToken,
-          idToken: googleAuth.idToken,
-        );
-
-        // Firebase'e giriş yap
-        logInfo('Firebase\'e Google credential ile giriş yapılıyor...');
-
-        try {
-          // Kalıcı oturum açma (true parametresi)
-          final userCredential = await _timeoutFuture(
-              _authService.signInWithCredential(credential, true),
-              const Duration(seconds: 30),
-              'Google ile giriş zaman aşımına uğradı');
-
-          if (userCredential.user != null) {
-            logSuccess('Google',
-                'Google ile giriş başarılı: ${userCredential.user?.email}');
-
-            // User'ı kaydet
-            try {
-              final basicUser =
-                  UserModel.fromFirebaseUser(userCredential.user!);
-
-              // AuthService üzerinden Firestore'a kaydet
-              await _authService.saveUserToFirestore(basicUser.copyWith(
-                lastLoginAt: DateTime.now(),
-              ));
-
-              logInfo('Google kullanıcısı veritabanına kaydedildi/güncellendi');
-            } catch (dbError) {
-              logWarning(
-                  'Kullanıcı veritabanına kaydedilemedi, ama giriş başarılı: $dbError');
-            }
-
-            // Başarılı giriş
-            emit(state.copyWith(
-              isLoading: false,
-              errorMessage: null,
-            ));
-            return;
-          } else {
-            logError('Google ile giriş başarısız', 'Kullanıcı null');
-            emit(state.copyWith(
-              isLoading: false,
-              errorMessage: 'Google ile giriş yapılamadı.',
-            ));
-            return;
-          }
-        } catch (firebaseError) {
-          // Firebase hatası durumunda, unavailable hatası için yeniden dene
-          if (firebaseError.toString().contains('unavailable') &&
-              retryCount < maxRetries - 1) {
-            retryCount++;
-            final retryDelay = _getExponentialBackoffDelay(retryCount);
-            logWarning('Firebase geçici olarak kullanılamıyor',
-                '$retryDelay saniye sonra tekrar denenecek (${retryCount}/${maxRetries - 1})');
-
-            // Kullanıcıya bilgi ver
-            emit(state.copyWith(
-              isLoading: true,
-              errorMessage: null,
-              pendingOperationMessage:
-                  'Sunucuya bağlanılamadı. $retryDelay saniye içinde tekrar deneniyor...',
-            ));
-
-            await Future.delayed(Duration(seconds: retryDelay));
-            continue;
-          } else {
-            // Diğer hatalar veya son deneme başarısız oldu
-            throw firebaseError;
-          }
-        }
-      } on firebase_auth.FirebaseAuthException catch (e) {
-        logError('Firebase Auth Hatası', '${e.code} - ${e.message}');
-        emit(state.copyWith(
-          isLoading: false,
-          errorMessage: getErrorMessage(e),
+        emit(AuthAuthenticated(
+          user: userData,
+          isFirstTime: isFirstTime,
         ));
-        return;
-      } catch (e) {
-        logError('Google Sign In Hatası', e.toString());
-        emit(state.copyWith(
-          isLoading: false,
-          errorMessage: 'Google ile giriş sırasında bir hata oluştu: $e',
-        ));
-        return;
-      }
-    }
-  }
+      } on FirebaseException catch (firestoreError, stackTrace) {
+        // Firestore-specific hatalar
+        logWarning(
+            'Firestore hatası (${firestoreError.code}): ${firestoreError.message}');
 
-  /// Apple ile giriş yapar
-  Future<void> signInWithApple() async {
-    int retryCount = 0;
-    const maxRetries = 3;
-
-    while (retryCount < maxRetries) {
-      try {
-        emit(state.copyWith(isLoading: true, errorMessage: null));
-
-        // Apple ile giriş sürecini başlat
-        final appleCredential = await SignInWithApple.getAppleIDCredential(
-          scopes: [
-            AppleIDAuthorizationScopes.email,
-            AppleIDAuthorizationScopes.fullName,
-          ],
-        );
-
-        // Apple'dan gelen verilerle Firebase credential oluştur
-        final oauthCredential =
-            firebase_auth.OAuthProvider('apple.com').credential(
-          idToken: appleCredential.identityToken,
-          accessToken: appleCredential.authorizationCode,
-        );
-
-        // Firebase'e giriş yap
-        logInfo('Firebase\'e Apple credential ile giriş yapılıyor...');
-
-        try {
-          // Kalıcı oturum açma (true parametresi)
-          final userCredential = await _timeoutFuture(
-              _authService.signInWithCredential(oauthCredential, true),
-              const Duration(seconds: 30),
-              'Apple ile giriş zaman aşımına uğradı');
-
-          if (userCredential.user != null) {
-            logSuccess('Apple',
-                'Apple ile giriş başarılı: ${userCredential.user?.email}');
-
-            // Kullanıcı bilgilerini oluştur
-            final basicUser = UserModel.fromFirebaseUser(userCredential.user!);
-
-            // Kullanıcı adı bilgisi boş olabilir, Apple credential'dan al
-            String? displayName;
-            if ((basicUser.displayName == null ||
-                    basicUser.displayName!.isEmpty) &&
-                (appleCredential.givenName != null ||
-                    appleCredential.familyName != null)) {
-              displayName = [
-                appleCredential.givenName ?? '',
-                appleCredential.familyName ?? ''
-              ].where((name) => name.isNotEmpty).join(' ');
-            }
-
-            // AuthService üzerinden Firestore'a kaydet
-            await _authService.saveUserToFirestore(basicUser.copyWith(
-              displayName: displayName?.isNotEmpty == true
-                  ? displayName
-                  : basicUser.displayName,
-              lastLoginAt: DateTime.now(),
-            ));
-
-            logInfo('Apple kullanıcısı veritabanına kaydedildi/güncellendi');
-
-            // Başarılı giriş
-            emit(state.copyWith(
-              isLoading: false,
-              errorMessage: null,
-            ));
-            return;
-          } else {
-            logError('Apple ile giriş başarısız', 'Kullanıcı null');
-            emit(state.copyWith(
-              isLoading: false,
-              errorMessage: 'Apple ile giriş yapılamadı.',
-            ));
-            return;
-          }
-        } catch (firebaseError) {
-          // Firebase hatası durumunda, unavailable hatası için yeniden dene
-          if (firebaseError.toString().contains('unavailable') &&
-              retryCount < maxRetries - 1) {
-            retryCount++;
-            final retryDelay = _getExponentialBackoffDelay(retryCount);
-            logWarning('Firebase geçici olarak kullanılamıyor',
-                '$retryDelay saniye sonra tekrar denenecek (${retryCount}/${maxRetries - 1})');
-
-            // Kullanıcıya bilgi ver
-            emit(state.copyWith(
-              isLoading: true,
-              errorMessage: null,
-              pendingOperationMessage:
-                  'Sunucuya bağlanılamadı. $retryDelay saniye içinde tekrar deneniyor...',
-            ));
-
-            await Future.delayed(Duration(seconds: retryDelay));
-            continue;
-          } else {
-            // Diğer hatalar veya son deneme başarısız oldu
-            throw firebaseError;
-          }
-        }
-      } on SignInWithAppleException catch (e) {
-        logError('Apple Sign In Hatası', e.toString());
-        emit(state.copyWith(
-          isLoading: false,
-          errorMessage:
-              'Apple ile giriş sırasında bir hata oluştu: ${e.toString()}',
-        ));
-        return;
-      } on firebase_auth.FirebaseAuthException catch (e) {
-        logError('Firebase Auth Hatası', '${e.code} - ${e.message}');
-        emit(state.copyWith(
-          isLoading: false,
-          errorMessage: getErrorMessage(e),
-        ));
-        return;
-      } catch (e) {
-        logError('Apple Sign In Hatası', e.toString());
-        emit(state.copyWith(
-          isLoading: false,
-          errorMessage: 'Apple ile giriş sırasında bir hata oluştu: $e',
-        ));
-        return;
-      }
-    }
-  }
-
-  /// Future'ı belirli bir timeout ile çalıştırır
-  Future<T> _timeoutFuture<T>(
-    Future<T> future,
-    Duration timeout,
-    String timeoutMessage,
-  ) {
-    return future.timeout(
-      timeout,
-      onTimeout: () {
-        throw TimeoutException(timeoutMessage);
-      },
-    );
-  }
-
-  /// Üstel geri çekilme gecikmesi hesaplar (exponential backoff)
-  int _getExponentialBackoffDelay(int retryAttempt) {
-    // Baz gecikme (saniye cinsinden) * 2^(retryAttempt-1)
-    // Örneğin: 2, 4, 8, 16, 32, ... saniye
-    const baseDelay = 2;
-    return baseDelay * (1 << (retryAttempt - 1));
-  }
-
-  /// E-posta ve şifre ile kayıt oluşturur
-  Future<void> signUpWithEmailAndPassword({
-    required String email,
-    required String password,
-    required String displayName,
-  }) async {
-    try {
-      // İnternet bağlantısı kontrolü
-      if (!_hasNetworkConnection) {
-        logWarning('İnternet bağlantısı yok, kayıt yapılamıyor');
-        emit(state.copyWith(
-          status: AuthStatus.unauthenticated,
-          isLoading: false,
-          errorMessage:
-              'İnternet bağlantısı bulunamadı. Lütfen bağlantınızı kontrol edin ve tekrar deneyin.',
-        ));
-        _hasPendingSignUp = true;
-        return;
-      }
-
-      _startLoading();
-      logInfo('Kayıt olunuyor: $email');
-
-      // Timeout ekle - 30 saniye sonra işlem tamamlanmazsa hata dön
-      Timer? timeoutTimer;
-      timeoutTimer = Timer(const Duration(seconds: 30), () {
-        if (state.isLoading) {
-          handleError(
-              'Kayıt timeout',
-              Exception(
-                  'İşlem zaman aşımına uğradı. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.'));
-          emit(state.copyWith(
-            status: AuthStatus.unauthenticated,
-            isLoading: false,
-            errorMessage:
-                'İşlem zaman aşımına uğradı. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.',
+        // Retry yapılabilir hatalar için fallback user oluştur
+        if (_isRetryableFirestoreError(firestoreError.code)) {
+          logInfo('Geçici Firestore hatası, fallback user oluşturuluyor');
+          await _createFallbackUser(firebaseUser.uid);
+        } else {
+          // Kalıcı hatalar için error state
+          handleError('Kalıcı Firestore hatası', firestoreError, stackTrace);
+          emit(AuthError(
+            message:
+                'Kullanıcı verilerine erişilemiyor: ${_getFirestoreErrorMessage(firestoreError.code)}',
+            errorCode: firestoreError.code,
+            isCritical: false,
           ));
         }
-      });
-
-      // En fazla 3 kez yeniden deneme stratejisi ile kayıt ol
-      int retryCount = 0;
-      UserModel? userModel;
-      Exception? lastException;
-
-      while (retryCount < 3 && userModel == null) {
-        try {
-          logInfo('Kayıt denemesi ${retryCount + 1}/3');
-
-          userModel = await _userRepository.signUpWithEmailAndPassword(
-            email: email,
-            password: password,
-            displayName: displayName,
-          );
-
-          // Başarılı kayıt
-          if (userModel != null) {
-            timeoutTimer.cancel(); // Timeout'u iptal et
-            logInfo('Kullanıcı başarıyla kayıt oldu: $email');
-            logSuccess('Kayıt', 'Kayıt olma başarılı: $email');
-
-            // State'i güncelle
-            emit(state.copyWith(
-              status: AuthStatus.authenticated,
-              user: userModel,
-              isLoading: false,
-              errorMessage: null,
-              pendingOperationMessage: null,
-            ));
-
-            // Bekleyen kayıt işaretini temizle
-            _hasPendingSignUp = false;
-
-            return; // Başarılı ise fonksiyondan çık
-          }
-        } catch (e) {
-          lastException = e is Exception ? e : Exception(e.toString());
-          handleError('Kayıt denemesi başarısız', e);
-
-          if (_isNetworkError(e) && retryCount < 2) {
-            // Servis geçici olarak kullanılamıyor, yeniden dene
-            logInfo(
-                'Firebase servisine bağlantı hatası, yeniden deneme ${retryCount + 1}/3');
-            retryCount++;
-
-            // Exponential backoff: her denemede artan bekleme süresi
-            final backoffDelay = (retryCount * 2) * 1000; // ms cinsinden
-            logInfo('$backoffDelay ms bekliyor...');
-            await Future.delayed(Duration(milliseconds: backoffDelay));
-            continue;
-          } else {
-            // Maksimum deneme sayısına ulaşıldı veya başka bir hata
-            timeoutTimer.cancel(); // Timeout'u iptal et
-            handleError('Kayıt başarısız', e);
-
-            // Ağ hatası ise bekleyen kayıt işaretle
-            if (_isNetworkError(e)) {
-              _hasPendingSignUp = true;
-            }
-
-            // Hata mesajını UI'da göster
-            String errorMessage;
-            if (_isNetworkError(e)) {
-              errorMessage =
-                  'Bağlantı sorunu nedeniyle kayıt yapılamadı. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.';
-            } else if (lastException != null &&
-                lastException.toString().contains('email-already-in-use')) {
-              errorMessage =
-                  'Bu e-posta adresi zaten kullanılıyor. Lütfen başka bir e-posta adresi deneyin.';
-            } else if (lastException != null &&
-                lastException.toString().contains('weak-password')) {
-              errorMessage =
-                  'Şifreniz çok zayıf. Lütfen en az 6 karakter içeren daha güçlü bir şifre belirleyin.';
-            } else if (lastException != null &&
-                lastException.toString().contains('invalid-email')) {
-              errorMessage =
-                  'Geçersiz e-posta adresi formatı. Lütfen geçerli bir e-posta adresi giriniz.';
-            } else if (lastException != null &&
-                lastException
-                    .toString()
-                    .contains('createUserWithEmailAndPassword')) {
-              errorMessage =
-                  'Hesap oluşturulurken bir sorun oluştu. Lütfen bilgilerinizi kontrol edip tekrar deneyin.';
-            } else {
-              // Daha kullanıcı dostu genel hata mesajı
-              errorMessage =
-                  'Kayıt yapılamadı, lütfen daha sonra tekrar deneyin.';
-
-              // Debug için detaylı hatayı loglara yaz
-              if (lastException != null) {
-                logError('Ham hata mesajı', lastException.toString());
-              }
-            }
-
-            emit(state.copyWith(
-              status: AuthStatus.unauthenticated,
-              isLoading: false,
-              errorMessage: errorMessage,
-              showRetryButton:
-                  lastException != null && _isNetworkError(lastException),
-            ));
-            return;
-          }
-        }
-      }
-
-      // Tüm yeniden denemeler başarısız oldu
-      if (userModel == null) {
-        timeoutTimer.cancel(); // Timeout'u iptal et
-        handleError('Kayıt başarısız',
-            lastException ?? Exception('Tüm denemeler başarısız oldu'));
-
-        // Ağ hatası ise bekleyen kayıt işaretle
-        if (lastException != null && _isNetworkError(lastException)) {
-          _hasPendingSignUp = true;
-        }
-
-        String errorMessage;
-        if (lastException != null && _isNetworkError(lastException)) {
-          errorMessage =
-              'Bağlantı sorunu nedeniyle kayıt yapılamadı. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.';
-        } else if (lastException != null &&
-            lastException.toString().contains('email-already-in-use')) {
-          errorMessage =
-              'Bu e-posta adresi zaten kullanılıyor. Lütfen başka bir e-posta adresi deneyin.';
-        } else if (lastException != null &&
-            lastException.toString().contains('weak-password')) {
-          errorMessage =
-              'Şifreniz çok zayıf. Lütfen en az 6 karakter içeren daha güçlü bir şifre belirleyin.';
-        } else if (lastException != null &&
-            lastException.toString().contains('invalid-email')) {
-          errorMessage =
-              'Geçersiz e-posta adresi formatı. Lütfen geçerli bir e-posta adresi giriniz.';
-        } else if (lastException != null &&
-            lastException
-                .toString()
-                .contains('createUserWithEmailAndPassword')) {
-          errorMessage =
-              'Hesap oluşturulurken bir sorun oluştu. Lütfen bilgilerinizi kontrol edip tekrar deneyin.';
-        } else {
-          // Daha kullanıcı dostu genel hata mesajı
-          errorMessage = 'Kayıt yapılamadı, lütfen daha sonra tekrar deneyin.';
-
-          // Debug için detaylı hatayı loglara yaz
-          if (lastException != null) {
-            logError('Ham hata mesajı', lastException.toString());
-          }
-        }
-
-        emit(state.copyWith(
-          status: AuthStatus.unauthenticated,
-          isLoading: false,
-          errorMessage: errorMessage,
-          showRetryButton:
-              lastException != null && _isNetworkError(lastException),
-        ));
-      }
-    } catch (e) {
-      _handleError('Kayıt olma', e);
-    }
-  }
-
-  // Alias metodu - eski isimle uyumluluk için
-  Future<void> signUp({
-    required String email,
-    required String password,
-    required String displayName,
-  }) async {
-    return signUpWithEmailAndPassword(
-      email: email,
-      password: password,
-      displayName: displayName,
-    );
-  }
-
-  /// Kullanıcının oturumunu kapatır
-  Future<void> signOut() async {
-    try {
-      _startLoading();
-      logInfo('Oturum kapatılıyor');
-
-      await _userRepository.signOut();
-
-      // Önce state'i sıfırla
-      emit(AuthState.initial());
-
-      logSuccess('Oturum kapatma', 'Oturum kapatma başarılı');
-    } catch (e) {
-      // Hata durumunda bile state'i sıfırla
-      emit(AuthState.initial());
-      _handleError('Oturum kapatma', e);
-    }
-  }
-
-  /// Kullanıcı hesabını siler
-  Future<void> deleteAccount() async {
-    try {
-      _startLoading();
-      logInfo('🔄 Hesap silme işlemi başlatılıyor');
-
-      // Kullanıcı bilgilerini log için saklayalım
-      final userId = state.user?.id;
-      final email = state.user?.email;
-      if (userId != null) {
-        logInfo('Silinen hesap: $userId ($email)');
-      }
-
-      // UserRepository üzerinden silme işlemini başlat
-      await _userRepository.deleteAccount();
-
-      // Başarılı silme durumunda - accountDeleted flag'ini true olarak ayarla
-      emit(state.copyWith(
-        status: AuthStatus.unauthenticated,
-        user: null,
-        isLoading: false,
-        accountDeleted: true, // Hesap silindi bayrağını ayarla
-      ));
-      logSuccess('✅ Hesap başarıyla silindi');
-    } catch (e) {
-      // Hata durumunu işle
-      logError('❌ Hesap silme hatası', e.toString());
-
-      // State'i her durumda temizle - kullanıcı UI'nın doğru güncellenmesi için gerekli
-      emit(AuthState.initial());
-
-      // Hata mesajı belirle
-      String errorMessage;
-
-      if (e.toString().contains('yeniden giriş') ||
-          e.toString().contains('tekrar giriş') ||
-          e.toString().contains('Güvenlik nedeniyle')) {
-        errorMessage =
-            'Güvenlik nedeniyle hesabınızı silmek için yeniden giriş yapmanız gerekiyor.';
-      } else if (e.toString().contains('verileriniz silindi ancak kimlik')) {
-        errorMessage =
-            'Hesap verileriniz silindi ancak hesabınız tam olarak kaldırılamadı. Lütfen daha sonra tekrar giriş yapıp silme işlemini deneyin.';
-      } else {
-        errorMessage =
-            'Hesap silme işlemi sırasında bir hata oluştu. Lütfen daha sonra tekrar deneyin.';
-      }
-
-      emit(state.copyWith(errorMessage: errorMessage));
-    }
-  }
-
-  /// Hesap silme bildirimini temizler
-  void clearAccountDeletedState() {
-    if (state.accountDeleted) {
-      emit(state.copyWith(accountDeleted: false));
-    }
-  }
-
-  /// Parola sıfırlama e-postası gönderir
-  Future<void> sendPasswordResetEmail(String email) async {
-    try {
-      // İnternet bağlantısı kontrolü
-      if (!_hasNetworkConnection) {
+      } catch (firestoreError, stackTrace) {
+        // Diğer hatalar
         logWarning(
-            'İnternet bağlantısı yok, şifre sıfırlama işlemi yapılamıyor');
-        emit(state.copyWith(
-          isLoading: false,
-          errorMessage:
-              'İnternet bağlantısı bulunamadı. Lütfen bağlantınızı kontrol edin ve tekrar deneyin.',
-        ));
-        return;
+            'Beklenmeyen Firestore hatası, fallback user oluşturuluyor: $firestoreError');
+        handleError('Beklenmeyen Firestore hatası', firestoreError, stackTrace);
+        await _createFallbackUser(firebaseUser.uid);
       }
-
-      _startLoading();
-      logInfo('Parola sıfırlama e-postası gönderiliyor: $email');
-
-      await _authService.sendPasswordResetEmail(email);
-
-      logSuccess('Parola sıfırlama', 'Parola sıfırlama e-postası gönderildi');
-      emit(state.copyWith(
-        isLoading: false,
-        successMessage:
-            'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi. Lütfen e-postanızı kontrol edin.',
-      ));
-    } catch (e) {
-      _handleError('Parola sıfırlama e-postası gönderme', e);
+    } catch (error, stackTrace) {
+      handleError('Auth state değişikliği işleme hatası', error, stackTrace);
     }
   }
 
-  /// E-posta doğrulama kontrolünü başlatır
-  void startEmailVerificationCheck() {
-    _emailVerificationTimer?.cancel();
-    _emailVerificationTimer = Timer.periodic(
-      const Duration(seconds: 5),
-      (timer) async {
-        try {
-          final user = _authService.currentUser;
-          if (user != null && user.emailVerified) {
-            timer.cancel();
-            logSuccess('E-posta doğrulama', 'E-posta doğrulandı');
-          }
-        } catch (e) {
-          handleError('E-posta doğrulama kontrolü', e);
-        }
-      },
-    );
-  }
-
-  /// E-posta doğrulama kontrolünü durdurur
-  void stopEmailVerificationCheck() {
-    _emailVerificationTimer?.cancel();
-    _emailVerificationTimer = null;
-  }
-
-  /// E-posta doğrulama durumu için doğrudan güncelleme
-  Future<void> refreshEmailVerificationStatus() async {
+  /// Döngüyü önlemek için direkt anonymous user oluşturur
+  Future<void> _createAnonymousUserDirectly(String userId) async {
     try {
-      _startLoading();
-      final updatedUser =
-          await _userRepository.refreshEmailVerificationStatus();
+      logInfo('Direkt anonymous user oluşturuluyor', userId);
 
-      if (updatedUser != null) {
-        emit(state.copyWith(user: updatedUser, isLoading: false));
-        logSuccess('E-posta doğrulama durumu güncellendi');
-      } else {
-        emit(state.copyWith(isLoading: false));
-      }
-    } catch (e) {
-      _handleError('E-posta doğrulama durumu güncelleme', e);
-    }
-  }
-
-  /// Firebase hata kodlarını kullanıcı dostu mesaja dönüştürür
-  String getErrorMessage(firebase_auth.FirebaseAuthException exception) {
-    return exception.message ?? 'Bir hata oluştu: ${exception.code}';
-  }
-
-  /// Yeniden deneme fonksiyonu - UI'da Tekrar Dene butonu için
-  Future<void> retryLastOperation() async {
-    if (_hasPendingSignIn) {
-      // UI'dan e-posta ve şifre bilgilerini almak gerekecek
-      emit(state.copyWith(
-        retryOperation: 'sign_in',
-        pendingOperationMessage: 'Lütfen giriş bilgilerinizi yeniden girin.',
-      ));
-    } else if (_hasPendingSignUp) {
-      // UI'dan kayıt bilgilerini almak gerekecek
-      emit(state.copyWith(
-        retryOperation: 'sign_up',
-        pendingOperationMessage: 'Lütfen kayıt bilgilerinizi yeniden girin.',
-      ));
-    } else {
-      // Diğer bekleyen işlemler
-      _reconnectToFirebase();
-      emit(state.copyWith(
-        errorMessage: null,
-        showRetryButton: false,
-      ));
-    }
-  }
-
-  /// Kullanıcı profil bilgilerini günceller
-  Future<void> updateProfile({String? displayName, String? photoURL}) async {
-    try {
-      _startLoading();
-      logInfo('Profil güncelleniyor');
-
-      final updatedUser = await _userRepository.updateProfile(
-        displayName: displayName,
-        photoURL: photoURL,
+      final user = UserModel.anonymous(
+        id: userId,
+        name: 'Misafir Kullanıcı ${userId.substring(0, 8)}',
       );
 
-      if (updatedUser != null) {
-        emit(state.copyWith(user: updatedUser, isLoading: false));
-        logSuccess('Profil güncelleme başarılı');
-      } else {
-        emit(state.copyWith(isLoading: false));
-        logInfo('Profil güncellenemedi: Kullanıcı bilgisi alınamadı');
+      // Kullanıcıyı Firestore'a kaydetmeyi dene
+      try {
+        logInfo('Kullanıcı Firestore\'a kaydediliyor', userId);
+        await _authRepository.updateUser(user);
+        logSuccess('Kullanıcı başarıyla Firestore\'a kaydedildi', userId);
+      } catch (firestoreError) {
+        logWarning('Firestore kaydetme hatası, memory user kullanılıyor',
+            '$userId: $firestoreError');
+        // Hata olsa bile devam et
       }
-    } catch (e) {
-      _handleError('Profil güncelleme', e);
+
+      // Başarılı durumda attempt sayısını sıfırla
+      _anonymousSignInAttempts = 0;
+
+      emit(AuthAuthenticated(
+        user: user,
+        isFirstTime: true,
+      ));
+
+      logSuccess('Anonymous user direkt oluşturuldu', userId);
+    } catch (e, stackTrace) {
+      handleError('Direkt user oluşturma hatası', e, stackTrace);
+      await _createFallbackUser(userId);
     }
   }
 
-  /// Hata mesajını temizler
-  void clearErrorMessage() {
-    if (state.errorMessage != null) {
-      emit(state.copyWith(
-        errorMessage: null,
-        showRetryButton: false,
-        pendingOperationMessage: null,
+  /// Fallback user oluşturur (son çare)
+  Future<void> _createFallbackUser(String userId) async {
+    try {
+      logWarning('Fallback user oluşturuluyor', userId);
+
+      final user = UserModel.anonymous(
+        id: userId,
+        name: 'Misafir ${userId.substring(0, 6)}',
+      );
+
+      emit(AuthAuthenticated(
+        user: user,
+        isFirstTime: true,
+      ));
+
+      logInfo('Fallback user oluşturuldu', userId);
+    } catch (e, stackTrace) {
+      handleError('Fallback user oluşturma hatası', e, stackTrace);
+      emit(const AuthError(
+        message: 'Kullanıcı oluşturulamadı',
+        isCritical: true,
       ));
     }
   }
 
-  /// Başarı mesajını temizler
-  void clearSuccessMessage() {
-    if (state.successMessage != null) {
-      emit(state.copyWith(successMessage: null));
-    }
-  }
-
-  /// Bekleyen işlem mesajını temizler
-  void clearPendingOperationMessage() {
-    if (state.pendingOperationMessage != null) {
-      emit(state.copyWith(
-        pendingOperationMessage: null,
-        retryOperation: null,
-      ));
-    }
-  }
-
-  /// Bağlantı hatası durumunu işler
-  void _handleNoConnectionError(bool isSignIn) {
-    logWarning('İnternet bağlantısı yok, işlem yapılamıyor');
-    emit(state.copyWith(
-      status: AuthStatus.unauthenticated,
-      isLoading: false,
-      errorMessage:
-          'İnternet bağlantısı bulunamadı. Lütfen bağlantınızı kontrol edin ve tekrar deneyin.',
-    ));
-
-    // Bekleyen işlem durumunu güncelle
-    if (isSignIn) {
-      _hasPendingSignIn = true;
-    } else {
-      _hasPendingSignUp = true;
-    }
-  }
-
-  /// Firebase auth hatalarını işler
-  void _handleFirebaseAuthError(firebase_auth.FirebaseAuthException e) {
-    String errorMessage;
-
-    switch (e.code) {
-      case 'user-not-found':
-        errorMessage = 'Bu e-posta adresine kayıtlı bir kullanıcı bulunamadı.';
-        break;
-      case 'wrong-password':
-        errorMessage = 'Hatalı şifre girdiniz. Lütfen tekrar deneyin.';
-        break;
-      case 'invalid-email':
-        errorMessage = 'Geçersiz e-posta formatı.';
-        break;
-      case 'user-disabled':
-        errorMessage = 'Bu kullanıcı hesabı devre dışı bırakılmış.';
-        break;
-      case 'too-many-requests':
-        errorMessage =
-            'Çok fazla başarısız giriş denemesi. Lütfen daha sonra tekrar deneyin.';
-        break;
-      case 'operation-not-allowed':
-        errorMessage = 'Bu giriş yöntemi şu anda devre dışı.';
-        break;
-      case 'account-exists-with-different-credential':
-        errorMessage =
-            'Bu e-posta adresi farklı bir giriş yöntemiyle ilişkilendirilmiş.';
-        break;
-      case 'network-request-failed':
-        errorMessage =
-            'Ağ bağlantı hatası. Lütfen internet bağlantınızı kontrol edin.';
-        break;
-      case 'email-already-in-use':
-        errorMessage = 'Bu e-posta adresi zaten kullanımda.';
-        break;
-      case 'weak-password':
-        errorMessage = 'Şifre çok zayıf. Lütfen daha güçlü bir şifre seçin.';
-        break;
-      default:
-        errorMessage = 'Bir hata oluştu: ${e.message}';
-    }
-
-    emitErrorState(errorMessage);
-  }
-
-  /// Premium hesaba yükseltme
-  Future<void> upgradeToPremium() async {
+  /// Firebase'in hazır olup olmadığını kontrol eder
+  bool _isFirebaseReady() {
     try {
-      _startLoading();
-      logInfo('Premium yükseltme yapılıyor');
-
-      final user = await _userRepository.upgradeToPremium();
-
-      if (user != null) {
-        emit(state.copyWith(user: user, isLoading: false, errorMessage: null));
-        logSuccess('Kullanıcı premium\'a yükseltildi: ${user.id}');
-      } else {
-        emit(state.copyWith(isLoading: false));
+      // Firebase Core başlatılmış mı kontrol et
+      if (Firebase.apps.isEmpty) {
+        logWarning('Firebase henüz başlatılmamış');
+        return false;
       }
+
+      // Firebase Auth mevcut mu kontrol et
+      try {
+        // _authRepository'nin userStream'ine erişim test et
+        _authRepository.userStream;
+      } catch (e) {
+        logWarning('AuthRepository henüz hazır değil: $e');
+        return false;
+      }
+
+      return true;
     } catch (e) {
-      _handleError('Premium yükseltme', e);
+      logWarning('Firebase hazırlık kontrolü hatası: $e');
+      return false;
     }
   }
 
-  /// Kullanıcının analiz kredilerini günceller
-  /// [creditsToAdd] eklenecek kredi miktarı (negatif değer düşülebilir)
-  Future<void> updateAnalysisCredits(int creditsToAdd) async {
+  /// Anonim giriş yapar
+  ///
+  /// Kullanıcıyı anonim olarak giriş yapar ve ilk kez ise
+  /// onboarding'e yönlendirilmek üzere isFirstTime=true ile işaretler.
+  Future<void> signInAnonymously() async {
     try {
-      if (state.user == null) {
-        logInfo('Kredi güncellemesi yapılamıyor: Kullanıcı oturum açmamış');
+      // Firebase hazırlık kontrolü
+      if (!_isFirebaseReady()) {
+        logWarning('Firebase henüz hazır değil, anonim giriş erteleniyor');
+        emit(const AuthError(
+          message: 'Sistem henüz hazır değil, lütfen bekleyin',
+          isCritical: false,
+        ));
         return;
       }
 
-      _startLoading();
-      final currentCredits = state.user!.analysisCredits;
-      final newCredits = currentCredits + creditsToAdd;
+      // Attempt sayısını artır
+      _anonymousSignInAttempts++;
 
-      // Negatif değer olamaz
-      final finalCredits = newCredits < 0 ? 0 : newCredits;
+      logInfo(
+          'Anonim giriş işlemi başlatılıyor (Deneme: $_anonymousSignInAttempts)');
+      emit(const AuthLoading(message: 'Giriş yapılıyor...'));
 
-      logInfo('Analiz kredisi güncelleniyor: $currentCredits -> $finalCredits');
+      // Anonim giriş yap
+      final UserModel user = await _authRepository.signInAnonymously();
 
-      // Firestore'da kullanıcı dökümanını güncelle
-      final updatedUser =
-          await _userRepository.updateAnalysisCredits(finalCredits);
+      // İlk kez giriş yapan kullanıcı mı kontrol et
+      final bool isFirstTime = await _authRepository.isFirstTimeUser(user.id);
 
-      if (updatedUser != null) {
-        emit(state.copyWith(user: updatedUser, isLoading: false));
-        logSuccess('Analiz kredisi güncellendi: $finalCredits');
-      } else {
-        emit(state.copyWith(isLoading: false));
+      // Başarılı durumda attempt sayısını sıfırla
+      _anonymousSignInAttempts = 0;
+
+      logSuccess('Anonim giriş başarılı', user.id);
+
+      emit(AuthAuthenticated(
+        user: user,
+        isFirstTime: isFirstTime,
+      ));
+    } on FirebaseAuthException catch (error, stackTrace) {
+      handleError('Anonim giriş Firebase hatası', error, stackTrace);
+      emit(AuthError(
+        message: _getFirebaseErrorMessage(error),
+        errorCode: error.code,
+        isCritical: true,
+      ));
+    } catch (error, stackTrace) {
+      handleError('Anonim giriş genel hatası', error, stackTrace);
+
+      // Maksimum deneme sayısına ulaşıldıysa kritik hata
+      final isCritical =
+          _anonymousSignInAttempts >= _maxAnonymousSignInAttempts;
+
+      emit(AuthError(
+        message: isCritical
+            ? 'Giriş yapılırken tekrarlanan hata oluştu. Lütfen uygulamayı yeniden başlatın.'
+            : 'Giriş yapılırken bir sorun oluştu',
+        isCritical: isCritical,
+      ));
+    }
+  }
+
+  /// Çıkış yapar
+  Future<void> signOut() async {
+    try {
+      logInfo('Çıkış işlemi başlatılıyor');
+      emit(const AuthLoading(message: 'Çıkış yapılıyor...'));
+
+      await _authRepository.signOut();
+
+      logSuccess('Çıkış işlemi başarılı');
+
+      emit(const AuthUnauthenticated(
+        reason: 'Kullanıcı çıkış yaptı',
+        hasLoggedInBefore: true,
+      ));
+    } catch (error, stackTrace) {
+      handleError('Çıkış işlemi hatası', error, stackTrace);
+      emit(const AuthError(
+        message: 'Çıkış yapılırken bir sorun oluştu',
+        isCritical: false,
+      ));
+    }
+  }
+
+  /// Kullanıcı verilerini günceller
+  Future<void> updateUser(UserModel updatedUser) async {
+    try {
+      logInfo('Kullanıcı verisi güncelleniyor', updatedUser.id);
+
+      final currentState = state;
+      if (currentState is! AuthAuthenticated) {
+        logWarning('Kullanıcı güncellemesi için authenticated state gerekli');
+        return;
       }
-    } catch (e) {
-      _handleError('Analiz kredisi güncelleme', e);
+
+      emit(const AuthLoading(message: 'Profil güncelleniyor...'));
+
+      final UserModel updated = await _authRepository.updateUser(updatedUser);
+
+      logSuccess('Kullanıcı verisi güncellendi', updated.id);
+
+      emit(currentState.copyWith(user: updated));
+    } catch (error, stackTrace) {
+      handleError('Kullanıcı verisi güncelleme hatası', error, stackTrace);
+      emit(AuthError(
+        message: 'Profil güncellenirken bir sorun oluştu',
+        isCritical: false,
+        previousState: state,
+      ));
     }
   }
 
-  /// Kullanıcının analiz kredilerini kontrol eder
-  /// Yeterli kredi yoksa false döner
-  bool checkCredits() {
-    if (state.user == null) {
-      logInfo('Kredi kontrolü yapılamıyor: Kullanıcı oturum açmamış');
-      return false;
+  /// Kullanıcının analiz kredisini günceller
+  Future<void> updateAnalysisCredits(int newCredits) async {
+    try {
+      final currentState = state;
+      if (currentState is! AuthAuthenticated) {
+        logWarning('Kredi güncellemesi için authenticated state gerekli');
+        return;
+      }
+
+      logInfo('Analiz kredisi güncelleniyor',
+          '${currentState.user.id}: $newCredits');
+
+      final UserModel updated = await _authRepository.updateAnalysisCredits(
+        currentState.user.id,
+        newCredits,
+      );
+
+      logSuccess('Analiz kredisi güncellendi', '${updated.id}: $newCredits');
+
+      emit(currentState.copyWith(user: updated));
+    } catch (error, stackTrace) {
+      handleError('Analiz kredisi güncelleme hatası', error, stackTrace);
+      emit(AuthError(
+        message: 'Kredi güncellenirken bir sorun oluştu',
+        isCritical: false,
+        previousState: state,
+      ));
     }
-
-    // Premium kullanıcılar her zaman analiz yapabilir
-    if (state.user!.isPremium) {
-      return true;
-    }
-
-    // Normal kullanıcılar için kredi kontrolü
-    final hasCredits = state.user!.analysisCredits > 0;
-
-    if (!hasCredits) {
-      logInfo('Yetersiz analiz kredisi: ${state.user!.analysisCredits}');
-    }
-
-    return hasCredits;
   }
 
+  /// Onboarding tamamlandığını işaretler
+  void completeOnboarding() {
+    final currentState = state;
+    if (currentState is! AuthAuthenticated) {
+      logWarning('Onboarding tamamlama için authenticated state gerekli');
+      return;
+    }
+
+    logInfo('Onboarding tamamlandı', currentState.user.id);
+
+    emit(currentState.copyWith(isFirstTime: false));
+  }
+
+  /// Hesabı tamamen siler
+  Future<void> deleteAccount() async {
+    try {
+      final currentState = state;
+      if (currentState is! AuthAuthenticated) {
+        logWarning('Hesap silme için authenticated state gerekli');
+        return;
+      }
+
+      logInfo('Hesap silme işlemi başlatılıyor', currentState.user.id);
+      emit(const AuthLoading(message: 'Hesap siliniyor...'));
+
+      await _authRepository.deleteAccount();
+
+      logSuccess('Hesap başarıyla silindi', currentState.user.id);
+
+      emit(const AuthUnauthenticated(
+        reason: 'Hesap silindi',
+        hasLoggedInBefore: false,
+      ));
+    } catch (error, stackTrace) {
+      handleError('Hesap silme hatası', error, stackTrace);
+      emit(AuthError(
+        message: 'Hesap silinirken bir sorun oluştu',
+        isCritical: true,
+        previousState: state,
+      ));
+    }
+  }
+
+  /// Firestore hata kodunun retry yapılabilir olup olmadığını kontrol eder
+  bool _isRetryableFirestoreError(String errorCode) {
+    switch (errorCode) {
+      case 'unavailable':
+      case 'deadline-exceeded':
+      case 'resource-exhausted':
+      case 'aborted':
+      case 'internal':
+        return true;
+      case 'permission-denied':
+      case 'not-found':
+      case 'already-exists':
+      case 'invalid-argument':
+      case 'unauthenticated':
+        return false;
+      default:
+        // Bilinmeyen hatalar için retry yapma
+        return false;
+    }
+  }
+
+  /// Firestore hata mesajlarını Türkçe'ye çevirir
+  String _getFirestoreErrorMessage(String errorCode) {
+    switch (errorCode) {
+      case 'unavailable':
+        return 'Veritabanı servisi geçici olarak kullanılamıyor';
+      case 'deadline-exceeded':
+        return 'İşlem zaman aşımına uğradı';
+      case 'resource-exhausted':
+        return 'Sistem kaynaklarına erişim sınırı aşıldı';
+      case 'permission-denied':
+        return 'Bu işlem için yetkiniz bulunmuyor';
+      case 'not-found':
+        return 'İstenen veri bulunamadı';
+      case 'already-exists':
+        return 'Bu veri zaten mevcut';
+      case 'invalid-argument':
+        return 'Geçersiz veri gönderildi';
+      case 'unauthenticated':
+        return 'Kimlik doğrulaması gerekli';
+      case 'aborted':
+        return 'İşlem iptal edildi';
+      case 'internal':
+        return 'Sistem iç hatası';
+      default:
+        return 'Veritabanı hatası oluştu';
+    }
+  }
+
+  /// Firebase Auth hata kodlarını Türkçe mesajlara çevirir
+  String _getFirebaseErrorMessage(FirebaseAuthException error) {
+    switch (error.code) {
+      case 'user-not-found':
+        return 'Bu email adresine kayıtlı kullanıcı bulunamadı';
+      case 'wrong-password':
+        return 'Hatalı şifre girdiniz';
+      case 'email-already-in-use':
+        return 'Bu email adresi zaten kullanımda';
+      case 'weak-password':
+        return 'Şifre çok zayıf. En az 6 karakter olmalı';
+      case 'invalid-email':
+        return 'Geçersiz email adresi';
+      case 'too-many-requests':
+        return 'Çok fazla deneme yapıldı. Lütfen daha sonra tekrar deneyin';
+      case 'network-request-failed':
+        return 'İnternet bağlantısı hatası';
+      case 'user-disabled':
+        return 'Bu hesap devre dışı bırakılmış';
+      case 'operation-not-allowed':
+        return 'Bu işlem şu anda izinli değil';
+      case 'invalid-credential':
+        return 'Geçersiz kimlik bilgileri';
+      default:
+        return error.message ?? 'Bilinmeyen bir hata oluştu';
+    }
+  }
+
+  /// BaseCubit'den gelen hata state emit metodu
+  @override
+  void emitErrorState(String errorMessage) {
+    emit(AuthError(
+      message: errorMessage,
+      isCritical: false,
+      previousState: state,
+    ));
+  }
+
+  /// BaseCubit'den gelen loading state emit metodu
+  @override
+  void emitLoadingState() {
+    emit(const AuthLoading());
+  }
+
+  /// Cubit dispose edildiğinde stream subscription'ı iptal et
   @override
   Future<void> close() {
-    _userSubscription?.cancel();
-    _emailVerificationTimer?.cancel();
-    _connectivitySubscription?.cancel();
-    _reconnectTimer?.cancel();
+    logInfo('AuthCubit kapatılıyor');
+    _authSubscription?.cancel();
     return super.close();
   }
 }

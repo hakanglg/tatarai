@@ -97,12 +97,12 @@ class RemoteConfigService {
           'optional_update_message_$actualLocale', 'Yeni sürüm mevcut!');
 
       // Firebase'den alınan değerleri detaylı logla
-      AppLogger.i('Remote Config değerleri (${isAndroid ? 'Android' : 'iOS'}): ' +
-          'latestVersion=$latestVersion, ' +
+      AppLogger.i('Remote Config değerleri (${isAndroid ? 'Android' : 'iOS'}): '
+              'latestVersion=$latestVersion, ' +
           'minVersion=$minVersion, ' +
           'storeUrl=$storeUrl, ' +
-          'forceMsg=${forceMessage.length > 20 ? forceMessage.substring(0, 20) + "..." : forceMessage}, ' +
-          'optionalMsg=${optionalMessage.length > 20 ? optionalMessage.substring(0, 20) + "..." : optionalMessage}');
+          'forceMsg=${forceMessage.length > 20 ? "${forceMessage.substring(0, 20)}..." : forceMessage}, ' +
+          'optionalMsg=${optionalMessage.length > 20 ? "${optionalMessage.substring(0, 20)}..." : optionalMessage}');
 
       return UpdateConfig(
         latestVersion: latestVersion,

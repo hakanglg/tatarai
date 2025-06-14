@@ -2,7 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:tatarai/core/extensions/string_extension.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/features/home/views/home_tab_content.dart';
-import 'package:tatarai/features/plant_analysis/views/analysis/analysis_screen.dart';
+import 'package:tatarai/features/plant_analysis/presentation/views/analysis/analysis_screen.dart';
 import 'package:tatarai/features/profile/views/profile_screen.dart';
 
 /// Navigasyon öğeleri için varsayılan ikonlar ve başlıklar
@@ -35,7 +35,7 @@ class NavigationItems {
   static List<BottomNavigationBarItem> getAllTabs(BuildContext context) => [
         homeTab(context),
         analysisTab(context),
-        profileTab(context),
+        // profileTab(context),
       ];
 
   /// Varsayılan tab itemları (localize edilmemiş, sadece internal kullanım için)
@@ -50,11 +50,11 @@ class NavigationItems {
       activeIcon: Icon(CupertinoIcons.camera_fill),
       label: 'Analiz',
     ),
-    BottomNavigationBarItem(
-      icon: Icon(CupertinoIcons.person),
-      activeIcon: Icon(CupertinoIcons.person_fill),
-      label: 'Profil',
-    ),
+    // BottomNavigationBarItem(
+    //   icon: Icon(CupertinoIcons.person),
+    //   activeIcon: Icon(CupertinoIcons.person_fill),
+    //   label: 'Profil',
+    // ),
   ];
 }
 
@@ -115,7 +115,7 @@ class NavigationManager with ChangeNotifier {
       _screens = [
         const HomeTabContent(),
         const AnalysisScreen(),
-        const ProfileScreen(),
+        // const ProfileScreen(),
       ];
     } catch (e, stack) {
       AppLogger.e('Ekranları yüklerken hata', e, stack);

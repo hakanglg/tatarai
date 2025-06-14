@@ -3,45 +3,114 @@ import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:tatarai/core/base/base_service.dart';
 import 'package:tatarai/core/constants/app_constants.dart';
 import 'package:tatarai/core/utils/validation_util.dart';
 import 'package:tatarai/core/utils/logger.dart';
+import 'package:tatarai/core/models/user_model.dart';
 import 'package:tatarai/features/plant_analysis/services/gemini_service.dart';
-import 'package:tatarai/features/auth/services/auth_service.dart';
+import 'package:tatarai/features/plant_analysis/data/models/plant_analysis_result.dart';
 
-/// Bitki analizi servisi
-/// Kullanıcının analiz hakkı kontrolünü yaparak Gemini servisine yönlendirir
-class PlantAnalysisService extends BaseService {
+/// Plant Analysis Service Result Types
+///
+/// Defines the various result types for plant analysis operations
+enum AnalysisServiceResultType {
+  /// Analysis completed successfully
+  success,
+
+  /// User authentication error (not logged in)
+  userAuthError,
+
+  /// Premium subscription required
+  premiumRequired,
+
+  /// Network connectivity error
+  connectivityError,
+
+  /// Insufficient analysis credits
+  creditError,
+
+  /// External API error
+  apiError,
+
+  /// General/unknown error
+  generalError,
+}
+
+/// Plant Analysis Service
+///
+/// Handles plant analysis operations with user validation, credit management,
+/// and integration with AI analysis services. Follows Clean Architecture
+/// principles with proper separation of concerns.
+///
+/// Features:
+/// - User authentication and authorization
+/// - Credit system management
+/// - Premium feature access control
+/// - Network connectivity validation
+/// - Error handling and logging
+/// - Integration with Gemini AI service
+class PlantAnalysisService {
+  // ============================================================================
+  // DEPENDENCIES
+  // ============================================================================
+
+  /// Gemini AI service for plant analysis
   final GeminiService _geminiService;
-  final FirebaseFirestore _firestore;
-  final FirebaseStorage _storage;
-  final AuthService _authService;
 
-  /// Servis oluşturulurken gerekli bağımlılıkları alır
+  /// Firestore instance for user data management
+  final FirebaseFirestore _firestore;
+
+  /// Firebase Storage for image uploads
+  final FirebaseStorage _storage;
+
+  /// Service name for logging context
+  static const String _serviceName = 'PlantAnalysisService';
+
+  // ============================================================================
+  // CONSTRUCTOR
+  // ============================================================================
+
+  /// Creates PlantAnalysisService with required dependencies
+  ///
+  /// @param geminiService - AI analysis service
+  /// @param firestore - Firestore database instance
+  /// @param storage - Firebase storage instance
   PlantAnalysisService({
-    GeminiService? geminiService,
+    required GeminiService geminiService,
     required FirebaseFirestore firestore,
     required FirebaseStorage storage,
-    required AuthService authService,
-  })  : _geminiService = geminiService ?? GeminiService(),
+  })  : _geminiService = geminiService,
         _firestore = firestore,
-        _storage = storage,
-        _authService = authService;
+        _storage = storage {
+    AppLogger.logWithContext(_serviceName, 'Service initialized');
+  }
 
-  /// Bitki analizi yapar ve kullanıcı kredisini kontrol eder
+  // ============================================================================
+  // PUBLIC METHODS
+  // ============================================================================
+
+  /// Analyzes plant image with comprehensive validation
   ///
-  /// [imageBytes] analiz edilecek görselin bayt dizisi
-  /// [userId] kullanıcı kimliği
-  /// [prompt] analiz talimatları (opsiyonel)
-  /// [location] Konum bilgisi (opsiyonel)
-  /// [province] İl bilgisi (opsiyonel)
-  /// [district] İlçe bilgisi (opsiyonel)
-  /// [neighborhood] Mahalle bilgisi (opsiyonel)
-  /// [fieldName] Tarla adı (opsiyonel)
+  /// Performs complete plant analysis workflow:
+  /// 1. User authentication validation
+  /// 2. Network connectivity check
+  /// 3. User credits verification
+  /// 4. Location info preparation
+  /// 5. AI analysis execution
+  /// 6. Credit deduction
+  ///
+  /// @param imageBytes - Image data to analyze
+  /// @param user - User performing the analysis
+  /// @param prompt - Optional analysis instructions
+  /// @param location - Optional location information
+  /// @param province - Optional province information
+  /// @param district - Optional district information
+  /// @param neighborhood - Optional neighborhood information
+  /// @param fieldName - Optional field name
+  /// @return AnalysisResponse with results or error
   Future<AnalysisResponse> analyzePlant(
     Uint8List imageBytes,
-    String userId, {
+    UserModel user, {
     String? prompt,
     String? location,
     String? province,
@@ -50,60 +119,51 @@ class PlantAnalysisService extends BaseService {
     String? fieldName,
   }) async {
     try {
-      logStart('analyzePlant',
-          'Görsel boyutu: ${imageBytes.length} bayt, UserId: $userId');
+      AppLogger.logWithContext(
+        _serviceName,
+        'Plant analysis started',
+        'Image size: ${imageBytes.length} bytes, User: ${user.id}',
+      );
 
-      // 1. Kullanıcı kontrolü
-      final user = _authService.currentUser;
-      if (user == null) {
-        logError('Kullanıcı oturum açmamış');
-        return AnalysisResponse(
-          success: false,
-          message: 'Kullanıcı oturum açmamış',
-        );
+      // === VALIDATION PHASE ===
+
+      // 1. Basic user validation
+      final userValidationResult = await _validateUser(user);
+      if (!userValidationResult.success) {
+        return userValidationResult;
       }
 
-      // 2. Bağlantı kontrolü
-      final ValidationResult connectivityValidation =
-          await ValidationUtil.checkConnectivity();
-      if (!connectivityValidation.isValid) {
-        logWarning(
-            'Bağlantı kontrolü başarısız', connectivityValidation.message);
-        return AnalysisResponse(
-          success: false,
-          message:
-              connectivityValidation.message ?? 'İnternet bağlantısı hatası',
-        );
+      // 2. Network connectivity check
+      final connectivityValidationResult = await _validateConnectivity();
+      if (!connectivityValidationResult.success) {
+        return connectivityValidationResult;
       }
 
-      // 3. Kullanıcı kredisi kontrolü
-      final ValidationResult creditValidation =
-          await ValidationUtil.checkUserCreditsFromFirestore(
-              userId, _firestore);
-
-      if (!creditValidation.isValid) {
-        logWarning(
-            'Kullanıcı kredisi kontrolü başarısız', creditValidation.message);
-        return AnalysisResponse(
-          success: false,
-          message: creditValidation.message ?? 'Analiz hakkınız bulunmuyor.',
-          needsPremium: creditValidation.needsPremium,
-        );
+      // 3. User credits validation
+      final creditValidationResult = await _validateUserCredits(user.id);
+      if (!creditValidationResult.success) {
+        return creditValidationResult;
       }
 
-      // 4. Konum bilgisini hazırla
+      // === ANALYSIS PHASE ===
+
+      // 4. Prepare location information
       final String locationInfo = _prepareLocationInfo(
-          location: location,
-          province: province,
-          district: district,
-          neighborhood: neighborhood);
+        location: location,
+        province: province,
+        district: district,
+        neighborhood: neighborhood,
+      );
 
-      // 5. Analizi gerçekleştir
+      // 5. Perform AI analysis
       try {
-        logInfo('GeminiService.analyzeImage çağrılıyor',
-            'Görsel boyutu: ${imageBytes.length} bayt');
+        AppLogger.logWithContext(
+          _serviceName,
+          'Calling Gemini AI service',
+          'Image size: ${imageBytes.length} bytes',
+        );
 
-        final result = await _geminiService.analyzeImage(
+        final analysisResult = await _geminiService.analyzeImage(
           imageBytes,
           prompt: prompt,
           location: locationInfo,
@@ -113,272 +173,715 @@ class PlantAnalysisService extends BaseService {
           fieldName: fieldName,
         );
 
-        // 6. Başarılı cevap işleme
-        logSuccess('GeminiService işlemi başarılı',
-            'Yanıt uzunluğu: ${result.length} karakter');
+        AppLogger.successWithContext(
+          _serviceName,
+          'AI analysis completed',
+          'Response length: ${analysisResult.length} characters',
+        );
 
-        // 7. Kredi güncelleme
-        await _updateUserCredits(userId);
+        // 6. Update user credits
+        await _updateUserCredits(user.id);
 
-        // 8. Sonucu döndür
-        logEnd('analyzePlant', 'userId: $userId');
+        // 7. Return successful response
+        AppLogger.successWithContext(
+          _serviceName,
+          'Plant analysis completed successfully',
+          'User: ${user.id}',
+        );
+
         return AnalysisResponse(
           success: true,
-          message: 'Analiz başarıyla tamamlandı.',
-          result: result,
+          message: 'Analysis completed successfully',
+          result: analysisResult,
           location: locationInfo,
           fieldName: fieldName,
+          resultType: AnalysisServiceResultType.success,
         );
       } catch (geminiError) {
-        logError('GeminiService hatası', geminiError.toString());
+        AppLogger.errorWithContext(
+          _serviceName,
+          'Gemini AI service error',
+          geminiError,
+        );
         return _createErrorResponse(geminiError);
       }
-    } catch (e) {
-      logError('Bitki analizi genel hatası', e.toString());
+    } catch (e, stackTrace) {
+      return _handleGeneralError(e, stackTrace, 'Plant analysis general error');
+    }
+  }
+
+  /// Gets disease advice without image analysis (Premium feature)
+  ///
+  /// @param diseaseName - Name of the disease
+  /// @param user - User requesting advice
+  /// @return AnalysisResponse with disease recommendations
+  Future<AnalysisResponse> getDiseaseAdvice(
+    String diseaseName,
+    UserModel user,
+  ) async {
+    try {
+      AppLogger.logWithContext(
+        _serviceName,
+        'Disease advice requested',
+        'Disease: $diseaseName, User: ${user.id}',
+      );
+
+      // 1. Basic user validation
+      final userValidationResult = await _validateUser(user);
+      if (!userValidationResult.success) {
+        return userValidationResult;
+      }
+
+      // 2. Premium access validation
+      final premiumValidationResult = await _validateUserPremium(user.id);
+      if (!premiumValidationResult.success) {
+        return premiumValidationResult;
+      }
+
+      // 3. Get disease recommendations
+      final recommendations = await _geminiService.getDiseaseRecommendations(
+        diseaseName,
+      );
+
+      AppLogger.successWithContext(
+        _serviceName,
+        'Disease advice generated successfully',
+        'User: ${user.id}, Disease: $diseaseName',
+      );
+
+      return AnalysisResponse(
+        success: true,
+        message: 'Disease recommendations retrieved successfully',
+        result: recommendations,
+        resultType: AnalysisServiceResultType.success,
+      );
+    } catch (e, stackTrace) {
+      return _handleGeneralError(e, stackTrace, 'Disease advice error');
+    }
+  }
+
+  /// Gets plant care advice without image analysis (Premium feature)
+  ///
+  /// @param plantName - Name of the plant
+  /// @param user - User requesting advice
+  /// @return AnalysisResponse with care recommendations
+  Future<AnalysisResponse> getPlantCareAdvice(
+    String plantName,
+    UserModel user,
+  ) async {
+    try {
+      AppLogger.logWithContext(
+        _serviceName,
+        'Plant care advice requested',
+        'Plant: $plantName, User: ${user.id}',
+      );
+
+      // 1. Basic user validation
+      final userValidationResult = await _validateUser(user);
+      if (!userValidationResult.success) {
+        return userValidationResult;
+      }
+
+      // 2. Premium access validation
+      final premiumValidationResult = await _validateUserPremium(user.id);
+      if (!premiumValidationResult.success) {
+        return premiumValidationResult;
+      }
+
+      // 3. Get plant care advice
+      final careAdvice = await _geminiService.getPlantCareAdvice(plantName);
+
+      AppLogger.successWithContext(
+        _serviceName,
+        'Plant care advice generated successfully',
+        'User: ${user.id}, Plant: $plantName',
+      );
+
+      return AnalysisResponse(
+        success: true,
+        message: 'Plant care recommendations retrieved successfully',
+        result: careAdvice,
+        resultType: AnalysisServiceResultType.success,
+      );
+    } catch (e, stackTrace) {
+      return _handleGeneralError(e, stackTrace, 'Plant care advice error');
+    }
+  }
+
+  /// Uploads image to Firebase Storage
+  ///
+  /// @param imageFile - Image file to upload
+  /// @return Image download URL
+  Future<String> uploadImage(File imageFile) async {
+    try {
+      AppLogger.logWithContext(
+        _serviceName,
+        'Uploading image to storage',
+        'File path: ${imageFile.path}',
+      );
+
+      final fileName = 'analyses/${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final storageRef = _storage.ref().child(fileName);
+
+      final uploadTask = await storageRef.putFile(imageFile);
+      final imageUrl = await uploadTask.ref.getDownloadURL();
+
+      AppLogger.successWithContext(
+        _serviceName,
+        'Image uploaded successfully',
+        imageUrl,
+      );
+
+      return imageUrl;
+    } catch (e, stackTrace) {
+      AppLogger.errorWithContext(
+        _serviceName,
+        'Image upload error',
+        e,
+        stackTrace,
+      );
+      rethrow;
+    }
+  }
+
+  /// Analyzes image and returns structured result
+  ///
+  /// @param imageUrl - URL of uploaded image
+  /// @param location - Location information
+  /// @param fieldName - Optional field name
+  /// @return PlantAnalysisResult with structured data
+  Future<PlantAnalysisResult> analyzeImage({
+    required String imageUrl,
+    required String location,
+    String? fieldName,
+  }) async {
+    try {
+      AppLogger.logWithContext(
+        _serviceName,
+        'Analyzing image with structured response',
+        'URL: $imageUrl',
+      );
+
+      // TODO: Integrate with actual AI analysis service
+      // This is a placeholder implementation
+      final analysisResult = PlantAnalysisResult(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        plantName: 'Sample Plant',
+        probability: 0.95,
+        isHealthy: true,
+        diseases: [],
+        description: 'This is a sample analysis result for development.',
+        suggestions: [
+          'Maintain regular watering schedule',
+          'Provide adequate sunlight exposure',
+          'Apply fertilizer weekly',
+        ],
+        imageUrl: imageUrl,
+        similarImages: [],
+        location: location,
+        fieldName: fieldName,
+        timestamp: DateTime.now().millisecondsSinceEpoch,
+      );
+
+      AppLogger.successWithContext(
+        _serviceName,
+        'Image analysis completed',
+        'Plant: ${analysisResult.plantName}',
+      );
+
+      return analysisResult;
+    } catch (e, stackTrace) {
+      AppLogger.errorWithContext(
+        _serviceName,
+        'Image analysis error',
+        e,
+        stackTrace,
+      );
+      rethrow;
+    }
+  }
+
+  /// Converts file to byte array
+  ///
+  /// @param file - File to convert
+  /// @return Byte array representation
+  Future<Uint8List> fileToBytes(File file) async {
+    try {
+      AppLogger.logWithContext(
+        _serviceName,
+        'Converting file to bytes',
+        'File: ${file.path}',
+      );
+
+      final bytes = await file.readAsBytes();
+
+      AppLogger.successWithContext(
+        _serviceName,
+        'File converted to bytes',
+        'Size: ${bytes.length} bytes',
+      );
+
+      return bytes;
+    } catch (e, stackTrace) {
+      AppLogger.errorWithContext(
+        _serviceName,
+        'File to bytes conversion error',
+        e,
+        stackTrace,
+      );
+      rethrow;
+    }
+  }
+
+  // ============================================================================
+  // PRIVATE VALIDATION METHODS
+  // ============================================================================
+
+  /// Validates user authentication
+  ///
+  /// @param user - User to validate
+  /// @return AnalysisResponse indicating validation result
+  Future<AnalysisResponse> _validateUser(UserModel user) async {
+    try {
+      // Basic user validation
+      if (user.id.isEmpty) {
+        AppLogger.warnWithContext(
+          _serviceName,
+          'Invalid user ID provided',
+        );
+        return AnalysisResponse(
+          success: false,
+          message: 'Invalid user authentication',
+          resultType: AnalysisServiceResultType.userAuthError,
+        );
+      }
+
+      // Check if user exists in Firestore
+      final userDoc = await _firestore
+          .collection(AppConstants.usersCollection)
+          .doc(user.id)
+          .get();
+
+      if (!userDoc.exists) {
+        AppLogger.warnWithContext(
+          _serviceName,
+          'User not found in database',
+          user.id,
+        );
+        return AnalysisResponse(
+          success: false,
+          message: 'User not found',
+          resultType: AnalysisServiceResultType.userAuthError,
+        );
+      }
+
+      return AnalysisResponse(
+        success: true,
+        message: 'User validated successfully',
+      );
+    } catch (e, stackTrace) {
+      AppLogger.errorWithContext(
+        _serviceName,
+        'User validation error',
+        e,
+        stackTrace,
+      );
       return AnalysisResponse(
         success: false,
-        message:
-            'Analiz sırasında bir hata oluştu: ${e.toString().substring(0, e.toString().length > 100 ? 100 : e.toString().length)}...',
+        message: 'User validation failed',
+        resultType: AnalysisServiceResultType.generalError,
       );
     }
   }
 
-  /// Kullanıcı kredisini günceller
-  Future<void> _updateUserCredits(String userId) async {
+  /// Validates network connectivity
+  ///
+  /// @return AnalysisResponse indicating connectivity status
+  Future<AnalysisResponse> _validateConnectivity() async {
     try {
-      // Kullanıcı verilerini al
-      final userDocRef = await _firestore
+      final connectivityValidation = await ValidationUtil.checkConnectivity();
+
+      if (!connectivityValidation.isValid) {
+        AppLogger.warnWithContext(
+          _serviceName,
+          'Network connectivity validation failed',
+          connectivityValidation.message,
+        );
+        return AnalysisResponse(
+          success: false,
+          message:
+              connectivityValidation.message ?? 'Network connectivity error',
+          resultType: AnalysisServiceResultType.connectivityError,
+        );
+      }
+
+      return AnalysisResponse(
+        success: true,
+        message: 'Network connectivity validated',
+      );
+    } catch (e, stackTrace) {
+      AppLogger.errorWithContext(
+        _serviceName,
+        'Connectivity validation error',
+        e,
+        stackTrace,
+      );
+      return AnalysisResponse(
+        success: false,
+        message: 'Network connectivity check failed',
+        resultType: AnalysisServiceResultType.connectivityError,
+      );
+    }
+  }
+
+  /// Validates user credits for analysis
+  ///
+  /// @param userId - User ID to check credits for
+  /// @return AnalysisResponse indicating credit status
+  Future<AnalysisResponse> _validateUserCredits(String userId) async {
+    try {
+      final creditValidation =
+          await ValidationUtil.checkUserCreditsFromFirestore(
+        userId,
+        _firestore,
+      );
+
+      if (!creditValidation.isValid) {
+        AppLogger.warnWithContext(
+          _serviceName,
+          'User credits validation failed',
+          creditValidation.message,
+        );
+        return AnalysisResponse(
+          success: false,
+          message: creditValidation.message ?? 'Insufficient analysis credits',
+          needsPremium: creditValidation.needsPremium,
+          resultType: AnalysisServiceResultType.creditError,
+        );
+      }
+
+      return AnalysisResponse(
+        success: true,
+        message: 'User credits validated',
+      );
+    } catch (e, stackTrace) {
+      AppLogger.errorWithContext(
+        _serviceName,
+        'Credits validation error',
+        e,
+        stackTrace,
+      );
+      return AnalysisResponse(
+        success: false,
+        message: 'Credit validation failed',
+        resultType: AnalysisServiceResultType.generalError,
+      );
+    }
+  }
+
+  /// Validates user premium subscription
+  ///
+  /// @param userId - User ID to check premium status
+  /// @return AnalysisResponse indicating premium status
+  Future<AnalysisResponse> _validateUserPremium(String userId) async {
+    try {
+      final userDoc = await _firestore
           .collection(AppConstants.usersCollection)
           .doc(userId)
           .get();
-      final userDataMap = userDocRef.data();
-      final bool isPremium = userDataMap?['isPremium'] ?? false;
 
-      // Premium değilse, krediyi azalt
+      final userData = userDoc.data();
+      final bool isPremium = userData?['isPremium'] ?? false;
+
+      if (!isPremium) {
+        AppLogger.warnWithContext(
+          _serviceName,
+          'Non-premium user requested premium feature',
+          userId,
+        );
+        return AnalysisResponse(
+          success: false,
+          message: 'This feature is available only for premium users',
+          needsPremium: true,
+          resultType: AnalysisServiceResultType.premiumRequired,
+        );
+      }
+
+      return AnalysisResponse(
+        success: true,
+        message: 'Premium user validated',
+      );
+    } catch (e, stackTrace) {
+      AppLogger.errorWithContext(
+        _serviceName,
+        'Premium validation error',
+        e,
+        stackTrace,
+      );
+      return AnalysisResponse(
+        success: false,
+        message: 'Premium validation failed',
+        resultType: AnalysisServiceResultType.generalError,
+      );
+    }
+  }
+
+  // ============================================================================
+  // PRIVATE HELPER METHODS
+  // ============================================================================
+
+  /// Updates user credits after successful analysis
+  ///
+  /// @param userId - User ID to update credits for
+  Future<void> _updateUserCredits(String userId) async {
+    try {
+      final userDoc = await _firestore
+          .collection(AppConstants.usersCollection)
+          .doc(userId)
+          .get();
+
+      final userData = userDoc.data();
+      final bool isPremium = userData?['isPremium'] ?? false;
+
+      // Only deduct credits for non-premium users
       if (!isPremium) {
         await _firestore
             .collection(AppConstants.usersCollection)
             .doc(userId)
-            .update({'analysisCredits': FieldValue.increment(-1)});
+            .update({
+          'analysisCredits': FieldValue.increment(-1),
+        });
 
-        // Kalan kredi sayısını log'la
-        final int userCredits = userDataMap?['analysisCredits'] ?? 0;
-        final int remainingCredits = userCredits - 1;
-        logInfo(
-            'Kullanıcı kredisi düşürüldü', 'Kalan kredi: $remainingCredits');
+        final int currentCredits = userData?['analysisCredits'] ?? 0;
+        final int remainingCredits = currentCredits - 1;
+
+        AppLogger.successWithContext(
+          _serviceName,
+          'User credits updated',
+          'Remaining credits: $remainingCredits',
+        );
+      } else {
+        AppLogger.logWithContext(
+          _serviceName,
+          'Premium user - no credit deduction',
+          userId,
+        );
       }
-    } catch (e) {
-      logWarning('Kredi güncellemesi yapılamadı', e.toString());
-      // Kredi güncellemesi yapılamazsa hata fırlatma, işleme devam et
+    } catch (e, stackTrace) {
+      AppLogger.errorWithContext(
+        _serviceName,
+        'Credit update error',
+        e,
+        stackTrace,
+      );
+      // Don't throw error for credit update failures
+      // Analysis was successful, credit update is secondary
     }
   }
 
-  /// Konum bilgisini hazırlar
-  String _prepareLocationInfo(
-      {String? location,
-      String? province,
-      String? district,
-      String? neighborhood}) {
-    String detailedLocation = "";
+  /// Prepares location information string
+  ///
+  /// @param location - Base location
+  /// @param province - Province information
+  /// @param district - District information
+  /// @param neighborhood - Neighborhood information
+  /// @return Formatted location string
+  String _prepareLocationInfo({
+    String? location,
+    String? province,
+    String? district,
+    String? neighborhood,
+  }) {
+    final List<String> locationParts = [];
 
-    // İl, ilçe ve mahalle bilgilerinden detaylı konum oluştur
-    if (province != null && district != null) {
-      detailedLocation = "$province/$district";
-      if (neighborhood != null && neighborhood.isNotEmpty) {
-        detailedLocation += "/$neighborhood";
+    // Build detailed location from administrative divisions
+    if (province != null && province.isNotEmpty) {
+      locationParts.add(province);
+
+      if (district != null && district.isNotEmpty) {
+        locationParts.add(district);
+
+        if (neighborhood != null && neighborhood.isNotEmpty) {
+          locationParts.add(neighborhood);
+        }
       }
     }
 
-    // Detaylı konum yoksa verilen lokasyonu kullan
-    return detailedLocation.isNotEmpty
-        ? detailedLocation
-        : (location != null && location.isNotEmpty)
-            ? location
-            : "Tekirdağ/Tatarlı";
+    // Use detailed location if available, otherwise use provided location
+    if (locationParts.isNotEmpty) {
+      return locationParts.join('/');
+    }
+
+    if (location != null && location.isNotEmpty) {
+      return location;
+    }
+
+    // Default location if nothing provided
+    return 'Unknown Location';
   }
 
-  /// API hatası için yanıt oluşturur
-  AnalysisResponse _createErrorResponse(dynamic geminiError) {
-    String errorMessage =
-        'Analiz sırasında bir hata oluştu: ${geminiError.toString()}';
+  /// Creates error response for API failures
+  ///
+  /// @param error - Error object from API
+  /// @return AnalysisResponse with appropriate error details
+  AnalysisResponse _createErrorResponse(dynamic error) {
+    final String errorString = error.toString().toLowerCase();
+    String errorMessage = 'Analysis error occurred';
+    AnalysisServiceResultType resultType = AnalysisServiceResultType.apiError;
 
-    if (geminiError.toString().contains('API anahtarı')) {
+    // Categorize error based on content
+    if (errorString.contains('api key') ||
+        errorString.contains('api anahtarı')) {
       errorMessage =
-          'API anahtarı hatası: Lütfen daha sonra tekrar deneyin veya destek ile iletişime geçin.';
-    } else if (geminiError.toString().contains('Network')) {
+          'API key error. Please try again later or contact support.';
+    } else if (errorString.contains('network') ||
+        errorString.contains('connection')) {
       errorMessage =
-          'Ağ hatası: İnternet bağlantınızı kontrol edin ve tekrar deneyin.';
-    } else if (geminiError.toString().contains('403')) {
-      errorMessage = 'Yetkilendirme hatası: Gemini API erişimi sağlanamadı.';
+          'Network error. Please check your internet connection and try again.';
+      resultType = AnalysisServiceResultType.connectivityError;
+    } else if (errorString.contains('403') ||
+        errorString.contains('unauthorized')) {
+      errorMessage =
+          'Authorization error. API access could not be established.';
+    } else if (errorString.contains('timeout')) {
+      errorMessage = 'Request timeout. Please try again.';
+    } else {
+      errorMessage =
+          'Analysis service temporarily unavailable. Please try again later.';
     }
 
     return AnalysisResponse(
       success: false,
       message: errorMessage,
+      resultType: resultType,
     );
   }
 
-  /// Görsel olmadan hastalık önerisi alır
+  /// Handles general errors with logging
   ///
-  /// [diseaseName] hastalık adı
-  /// [userId] kullanıcı kimliği
-  Future<AnalysisResponse> getDiseaseAdvice(
-    String diseaseName,
-    String userId,
-  ) async {
-    try {
-      final user = _authService.currentUser;
-      if (user == null) {
-        logError('Kullanıcı oturum açmamış');
-        return AnalysisResponse(
-          success: false,
-          message: 'Kullanıcı oturum açmamış',
-        );
-      }
+  /// @param error - Error object
+  /// @param stackTrace - Stack trace for debugging
+  /// @param context - Error context description
+  /// @return AnalysisResponse with error details
+  AnalysisResponse _handleGeneralError(
+    dynamic error,
+    StackTrace stackTrace,
+    String context,
+  ) {
+    AppLogger.errorWithContext(
+      _serviceName,
+      context,
+      error,
+      stackTrace,
+    );
 
-      // ValidationUtil ile premium kullanıcı kontrolü
-      final ValidationResult creditValidation =
-          await ValidationUtil.checkUserCreditsFromFirestore(
-              userId, _firestore);
-      final userDocRef = await _firestore
-          .collection(AppConstants.usersCollection)
-          .doc(userId)
-          .get();
-      final userDataMap = userDocRef.data();
-      final bool isPremium = userDataMap?['isPremium'] ?? false;
+    // Truncate error message for user display
+    final String errorMessage = error.toString();
+    final String truncatedMessage = errorMessage.length > 100
+        ? '${errorMessage.substring(0, 100)}...'
+        : errorMessage;
 
-      // Bu özellik sadece premium kullanıcılar için
-      if (!isPremium) {
-        logWarning('Premium olmayan kullanıcı hastalık önerisi istedi',
-            'userId: $userId');
-        return AnalysisResponse(
-          success: false,
-          message:
-              'Detaylı hastalık önerileri sadece premium kullanıcılar için sunulmaktadır.',
-          needsPremium: true,
-        );
-      }
-
-      // Premium kullanıcı - öneri al
-      final result = await _geminiService.getDiseaseRecommendations(
-        diseaseName,
-      );
-
-      logSuccess('Hastalık önerileri başarıyla getirildi',
-          'userId: $userId, disease: $diseaseName');
-      return AnalysisResponse(
-        success: true,
-        message: 'Hastalık önerileri başarıyla getirildi.',
-        result: result,
-      );
-    } catch (e) {
-      logError('Hastalık önerileri alınırken hata oluştu', e.toString());
-      return AnalysisResponse(
-        success: false,
-        message: 'Öneriler alınırken bir hata oluştu: ${e.toString()}',
-      );
-    }
-  }
-
-  /// Görsel olmadan bitki bakım tavsiyeleri alır
-  ///
-  /// [plantId] bitki adı
-  /// [userId] kullanıcı kimliği
-  Future<AnalysisResponse> getPlantCareAdvice(
-    String plantId,
-    String userId,
-  ) async {
-    try {
-      final user = _authService.currentUser;
-      if (user == null) {
-        logError('Kullanıcı oturum açmamış');
-        throw Exception('Kullanıcı oturum açmamış');
-      }
-
-      // Kullanıcının premium olup olmadığını kontrol et
-      final userDocRef = await _firestore
-          .collection(AppConstants.usersCollection)
-          .doc(userId)
-          .get();
-      final userDataMap = userDocRef.data();
-      final bool isPremium = userDataMap?['isPremium'] ?? false;
-
-      // Bu özellik sadece premium kullanıcılar için
-      if (!isPremium) {
-        logWarning('Premium olmayan kullanıcı bakım önerisi istedi',
-            'userId: $userId');
-        return AnalysisResponse(
-          success: false,
-          message:
-              'Detaylı bakım önerileri sadece premium kullanıcılar için sunulmaktadır.',
-          needsPremium: true,
-        );
-      }
-
-      logInfo('Bitki bakım önerisi alınıyor...');
-
-      // Premium kullanıcı - öneri al
-      final result = await _geminiService.getPlantCareAdvice(
-        plantId,
-      );
-
-      logSuccess('Bitki bakım önerileri başarıyla getirildi',
-          'userId: $userId, plantId: $plantId');
-      return AnalysisResponse(
-        success: true,
-        message: 'Bitki bakım önerileri başarıyla getirildi.',
-        result: result,
-      );
-    } catch (e) {
-      logError('Bitki bakım önerisi alınırken hata oluştu', e.toString());
-      return AnalysisResponse(
-        success: false,
-        message:
-            'Bitki bakım önerisi alınırken bir hata oluştu: ${e.toString()}',
-      );
-    }
-  }
-
-  /// Dosyadan bayt dizisi oluşturur
-  ///
-  /// [file] dosya
-  Future<Uint8List> fileToBytes(File file) async {
-    try {
-      return await file.readAsBytes();
-    } catch (e) {
-      logError('Dosyadan bayt dizisi oluşturma hatası', e.toString());
-      rethrow;
-    }
+    return AnalysisResponse(
+      success: false,
+      message: 'Operation failed: $truncatedMessage',
+      resultType: AnalysisServiceResultType.generalError,
+    );
   }
 }
 
-/// Analiz cevabı için model sınıfı
+// ============================================================================
+// ANALYSIS RESPONSE MODEL
+// ============================================================================
+
+/// Analysis Response Model
+///
+/// Represents the response from plant analysis operations.
+/// Contains success status, user message, results, and metadata.
 class AnalysisResponse {
-  /// İşlem başarılı mı
+  /// Whether the operation was successful
   final bool success;
 
-  /// Kullanıcıya gösterilecek mesaj
+  /// User-friendly message describing the result
   final String message;
 
-  /// Analiz sonucu (varsa)
+  /// Analysis result content (if successful)
   final String? result;
 
-  /// Premium özellik gerektiriyor mu
+  /// Whether premium subscription is required
   final bool needsPremium;
 
-  /// Konum bilgisi (opsiyonel)
+  /// Location information used in analysis
   final String? location;
 
-  /// Tarla adı (opsiyonel)
+  /// Field name used in analysis
   final String? fieldName;
 
-  /// Analiz cevabı oluşturur
-  AnalysisResponse({
+  /// Type of result for categorization
+  final AnalysisServiceResultType? resultType;
+
+  /// Creates an AnalysisResponse
+  ///
+  /// @param success - Operation success status
+  /// @param message - User-friendly message
+  /// @param result - Analysis result content
+  /// @param needsPremium - Premium requirement flag
+  /// @param location - Location information
+  /// @param fieldName - Field name
+  /// @param resultType - Result type classification
+  const AnalysisResponse({
     required this.success,
     required this.message,
     this.result,
     this.needsPremium = false,
     this.location,
     this.fieldName,
+    this.resultType,
   });
+
+  /// Creates a successful response
+  ///
+  /// @param message - Success message
+  /// @param result - Analysis result
+  /// @param location - Location information
+  /// @param fieldName - Field name
+  /// @return AnalysisResponse with success status
+  factory AnalysisResponse.success({
+    required String message,
+    String? result,
+    String? location,
+    String? fieldName,
+  }) {
+    return AnalysisResponse(
+      success: true,
+      message: message,
+      result: result,
+      location: location,
+      fieldName: fieldName,
+      resultType: AnalysisServiceResultType.success,
+    );
+  }
+
+  /// Creates an error response
+  ///
+  /// @param message - Error message
+  /// @param resultType - Error type
+  /// @param needsPremium - Premium requirement flag
+  /// @return AnalysisResponse with error status
+  factory AnalysisResponse.error({
+    required String message,
+    required AnalysisServiceResultType resultType,
+    bool needsPremium = false,
+  }) {
+    return AnalysisResponse(
+      success: false,
+      message: message,
+      resultType: resultType,
+      needsPremium: needsPremium,
+    );
+  }
+
+  @override
+  String toString() {
+    return 'AnalysisResponse(success: $success, message: $message, resultType: $resultType)';
+  }
 }

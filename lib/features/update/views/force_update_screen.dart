@@ -1,5 +1,4 @@
 // lib/features/update/screens/force_update_screen.dart
-import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';

@@ -20,16 +20,12 @@ class AppConstants {
   static const String entitlementId = 'premium';
 
   // Ücretsiz kullanıcı için analiz kredisi
-  static const int FREE_ANALYSIS_CREDITS = 3;
+  static const int FREE_ANALYSIS_CREDITS = 5;
 
   // Firebase collection isimleri
   static const String usersCollection = 'users';
   static const String paymentsCollection = 'payments';
   static const String settingsCollection = 'settings';
-
-  /// Analizler koleksiyonu (ESKİ - flat yapı)
-  /// [Geçiş sonrası kaldırılacak]
-  static const String analysisCollection = 'analyses';
 
   /// Kullanıcının analizler alt koleksiyonu
   /// Yeni hiyerarşik yapı: users/{userId}/analyses/{analysisId}
@@ -46,42 +42,17 @@ class AppConstants {
   static const String subscriptionYearlyId = 'tatarai_premium_yearly';
   static const String subscriptionLifetimeId = 'tatarai_premium_lifetime';
 
-  // Varsayılan abonelik fiyatları
-  static const String defaultMonthlyPrice = '₺49.99/ay';
-  static const String defaultYearlyPrice = '₺399.99/yıl';
-  static const String defaultMonthlyOfYearlyPrice = '₺33.33';
-  static const String defaultLifetimePrice = '₺799.99';
-  static const double savingsPercentage = 30;
-
   // Resim sıkıştırma kalitesi (0-100)
   static const int imageQuality = 80;
-
-  // Hata mesajları
-  static const String errorGeneric = 'Bir hata oluştu. Lütfen tekrar deneyin.';
-  static const String errorNoInternet = 'İnternet bağlantısı bulunamadı.';
-  static const String errorTimeout = 'Bağlantı zaman aşımına uğradı.';
-  static const String errorImageUpload = 'Resim yüklenirken bir hata oluştu.';
-  static const String errorAnalysis = 'Analiz sırasında bir hata oluştu.';
-  static const String errorAuthentication = 'Giriş yapılırken bir hata oluştu.';
-  static const String errorPurchase =
-      'Satın alma işlemi sırasında bir hata oluştu.';
-
-  // Başarı mesajları
-  static const String successAnalysis = 'Analiz başarıyla tamamlandı.';
-  static const String successImageUpload = 'Resim başarıyla yüklendi.';
-  static const String successAuthentication = 'Giriş başarıyla tamamlandı.';
-  static const String successPurchase =
-      'Satın alma işlemi başarıyla tamamlandı.';
-
-  // Uyarı mesajları
-  static const String warningImageQuality =
-      'Daha iyi sonuçlar için net bir fotoğraf çekin.';
-  static const String warningSubscriptionExpiring =
-      'Aboneliğiniz yakında sona erecek.';
-  static const String warningTokensLow = 'Token sayınız azalıyor.';
 
   // Animasyon süreleri (milisaniye cinsinden)
   static const int animationDurationFast = 200;
   static const int animationDurationMedium = 350;
   static const int animationDurationSlow = 500;
+
+  // Analiz Kredileri
+  static const int PREMIUM_MONTHLY_CREDITS = 100; // Premium aylık kredi
+  static const int PREMIUM_YEARLY_CREDITS = 1200; // Premium yıllık kredi
+  static const double MINIMUM_IDENTIFICATION_PROBABILITY =
+      0.4; // Tanımlama için minimum olasılık
 }

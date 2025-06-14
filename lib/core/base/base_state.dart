@@ -8,9 +8,16 @@ abstract class BaseState extends Equatable {
   /// Hata mesajı
   final String? errorMessage;
 
+  /// Hata nesnesi (örneğin Exception)
+  final dynamic error;
+
   /// Default constructor
-  const BaseState({this.isLoading = false, this.errorMessage});
+  const BaseState({
+    this.isLoading = false,
+    this.errorMessage,
+    this.error,
+  });
 
   @override
-  List<Object?> get props => [isLoading, errorMessage];
+  List<Object?> get props => [isLoading, errorMessage, error];
 }

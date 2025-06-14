@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:tatarai/core/utils/logger.dart';
-import 'package:tatarai/features/plant_analysis/models/location_models.dart';
+import 'package:tatarai/features/plant_analysis/data/models/location_models.dart';
 
 /// Service for fetching location data (provinces, districts, neighborhoods) from API
 class LocationService {

@@ -18,6 +18,11 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # of the product and file versions while build-number is used as the build suffix.
 version: 1.0.1
 
+# Platform kısıtlaması
+platforms:
+  android:
+  ios:
+
 environment:
   sdk: ^3.6.0
 
@@ -59,6 +64,8 @@ dependencies:
   firebase_auth: ^5.5.2
   cloud_firestore: ^5.6.6
   firebase_storage: ^12.4.5
+  firebase_crashlytics: ^4.3.5
+  firebase_remote_config: ^5.4.3
 
   # Animations
   lottie: ^3.3.1
@@ -72,6 +79,8 @@ dependencies:
   permission_handler: ^12.0.0+1
   url_launcher: ^6.3.1
   flutter_image_compress: ^2.4.0
+
+  get_it: ^8.0.3
 
   
   # Payment
@@ -88,9 +97,11 @@ dependencies:
   google_generative_ai: ^0.4.6
   device_info_plus: ^11.4.0
   app_settings: ^6.1.1
-  firebase_crashlytics: ^4.3.5
   package_info_plus: ^8.3.0
-  firebase_remote_config: ^5.4.3
+
+  # Platform support
+  flutter_web_plugins:
+    sdk: flutter
 
 dev_dependencies:
   flutter_test:
@@ -184,3 +195,4 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
