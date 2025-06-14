@@ -521,7 +521,7 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
   }
 
   /// Yapay zeka analizi başlatma
-  void _startAnalysis() {
+  void _startAnalysis() async {
     if (_selectedImage == null) {
       _showErrorDialog('select_photo_first'.locale(context));
       return;
@@ -534,6 +534,26 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
       return;
     }
 
+    // Kullanıcının authentication durumunu kontrol et
+    final authState = context.read<AuthCubit>().state;
+    if (authState is! AuthAuthenticated) {
+      // Eğer kullanıcı authenticated değilse, anonim giriş yapmaya çalış
+      AppLogger.w('Kullanıcı authenticated değil, anonim giriş yapılıyor...');
+      try {
+        await context.read<AuthCubit>().signInAnonymously();
+        // Giriş sonrası tekrar kontrol et
+        final newAuthState = context.read<AuthCubit>().state;
+        if (newAuthState is! AuthAuthenticated) {
+          _showErrorDialog('Analiz yapmak için giriş yapmanız gerekiyor');
+          return;
+        }
+      } catch (e) {
+        AppLogger.e('Anonim giriş hatası: $e');
+        _showErrorDialog('Giriş yapılırken hata oluştu: $e');
+        return;
+      }
+    }
+
     // Haptic feedback ekle
     HapticFeedback.heavyImpact();
 
@@ -543,11 +563,14 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
         ? _fieldNameController.text.trim()
         : null;
 
+    // Güncel auth state'i al
+    final currentAuthState =
+        context.read<AuthCubit>().state as AuthAuthenticated;
+
     // Plant Analysis Cubit'i üzerinden analizi başlat
     context.read<PlantAnalysisCubit>().analyzeAndSave(
           _selectedImage!,
-          // TODO: Get current user from auth cubit
-          UserModel.anonymous(id: 'temp_user'),
+          currentAuthState.user, // Gerçek kullanıcıyı AuthCubit'den al
         );
   }
 

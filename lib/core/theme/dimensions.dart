@@ -67,23 +67,23 @@ class AppDimensions {
   double get iconSizeXS => isSmallScreen ? unit * 3 : 16;
 
   // Font boyutları
-  /// Aşırı büyük font boyutu: 32dp veya ekran genişliğine göre ölçeklendirilmiş değer
-  double get fontSizeXXL => isSmallScreen ? unit * 6.4 : 32;
+  /// Aşırı büyük font boyutu: 35dp veya ekran genişliğine göre ölçeklendirilmiş değer
+  double get fontSizeXXL => isSmallScreen ? unit * 7 : 35;
 
-  /// Alt başlık font boyutu: 24dp veya ekran genişliğine göre ölçeklendirilmiş değer
-  double get fontSizeXL => isSmallScreen ? unit * 5 : 24;
+  /// Alt başlık font boyutu: 27dp veya ekran genişliğine göre ölçeklendirilmiş değer
+  double get fontSizeXL => isSmallScreen ? unit * 5.4 : 27;
 
-  /// Büyük font boyutu: 20dp veya ekran genişliğine göre ölçeklendirilmiş değer
-  double get fontSizeL => isSmallScreen ? unit * 4 : 20;
+  /// Büyük font boyutu: 23dp veya ekran genişliğine göre ölçeklendirilmiş değer
+  double get fontSizeL => isSmallScreen ? unit * 4.6 : 23;
 
-  /// Normal font boyutu: 16dp veya ekran genişliğine göre ölçeklendirilmiş değer
-  double get fontSizeM => isSmallScreen ? unit * 3.2 : 16;
+  /// Normal font boyutu: 19dp veya ekran genişliğine göre ölçeklendirilmiş değer
+  double get fontSizeM => isSmallScreen ? unit * 3.8 : 19;
 
-  /// Küçük font boyutu: 14dp veya ekran genişliğine göre ölçeklendirilmiş değer
-  double get fontSizeS => isSmallScreen ? unit * 2.8 : 14;
+  /// Küçük font boyutu: 17dp veya ekran genişliğine göre ölçeklendirilmiş değer
+  double get fontSizeS => isSmallScreen ? unit * 3.4 : 17;
 
-  /// Çok küçük font boyutu: 12dp veya ekran genişliğine göre ölçeklendirilmiş değer
-  double get fontSizeXS => isSmallScreen ? unit * 2.4 : 12;
+  /// Çok küçük font boyutu: 15dp veya ekran genişliğine göre ölçeklendirilmiş değer
+  double get fontSizeXS => isSmallScreen ? unit * 3 : 15;
 
   // Radius değerleri
   /// Küçük border radius: 4dp veya ekran genişliğine göre ölçeklendirilmiş değer

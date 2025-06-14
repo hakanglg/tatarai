@@ -9,9 +9,12 @@ import 'firestore/firestore_service.dart';
 import '../repositories/auth_repository.dart';
 import '../../features/plant_analysis/services/gemini_service.dart';
 import '../../features/plant_analysis/services/location_service.dart';
+import '../../features/plant_analysis/presentation/cubits/plant_analysis_cubit.dart';
+import '../../core/repositories/plant_analysis_repository.dart';
 import '../../features/payment/cubits/payment_cubit.dart';
 import '../../features/home/cubits/home_cubit.dart';
 import '../utils/logger.dart';
+import '../../features/plant_analysis/services/plant_analysis_service.dart';
 
 /// Dependency injection için service locator
 ///
@@ -136,6 +139,30 @@ class ServiceLocator {
     // Home Cubit
     _getIt.registerFactory<HomeCubit>(
       () => HomeCubit(),
+    );
+
+    // Plant Analysis Service
+    _getIt.registerLazySingleton<PlantAnalysisService>(
+      () => PlantAnalysisService(
+        geminiService: _getIt<GeminiService>(),
+        firestore: _getIt<FirebaseFirestore>(),
+        storage: _getIt<FirebaseStorage>(),
+      ),
+    );
+
+    // Plant Analysis Repository
+    _getIt.registerLazySingleton<PlantAnalysisRepository>(
+      () => PlantAnalysisRepositoryImpl(
+        firestoreService: _getIt<FirestoreServiceInterface>(),
+        analysisService: _getIt<PlantAnalysisService>(),
+      ),
+    );
+
+    // Plant Analysis Cubit
+    _getIt.registerFactory<PlantAnalysisCubit>(
+      () => PlantAnalysisCubit(
+        repository: _getIt<PlantAnalysisRepository>(),
+      ),
     );
 
     AppLogger.logWithContext(
@@ -291,6 +318,14 @@ class Services {
 
   /// Home cubit'ini döner (Factory)
   static HomeCubit get homeCubit => ServiceLocator.get<HomeCubit>();
+
+  /// Plant Analysis cubit'ini döner (Factory)
+  static PlantAnalysisCubit get plantAnalysisCubit =>
+      ServiceLocator.get<PlantAnalysisCubit>();
+
+  /// Plant Analysis repository'yi döner
+  static PlantAnalysisRepository get plantAnalysisRepository =>
+      ServiceLocator.get<PlantAnalysisRepository>();
 }
 
 /// Service locator mixin
@@ -323,4 +358,11 @@ mixin ServiceLocatorMixin {
 
   /// Gemini service
   GeminiService get geminiService => getService<GeminiService>();
+
+  /// Plant Analysis cubit
+  PlantAnalysisCubit get plantAnalysisCubit => getService<PlantAnalysisCubit>();
+
+  /// Plant Analysis repository
+  PlantAnalysisRepository get plantAnalysisRepository =>
+      getService<PlantAnalysisRepository>();
 }

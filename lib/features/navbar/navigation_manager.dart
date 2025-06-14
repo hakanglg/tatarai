@@ -37,25 +37,6 @@ class NavigationItems {
         analysisTab(context),
         // profileTab(context),
       ];
-
-  /// Varsayılan tab itemları (localize edilmemiş, sadece internal kullanım için)
-  static const List<BottomNavigationBarItem> allTabs = [
-    BottomNavigationBarItem(
-      icon: Icon(CupertinoIcons.house),
-      activeIcon: Icon(CupertinoIcons.house_fill),
-      label: 'Ana Sayfa',
-    ),
-    BottomNavigationBarItem(
-      icon: Icon(CupertinoIcons.camera),
-      activeIcon: Icon(CupertinoIcons.camera_fill),
-      label: 'Analiz',
-    ),
-    // BottomNavigationBarItem(
-    //   icon: Icon(CupertinoIcons.person),
-    //   activeIcon: Icon(CupertinoIcons.person_fill),
-    //   label: 'Profil',
-    // ),
-  ];
 }
 
 /// Navigasyon yöneticisi sınıfı
@@ -119,10 +100,10 @@ class NavigationManager with ChangeNotifier {
       ];
     } catch (e, stack) {
       AppLogger.e('Ekranları yüklerken hata', e, stack);
-      _screens = List.generate(
-        NavigationItems.allTabs.length,
-        (_) => const SizedBox.shrink(),
-      );
+      _screens = [
+        const SizedBox.shrink(),
+        const SizedBox.shrink(),
+      ];
     }
   }
 
@@ -137,7 +118,7 @@ class NavigationManager with ChangeNotifier {
 
   /// Belirli bir tab'a geçiş yap
   void switchToTab(int index) {
-    if (index >= 0 && index < NavigationItems.allTabs.length) {
+    if (index >= 0 && index < _screens.length) {
       AppLogger.i('switchToTab çağrıldı: $index (şu anki: $_currentIndex)');
 
       // Önce controller'ı güncelle

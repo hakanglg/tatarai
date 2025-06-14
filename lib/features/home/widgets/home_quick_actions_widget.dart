@@ -58,41 +58,24 @@ class HomeQuickActionsWidget extends StatelessWidget {
 
   /// Quick actions grid widget'ı
   Widget _buildQuickActionsGrid(BuildContext context) {
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: HomeConstants.quickActionsGridCrossAxisCount,
-      childAspectRatio: HomeConstants.quickActionsGridAspectRatio,
-      mainAxisSpacing: context.dimensions.spaceS,
-      crossAxisSpacing: context.dimensions.spaceS,
-      children: [
-        _buildAnalysisCard(context),
-        _buildProfileCard(context),
-      ],
+    return Container(
+      width: double.infinity,
+      child: _buildAnalysisCard(context),
     );
   }
 
   /// Analiz kartı widget'ı
   Widget _buildAnalysisCard(BuildContext context) {
-    return _buildQuickActionCard(
-      context: context,
-      title: 'start_analysis'.locale(context),
-      subtitle: 'analyze_your_plant'.locale(context),
-      icon: CupertinoIcons.leaf_arrow_circlepath,
-      color: AppColors.primary,
-      onTap: () => _navigateToAnalysis(),
-    );
-  }
-
-  /// Profil kartı widget'ı
-  Widget _buildProfileCard(BuildContext context) {
-    return _buildQuickActionCard(
-      context: context,
-      title: 'profile'.locale(context),
-      subtitle: 'view_settings'.locale(context),
-      icon: CupertinoIcons.person_circle,
-      color: AppColors.info,
-      onTap: () => _navigateToProfile(),
+    return Container(
+      height: 120, // Sabit yükseklik
+      child: _buildQuickActionCard(
+        context: context,
+        title: 'start_analysis'.locale(context),
+        subtitle: 'analyze_your_plant'.locale(context),
+        icon: CupertinoIcons.leaf_arrow_circlepath,
+        color: AppColors.primary,
+        onTap: () => _navigateToAnalysis(),
+      ),
     );
   }
 
@@ -127,14 +110,21 @@ class HomeQuickActionsWidget extends StatelessWidget {
               width: 1,
             ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
               _buildCardIcon(color, icon),
-              const Spacer(),
-              _buildCardTitle(title),
-              SizedBox(height: context.dimensions.spaceXS),
-              _buildCardSubtitle(subtitle),
+              SizedBox(width: context.dimensions.spaceM),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildCardTitle(title),
+                    SizedBox(height: context.dimensions.spaceXS),
+                    _buildCardSubtitle(subtitle),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -145,16 +135,16 @@ class HomeQuickActionsWidget extends StatelessWidget {
   /// Card icon widget'ı
   Widget _buildCardIcon(Color color, IconData icon) {
     return Container(
-      width: 48,
-      height: 48,
+      width: 56,
+      height: 56,
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Icon(
         icon,
         color: color,
-        size: 24,
+        size: 28,
       ),
     );
   }
@@ -167,6 +157,8 @@ class HomeQuickActionsWidget extends StatelessWidget {
         fontWeight: FontWeight.w600,
         letterSpacing: HomeConstants.titleLetterSpacing,
       ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
     );
   }
 
@@ -188,14 +180,6 @@ class HomeQuickActionsWidget extends StatelessWidget {
     final navManager = NavigationManager.instance;
     if (navManager != null) {
       navManager.switchToTab(HomeConstants.analysisTabIndex);
-    }
-  }
-
-  /// Profil ekranına navigate eder
-  void _navigateToProfile() {
-    final navManager = NavigationManager.instance;
-    if (navManager != null) {
-      navManager.switchToTab(HomeConstants.profileTabIndex);
     }
   }
 }

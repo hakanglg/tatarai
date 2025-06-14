@@ -17,60 +17,60 @@ class AppTextTheme {
 
   /// Görüntüye uygun olarak düzenlenmiş metin stilleri
 
-  // Headline 1 (40pt)
+  // Headline 1 (43pt)
   static const TextStyle headline1 = TextStyle(
     fontFamily: _fontFamily,
-    fontSize: 40,
+    fontSize: 43,
     fontWeight: FontWeight.bold,
     color: _textColor,
     letterSpacing: -0.5,
   );
   static TextStyle get displayLarge => headline1;
 
-  // Large Title (34pt)
+  // Large Title (37pt)
   static const TextStyle largeTitle = TextStyle(
     fontFamily: _fontFamily,
-    fontSize: 34,
+    fontSize: 37,
     fontWeight: FontWeight.bold,
     color: _textColor,
     letterSpacing: -0.5,
   );
   static TextStyle get displayMedium => largeTitle;
 
-  // Headline 2 (28pt)
+  // Headline 2 (31pt)
   static const TextStyle headline2 = TextStyle(
     fontFamily: _fontFamily,
-    fontSize: 28,
+    fontSize: 31,
     fontWeight: FontWeight.bold,
     color: _textColor,
     letterSpacing: -0.5,
   );
   static TextStyle get displaySmall => headline2;
 
-  // Headline 3 (22pt)
+  // Headline 3 (25pt)
   static const TextStyle headline3 = TextStyle(
     fontFamily: _fontFamily,
-    fontSize: 22,
+    fontSize: 25,
     fontWeight: FontWeight.w600,
     color: _textColor,
     letterSpacing: -0.25,
   );
   static TextStyle get headlineMedium => headline3;
 
-  // Headline 4 (20pt)
+  // Headline 4 (23pt)
   static const TextStyle headline4 = TextStyle(
     fontFamily: _fontFamily,
-    fontSize: 20,
+    fontSize: 23,
     fontWeight: FontWeight.w600,
     color: _textColor,
     letterSpacing: -0.25,
   );
   static TextStyle get headlineSmall => headline4;
 
-  // Headline 5 (17pt)
+  // Headline 5 (19pt)
   static const TextStyle headline5 = TextStyle(
     fontFamily: _fontFamily,
-    fontSize: 17,
+    fontSize: 19,
     fontWeight: FontWeight.w600,
     color: _textColor,
     letterSpacing: -0.25,
@@ -80,19 +80,19 @@ class AppTextTheme {
   // Headline 6 (artık kullanılmayacak - yerine headlin5 kullanılacak)
   static TextStyle get headline6 => headline5;
 
-  // Large Body (17pt)
+  // Large Body (19pt)
   static const TextStyle largeBody = TextStyle(
     fontFamily: _fontFamily,
-    fontSize: 17,
+    fontSize: 19,
     fontWeight: FontWeight.normal,
     color: _textColor,
   );
   static TextStyle get bodyLarge => largeBody;
 
-  // Body (15pt)
+  // Body (17pt)
   static const TextStyle body = TextStyle(
     fontFamily: _fontFamily,
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: FontWeight.normal,
     color: _textColor,
   );
@@ -102,28 +102,28 @@ class AppTextTheme {
   static TextStyle get bodyText1 => largeBody;
   static TextStyle get bodyText2 => body;
 
-  // Caption L (13pt)
+  // Caption L (15pt)
   static const TextStyle captionL = TextStyle(
     fontFamily: _fontFamily,
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: FontWeight.normal,
     color: _secondaryTextColor,
   );
   static TextStyle get titleMedium => captionL;
 
-  // Small Caption (11pt)
+  // Small Caption (13pt)
   static const TextStyle smallCaption = TextStyle(
     fontFamily: _fontFamily,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: FontWeight.normal,
     color: _secondaryTextColor,
   );
   static TextStyle get titleSmall => smallCaption;
 
-  // Buton metni (15pt, medium weight)
+  // Buton metni (17pt, medium weight)
   static const TextStyle button = TextStyle(
     fontFamily: _fontFamily,
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: FontWeight.w500,
     color: AppColors.white,
     letterSpacing: 0.5,
@@ -133,10 +133,10 @@ class AppTextTheme {
   // Eski caption stilinin smallCaption ile eşleştirilmesi
   static TextStyle get caption => captionL;
 
-  // En küçük metin (11pt - small caption)
+  // En küçük metin (13pt - small caption)
   static const TextStyle overline = TextStyle(
     fontFamily: _fontFamily,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: FontWeight.normal,
     color: _secondaryTextColor,
     letterSpacing: 0.5,

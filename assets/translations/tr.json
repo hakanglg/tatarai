@@ -243,5 +243,28 @@
   "neighborhoods_loading": "Mahalleler yükleniyor...",
   "splash_title": "TatarAI",
   "splash_subtitle": "Yapay Zeka ile Tarım Asistanı",
-  "splash_loading": "Yükleniyor..."
+  "splash_loading": "Yükleniyor...",
+  
+  "quick_analysis": "Hızlı Analiz",
+  "history": "Geçmiş",
+  "header_message_1_title": "Bitkilerinizin Sağlığını Keşfedin",
+  "header_message_1_subtitle": "Yapay zeka ile bitkilerinizi analiz edin ve sağlıklı büyümelerini destekleyin.",
+  "header_message_2_title": "Bitki Bakımında Uzman Olun",
+  "header_message_2_subtitle": "Her fotoğrafla bitkileriniz hakkında daha fazla bilgi edinin.",
+  "header_message_3_title": "Doğanın Dilini Anlayın",
+  "header_message_3_subtitle": "Bitkilerinizin size ne söylediğini öğrenin ve onlara en iyi bakımı verin.",
+  "header_message_4_title": "Yeşil Dostlarınızı Koruyun",
+  "header_message_4_subtitle": "Hastalıkları erken tespit edin ve bitkilerinizi sağlıklı tutun.",
+  "header_message_5_title": "Bahçıvanlık Yolculuğunuz",
+  "header_message_5_subtitle": "Her analiz sizi daha deneyimli bir bahçıvan yapar.",
+  "header_message_6_title": "Bitki Sağlığı Uzmanı",
+  "header_message_6_subtitle": "Profesyonel analiz araçları artık cebinizde.",
+  "header_message_7_title": "Yeşil Yaşam Rehberiniz",
+  "header_message_7_subtitle": "Bitkilerinizle daha güçlü bir bağ kurun ve onları anlayın.",
+  
+  "stats_overview": "Genel Bakış",
+  "stats_total_analysis": "Toplam Analiz",
+  "stats_healthy_plants": "Sağlıklı Bitki",
+  "stats_this_month": "Bu Ay",
+  "stats_success_rate": "Başarı Oranı"
 } 

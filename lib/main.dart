@@ -7,6 +7,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:tatarai/core/constants/app_constants.dart';
 import 'package:tatarai/core/constants/locale_constants.dart';
 import 'package:tatarai/core/init/app_initializer.dart';
+import 'package:tatarai/core/init/localization/language_manager.dart';
 import 'package:tatarai/core/init/localization/localization_manager.dart';
 import 'package:tatarai/core/routing/app_router.dart';
 import 'package:tatarai/core/services/service_locator.dart';
@@ -16,6 +17,7 @@ import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
 import 'package:tatarai/features/auth/cubits/auth_state.dart';
 import 'package:tatarai/features/payment/cubits/payment_cubit.dart';
+import 'package:tatarai/features/plant_analysis/presentation/cubits/plant_analysis_cubit.dart';
 
 /// TatarAI uygulamasının ana giriş noktası
 ///
@@ -289,6 +291,7 @@ class _TatarAIState extends State<TatarAI> {
             locale: LocalizationManager.instance.currentLocaleNotifier.value,
             supportedLocales: LocaleConstants.supportedLocales,
             localizationsDelegates: const [
+              AppLocalizations.delegate,
               GlobalMaterialLocalizations.delegate,
               GlobalWidgetsLocalizations.delegate,
               GlobalCupertinoLocalizations.delegate,
@@ -326,6 +329,23 @@ class _TatarAIState extends State<TatarAI> {
         create: (context) {
           AppLogger.i('🏗️ PaymentCubit ServiceLocator\'dan oluşturuluyor');
           return Services.paymentCubit;
+        },
+        lazy: true, // Gerektiğinde başlat
+      ),
+
+      // Plant Analysis Cubit - ServiceLocator'dan
+      BlocProvider<PlantAnalysisCubit>(
+        create: (context) {
+          AppLogger.i(
+              '🏗️ PlantAnalysisCubit ServiceLocator\'dan oluşturuluyor');
+          try {
+            final plantAnalysisCubit = Services.plantAnalysisCubit;
+            AppLogger.i('✅ PlantAnalysisCubit başarıyla oluşturuldu');
+            return plantAnalysisCubit;
+          } catch (e, stackTrace) {
+            AppLogger.e('❌ PlantAnalysisCubit oluşturma hatası', e, stackTrace);
+            rethrow; // PlantAnalysisCubit kritik olduğu için hatayı fırlat
+          }
         },
         lazy: true, // Gerektiğinde başlat
       ),

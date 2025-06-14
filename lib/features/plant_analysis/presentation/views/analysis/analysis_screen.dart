@@ -22,6 +22,8 @@ import 'package:tatarai/features/plant_analysis/services/location_service.dart';
 import 'package:tatarai/features/plant_analysis/presentation/views/analyses_result/analysis_result_screen.dart';
 import 'package:tatarai/core/extensions/context_extensions.dart';
 import 'package:tatarai/features/profile/cubits/profile_cubit.dart';
+import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
+import 'package:tatarai/features/auth/cubits/auth_state.dart';
 import 'package:tatarai/core/models/user_model.dart';
 
 part 'analysis_screen_mixin.dart';

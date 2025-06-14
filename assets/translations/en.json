@@ -244,5 +244,28 @@
 
   "splash_title": "TatarAI",
   "splash_subtitle": "AI Farming Assistant",
-  "splash_loading": "Loading..."
+  "splash_loading": "Loading...",
+  
+  "quick_analysis": "Quick Analysis",
+  "history": "History",
+  "header_message_1_title": "Discover Your Plants' Health",
+  "header_message_1_subtitle": "Analyze your plants with AI and support their healthy growth.",
+  "header_message_2_title": "Become an Expert in Plant Care",
+  "header_message_2_subtitle": "Learn more about your plants with every photo.",
+  "header_message_3_title": "Understand Nature's Language",
+  "header_message_3_subtitle": "Learn what your plants are telling you and give them the best care.",
+  "header_message_4_title": "Protect Your Green Friends",
+  "header_message_4_subtitle": "Detect diseases early and keep your plants healthy.",
+  "header_message_5_title": "Your Gardening Journey",
+  "header_message_5_subtitle": "Every analysis makes you a more experienced gardener.",
+  "header_message_6_title": "Plant Health Expert",
+  "header_message_6_subtitle": "Professional analysis tools are now in your pocket.",
+  "header_message_7_title": "Your Green Life Guide",
+  "header_message_7_subtitle": "Build a stronger bond with your plants and understand them.",
+  
+  "stats_overview": "Overview",
+  "stats_total_analysis": "Total Analysis",
+  "stats_healthy_plants": "Healthy Plants",
+  "stats_this_month": "This Month",
+  "stats_success_rate": "Success Rate"
 } 
