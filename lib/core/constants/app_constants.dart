@@ -53,6 +53,39 @@ class AppConstants {
   // Analiz Kredileri
   static const int PREMIUM_MONTHLY_CREDITS = 100; // Premium aylık kredi
   static const int PREMIUM_YEARLY_CREDITS = 1200; // Premium yıllık kredi
+  static const int PREMIUM_LIFETIME_CREDITS = -1; // Sınırsız (Lifetime)
+
+  // UI Boyutları ve Spacing'ler
+  static const double iconSizeSmall = 16.0;
+  static const double iconSizeMedium = 20.0;
+  static const double iconSizeLarge = 24.0;
+  static const double iconSizeXL = 32.0;
+
+  // Progress Bar ve Score Ayarları
+  static const int maxGrowthScore = 100;
+  static const double progressBarHeight = 8.0;
+  static const double progressBarRadius = 4.0;
+
+  // Font Size Multipliers
+  static const double fontSizeMultiplierSmall = 0.9;
+  static const double fontSizeMultiplierLarge = 1.05;
+
+  // Border Width ve Opacity Değerleri
+  static const double borderWidthThin = 0.5;
+  static const double borderWidthDefault = 1.0;
+  static const double opacityLight = 0.1;
+  static const double opacityMedium = 0.3;
+  static const double opacityHeavy = 0.8;
+
+  // Timeout Değerleri
+  static const int connectionTimeoutSeconds = 5;
+  static const int firebaseTimeoutSeconds = 5;
+  static const int uploadTimeoutSeconds = 30;
+
+  // Retry Ayarları
+  static const int maxRetryAttempts = 3;
+  static const int retryDelaySeconds = 2;
+
   static const double MINIMUM_IDENTIFICATION_PROBABILITY =
       0.4; // Tanımlama için minimum olasılık
 }

@@ -15,13 +15,13 @@ import 'package:tatarai/core/theme/text_theme.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/core/widgets/app_button.dart';
 import 'package:tatarai/core/widgets/premium_button.dart';
+import 'package:tatarai/features/home/widgets/home_premium_card.dart';
 import 'package:tatarai/features/plant_analysis/presentation/cubits/plant_analysis_cubit.dart';
 import 'package:tatarai/features/plant_analysis/data/models/location_models.dart';
 import 'package:tatarai/features/plant_analysis/presentation/cubits/plant_analysis_state.dart';
 import 'package:tatarai/features/plant_analysis/services/location_service.dart';
 import 'package:tatarai/features/plant_analysis/presentation/views/analyses_result/analysis_result_screen.dart';
 import 'package:tatarai/core/extensions/context_extensions.dart';
-import 'package:tatarai/features/profile/cubits/profile_cubit.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
 import 'package:tatarai/features/auth/cubits/auth_state.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -138,6 +138,17 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     // Başlık ve açıklama
+                    // Premium Card - Ana sayfadaki gibi
+                    HomePremiumCard(
+                      onPremiumPurchased: () {
+                        AppLogger.i(
+                            'Premium satın alındı - Analysis ekranından');
+                        // State'i refresh et
+                        if (mounted) {
+                          setState(() {});
+                        }
+                      },
+                    ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
                       child: Column(
@@ -746,21 +757,6 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                             ? null
                             : CupertinoIcons.leaf_arrow_circlepath,
                         height: 58,
-                      ),
-                    ),
-
-                    // Premium button
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-                      child: PremiumButton.analysis(
-                        onPremiumPurchased: () {
-                          AppLogger.i(
-                              'Premium satın alındı - Analysis ekranından');
-                          // State'i refresh et
-                          if (mounted) {
-                            setState(() {});
-                          }
-                        },
                       ),
                     ),
 

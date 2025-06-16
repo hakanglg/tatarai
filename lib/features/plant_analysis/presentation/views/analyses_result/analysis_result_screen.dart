@@ -19,6 +19,7 @@ import 'package:tatarai/features/plant_analysis/data/models/disease_model.dart'
     as entity_disease;
 import 'package:tatarai/features/plant_analysis/presentation/views/widgets/font_size_control.dart';
 import 'package:tatarai/features/plant_analysis/presentation/views/widgets/info_card_item.dart';
+import 'package:tatarai/core/constants/app_constants.dart';
 
 part 'analysis_result_screen_mixin.dart';
 
@@ -167,6 +168,212 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
   // _buildHealthInfo metodu, _AnalysisResultScreenState sınıfının bir üyesi haline getirildi.
   // İlaç önerileri bölümü de bu metoda entegre edilmiştir.
   //#####
+
+  /// Gelişim skoru widget'ı oluşturur
+  Widget _buildGrowthScoreWidget(PlantAnalysisResult result) {
+    final score = result.growthScore ?? 0;
+    final color = result.getGrowthScoreColor(score);
+    final dim = context.dimensions;
+
+    return Container(
+      padding: EdgeInsets.all(dim.paddingM),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(dim.radiusM),
+        border: Border.all(
+          color: color.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                CupertinoIcons.chart_bar_alt_fill,
+                color: color,
+                size: AppConstants.iconSizeMedium,
+              ),
+              SizedBox(width: dim.spaceS),
+              Text(
+                'Gelişim Skoru: $score/100',
+                style: AppTextTheme.bodyText1.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: dim.spaceS),
+          // Progress bar
+          Container(
+            height: AppConstants.progressBarHeight,
+            decoration: BoxDecoration(
+              color: color.withOpacity(AppConstants.opacityLight * 2),
+              borderRadius:
+                  BorderRadius.circular(AppConstants.progressBarRadius),
+            ),
+            child: FractionallySizedBox(
+              alignment: Alignment.centerLeft,
+              widthFactor: score / AppConstants.maxGrowthScore,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius:
+                      BorderRadius.circular(AppConstants.progressBarRadius),
+                ),
+              ),
+            ),
+          ),
+          SizedBox(height: dim.spaceS),
+          Text(
+            result.getGrowthScoreText(score),
+            style: AppTextTheme.bodyText2.copyWith(
+              color: AppColors.textSecondary,
+              fontSize: _currentFontSize,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Hastalık detayları için genişletilmiş widget
+  Widget _buildExpandedDiseaseInfo(Disease disease) {
+    final dim = context.dimensions;
+
+    return Container(
+      margin: EdgeInsets.only(top: dim.spaceS),
+      padding: EdgeInsets.all(dim.paddingM),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(dim.radiusM),
+        border: Border.all(
+          color: CupertinoColors.systemGrey4,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Hastalık Detayları',
+            style: AppTextTheme.bodyText1.copyWith(
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          SizedBox(height: dim.spaceM),
+
+          if (disease.description != null &&
+              disease.description!.isNotEmpty) ...[
+            Text(
+              disease.description!,
+              style: AppTextTheme.bodyText2.copyWith(
+                color: AppColors.textSecondary,
+                fontSize: _currentFontSize,
+              ),
+            ),
+            SizedBox(height: dim.spaceM),
+          ],
+
+          // Tedavi önerileri
+          if (disease.treatments != null && disease.treatments!.isNotEmpty) ...[
+            _buildTreatmentSection('Tedavi Önerileri', disease.treatments!),
+          ],
+
+          // İlaç önerileri
+          if (disease.pesticideSuggestions != null &&
+              disease.pesticideSuggestions!.isNotEmpty) ...[
+            SizedBox(height: dim.spaceM),
+            _buildTreatmentSection(
+                'İlaç Önerileri', disease.pesticideSuggestions!),
+          ],
+
+          // Önleme yöntemleri
+          if (disease.preventiveMeasures != null &&
+              disease.preventiveMeasures!.isNotEmpty) ...[
+            SizedBox(height: dim.spaceM),
+            _buildTreatmentSection(
+                'Önleme Yöntemleri', disease.preventiveMeasures!),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Tedavi bölümü widget'ı
+  Widget _buildTreatmentSection(String title, List<String> treatments) {
+    final dim = context.dimensions;
+
+    if (treatments.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Icon(
+                title.contains('İlaç')
+                    ? CupertinoIcons.capsule_fill
+                    : title.contains('Biyolojik')
+                        ? CupertinoIcons.leaf_arrow_circlepath
+                        : CupertinoIcons.shield_fill,
+                color: AppColors.primary,
+                size: 16,
+              ),
+            ),
+            SizedBox(width: dim.spaceS),
+            Text(
+              title,
+              style: AppTextTheme.captionL.copyWith(
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary,
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: dim.spaceS),
+        ...treatments
+            .map((treatment) => Padding(
+                  padding: EdgeInsets.only(bottom: dim.spaceXS),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        margin: EdgeInsets.only(top: 6),
+                        width: 4,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      SizedBox(width: dim.spaceS),
+                      Expanded(
+                        child: Text(
+                          treatment,
+                          style: AppTextTheme.bodyText2.copyWith(
+                            color: AppColors.textSecondary,
+                            fontSize: _currentFontSize,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ))
+            .toList(),
+      ],
+    );
+  }
+
   Widget _buildHealthInfo(PlantAnalysisResult result) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
@@ -294,7 +501,8 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                               style: AppTextTheme.captionL.copyWith(
                                 color: AppColors.textSecondary,
                                 fontWeight: FontWeight.w500,
-                                fontSize: _currentFontSize * 0.9,
+                                fontSize: _currentFontSize *
+                                    AppConstants.fontSizeMultiplierSmall,
                               ),
                               toolbarOptions: const ToolbarOptions(
                                 copy: true,
@@ -368,6 +576,13 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                       value: result.plantName,
                       iconColor: AppColors.primary,
                     ),
+
+                    // Gelişim Skoru bölümü
+                    if (result.growthScore != null) ...[
+                      SizedBox(height: dim.spaceM),
+                      _buildGrowthScoreWidget(result),
+                    ],
+
                     if (result.growthStage != null &&
                         result.growthStage!.isNotEmpty) ...[
                       SizedBox(height: dim.spaceM),
@@ -375,7 +590,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                         icon: CupertinoIcons.chart_bar_alt_fill,
                         title: 'Gelişim Aşaması',
                         value: result.growthStage!,
-                        iconColor: CupertinoColors.activeOrange,
+                        iconColor: AppColors.success,
                       ),
                     ],
                   ],
@@ -545,7 +760,9 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                                         style: AppTextTheme.captionL.copyWith(
                                           color: severityColor,
                                           fontWeight: FontWeight.w600,
-                                          fontSize: dim.fontSizeXS * 0.9,
+                                          fontSize: dim.fontSizeXS *
+                                              AppConstants
+                                                  .fontSizeMultiplierSmall,
                                         ),
                                         toolbarOptions: const ToolbarOptions(
                                           copy: true,
@@ -605,80 +822,145 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                                   color: CupertinoColors.systemGrey4
                                       .withOpacity(0.5)),
                             ],
-                            if (disease.interventionMethods?.isNotEmpty ==
-                                true) ...[
-                              _buildMethodsList(
-                                baseIcon: CupertinoIcons.wand_stars,
-                                title: 'Önerilen Müdahale Yöntemleri',
-                                iconColor: CupertinoColors.activeGreen,
-                                methods: disease.interventionMethods!,
-                              ),
-                              if (disease.pesticideSuggestions?.isNotEmpty ==
-                                  true)
-                                Divider(
-                                    height: dim.spaceL,
-                                    thickness: 0.5,
-                                    color: CupertinoColors.systemGrey4
-                                        .withOpacity(0.5)),
-                            ],
-                            if (disease.pesticideSuggestions?.isNotEmpty ==
-                                true) ...[
-                              _buildMethodsList(
-                                baseIcon: CupertinoIcons.bandage_fill,
-                                title: 'Potansiyel İlaç Önerileri',
-                                iconColor: AppColors.info,
-                                methods: disease.pesticideSuggestions!,
-                              ),
-                            ],
-                            if (disease.interventionMethods?.isEmpty ??
-                                true &&
-                                    disease.pesticideSuggestions?.isEmpty ==
-                                        true)
-                              Container(
-                                margin: EdgeInsets.only(top: dim.spaceS),
-                                padding: EdgeInsets.all(dim.paddingM),
-                                decoration: BoxDecoration(
-                                  color: CupertinoColors.systemYellow
-                                      .withOpacity(0.1),
-                                  borderRadius:
-                                      BorderRadius.circular(dim.radiusM),
-                                  border: Border.all(
-                                    color: CupertinoColors.systemYellow
-                                        .withOpacity(0.3),
-                                    width: 1,
+                            // Gerçek Disease verilerini kullan - her hastalık için farklı öneriler
+                            () {
+                              final List<Widget> treatmentWidgets = [];
+
+                              // 1. Genel Tedavi Önerileri (Disease.treatments)
+                              if (disease.treatments != null &&
+                                  disease.treatments!.isNotEmpty) {
+                                treatmentWidgets.add(
+                                  _buildMethodsList(
+                                    baseIcon: CupertinoIcons.wand_stars,
+                                    title: 'Tedavi Yöntemleri',
+                                    iconColor: CupertinoColors.activeGreen,
+                                    methods: disease.treatments!,
                                   ),
-                                ),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Icon(
-                                      CupertinoIcons
-                                          .exclamationmark_triangle_fill,
+                                );
+                              }
+
+                              // 2. Müdahale Yöntemleri (Disease.interventionMethods)
+                              if (disease.interventionMethods != null &&
+                                  disease.interventionMethods!.isNotEmpty) {
+                                if (treatmentWidgets.isNotEmpty) {
+                                  treatmentWidgets.add(Divider(
+                                      height: dim.spaceL,
+                                      thickness: 0.5,
+                                      color: CupertinoColors.systemGrey4
+                                          .withOpacity(0.5)));
+                                }
+                                treatmentWidgets.add(
+                                  _buildMethodsList(
+                                    baseIcon: CupertinoIcons.gear_alt_fill,
+                                    title: 'Müdahale Yöntemleri',
+                                    iconColor: CupertinoColors.systemBlue,
+                                    methods: disease.interventionMethods!,
+                                  ),
+                                );
+                              }
+
+                              // 3. İlaç Önerileri (Disease.pesticideSuggestions)
+                              if (disease.pesticideSuggestions != null &&
+                                  disease.pesticideSuggestions!.isNotEmpty) {
+                                if (treatmentWidgets.isNotEmpty) {
+                                  treatmentWidgets.add(Divider(
+                                      height: dim.spaceL,
+                                      thickness: 0.5,
+                                      color: CupertinoColors.systemGrey4
+                                          .withOpacity(0.5)));
+                                }
+                                treatmentWidgets.add(
+                                  _buildMethodsList(
+                                    baseIcon: CupertinoIcons.bandage_fill,
+                                    title: 'İlaç Önerileri',
+                                    iconColor: AppColors.info,
+                                    methods: disease.pesticideSuggestions!,
+                                  ),
+                                );
+                              }
+
+                              // 4. Önleme Yöntemleri (Disease.preventiveMeasures)
+                              if (disease.preventiveMeasures != null &&
+                                  disease.preventiveMeasures!.isNotEmpty) {
+                                if (treatmentWidgets.isNotEmpty) {
+                                  treatmentWidgets.add(Divider(
+                                      height: dim.spaceL,
+                                      thickness: 0.5,
+                                      color: CupertinoColors.systemGrey4
+                                          .withOpacity(0.5)));
+                                }
+                                treatmentWidgets.add(
+                                  _buildMethodsList(
+                                    baseIcon: CupertinoIcons.shield_fill,
+                                    title: 'Önleme Yöntemleri',
+                                    iconColor: CupertinoColors.systemOrange,
+                                    methods: disease.preventiveMeasures!,
+                                  ),
+                                );
+                              }
+
+                              // 5. Belirtiler (Disease.symptoms)
+                              if (disease.symptoms != null &&
+                                  disease.symptoms!.isNotEmpty) {
+                                if (treatmentWidgets.isNotEmpty) {
+                                  treatmentWidgets.add(Divider(
+                                      height: dim.spaceL,
+                                      thickness: 0.5,
+                                      color: CupertinoColors.systemGrey4
+                                          .withOpacity(0.5)));
+                                }
+                                treatmentWidgets.add(
+                                  _buildMethodsList(
+                                    baseIcon: CupertinoIcons.eye_fill,
+                                    title: 'Hastalık Belirtileri',
+                                    iconColor: CupertinoColors.systemRed,
+                                    methods: disease.symptoms!,
+                                  ),
+                                );
+                              }
+
+                              // Eğer hiç veri yoksa uyarı mesajı göster
+                              if (treatmentWidgets.isEmpty) {
+                                treatmentWidgets.add(
+                                  Container(
+                                    padding: EdgeInsets.all(dim.paddingM),
+                                    decoration: BoxDecoration(
                                       color: CupertinoColors.systemYellow
-                                          .withOpacity(0.8),
-                                      size: 20,
-                                    ),
-                                    SizedBox(width: dim.spaceS),
-                                    Expanded(
-                                      child: SelectableText(
-                                        'Bu hastalık/sorun için özel müdahale veya ilaç önerisi bulunmamaktadır. Genel bitki sağlığı tavsiyelerine uyunuz.',
-                                        style: AppTextTheme.bodyText2.copyWith(
-                                          color: AppColors.textSecondary
-                                              .withOpacity(0.9),
-                                          fontSize: _currentFontSize * 0.95,
-                                          height: 1.4,
-                                        ),
-                                        toolbarOptions: const ToolbarOptions(
-                                          copy: true,
-                                          selectAll: true,
-                                          cut: false,
-                                          paste: false,
-                                        ),
+                                          .withOpacity(0.1),
+                                      borderRadius:
+                                          BorderRadius.circular(dim.radiusM),
+                                      border: Border.all(
+                                        color: CupertinoColors.systemYellow
+                                            .withOpacity(0.3),
+                                        width: 1,
                                       ),
                                     ),
-                                  ],
-                                ),
-                              ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          CupertinoIcons.info_circle,
+                                          color: CupertinoColors.systemYellow,
+                                          size: 20,
+                                        ),
+                                        SizedBox(width: dim.spaceS),
+                                        Expanded(
+                                          child: Text(
+                                            'Bu hastalık için detaylı tedavi bilgisi henüz mevcut değil. Genel bitki bakım kurallarına uyarak bitkinizin sağlığını koruyabilirsiniz.',
+                                            style:
+                                                AppTextTheme.bodyText2.copyWith(
+                                              color: AppColors.textSecondary,
+                                              fontSize: _currentFontSize * 0.95,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }
+
+                              return Column(children: treatmentWidgets);
+                            }(),
                           ],
                         ),
                       ),
@@ -965,9 +1247,26 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                       horizontal: dim.paddingM, vertical: dim.spaceL),
                   child: _buildHealthInfo(result),
                 ),
-                if (result.watering != null ||
-                    result.sunlight != null ||
-                    result.growthStage != null) ...[
+                // Gelişim Durumu ve Bakım Tavsiyeleri - Her zaman göster
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                      dim.paddingM, dim.paddingL, dim.paddingM, dim.paddingXS),
+                  child: Text(
+                    'Gelişim Durumu ve Bakım Tavsiyeleri',
+                    style: AppTextTheme.headline5.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
+                      fontSize: dim.fontSizeL,
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: dim.paddingM),
+                  child: _buildCareInfo(result),
+                ),
+
+                // Eski kontrol - kaldırıldı
+                if (false) ...[
                   Padding(
                     padding: EdgeInsets.fromLTRB(dim.paddingM, dim.paddingL,
                         dim.paddingM, dim.paddingXS),
@@ -1326,106 +1625,6 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
     );
   }
 
-  // Gelişim skoru widget'ı
-  Widget _buildGrowthScoreWidget(PlantAnalysisResult result) {
-    if (result.growthScore == null) return const SizedBox.shrink();
-
-    final score = result.growthScore!;
-    final dim = context.dimensions;
-
-    return Container(
-      margin: EdgeInsets.only(bottom: dim.spaceL),
-      padding: EdgeInsets.all(dim.paddingM),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(dim.radiusL),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                CupertinoIcons.chart_bar_alt_fill,
-                color: result.getGrowthScoreColor(score),
-                size: dim.iconSizeM,
-              ),
-              SizedBox(width: dim.spaceS),
-              Text(
-                'Gelişim Skoru: $score/100',
-                style: AppTextTheme.headline6.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: dim.spaceM),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(dim.radiusS),
-            child: LinearProgressIndicator(
-              value: score / 100,
-              backgroundColor: CupertinoColors.systemGrey5,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                result.getGrowthScoreColor(score),
-              ),
-              minHeight: 10,
-            ),
-          ),
-          SizedBox(height: dim.spaceM),
-          Text(
-            result.getGrowthScoreText(score),
-            style: AppTextTheme.bodyText2.copyWith(
-              color: AppColors.textSecondary,
-            ),
-          ),
-          if (result.growthStage != null && result.growthStage!.isNotEmpty) ...[
-            SizedBox(height: dim.spaceM),
-            const Divider(),
-            SizedBox(height: dim.spaceM),
-            Row(
-              children: [
-                Icon(
-                  CupertinoIcons.leaf_arrow_circlepath,
-                  color: AppColors.primary,
-                  size: dim.iconSizeM,
-                ),
-                SizedBox(width: dim.spaceS),
-                Flexible(
-                  child: Text(
-                    'Gelişim Aşaması: ${result.growthStage}',
-                    style: AppTextTheme.bodyText1.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                    softWrap: true,
-                    overflow: TextOverflow.visible,
-                    maxLines: 2,
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: dim.spaceS),
-            Text(
-              result.getGrowthAdvice(
-                score,
-                null,
-              ),
-              style: AppTextTheme.bodyText2.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
   // Bakım bilgileri widget'ı
   Widget _buildCareInfo(PlantAnalysisResult result) {
     final dim = context.dimensions;
@@ -1433,64 +1632,142 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (result.growthScore != null) ...[
+        // Gelişim skoru ve aşaması - Sadece gerçek veri varsa göster
+        if (result.growthScore != null || result.growthStage != null) ...[
           _buildGrowthScoreWidget(result),
           SizedBox(height: dim.spaceL),
         ],
-        Container(
-          padding: EdgeInsets.all(dim.paddingM),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(dim.radiusL),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
+
+        // Bakım bilgileri - Sadece gerçek veri olan alanları göster
+        () {
+          final List<Widget> careItems = [];
+
+          if (result.watering != null && result.watering!.isNotEmpty) {
+            careItems.add(_buildCareItem(
+              CupertinoIcons.drop_fill,
+              'Sulama',
+              result.watering!,
+              AppColors.info,
+            ));
+          }
+
+          if (result.sunlight != null && result.sunlight!.isNotEmpty) {
+            if (careItems.isNotEmpty)
+              careItems.add(SizedBox(height: dim.spaceM));
+            careItems.add(_buildCareItem(
+              CupertinoIcons.sun_max_fill,
+              'Güneş Işığı',
+              result.sunlight!,
+              CupertinoColors.systemYellow,
+            ));
+          }
+
+          if (result.soil != null && result.soil!.isNotEmpty) {
+            if (careItems.isNotEmpty)
+              careItems.add(SizedBox(height: dim.spaceM));
+            careItems.add(_buildCareItem(
+              CupertinoIcons.square_stack_3d_down_right_fill,
+              'Toprak',
+              result.soil!,
+              CupertinoColors.systemBrown,
+            ));
+          }
+
+          if (result.climate != null && result.climate!.isNotEmpty) {
+            if (careItems.isNotEmpty)
+              careItems.add(SizedBox(height: dim.spaceM));
+            careItems.add(_buildCareItem(
+              CupertinoIcons.cloud_sun_fill,
+              'İklim',
+              result.climate!,
+              CupertinoColors.systemTeal,
+            ));
+          }
+
+          // Tarımsal ipuçları varsa ekle
+          if (result.agriculturalTips != null &&
+              result.agriculturalTips!.isNotEmpty) {
+            if (careItems.isNotEmpty)
+              careItems.add(SizedBox(height: dim.spaceM));
+            careItems.add(_buildCareItem(
+              CupertinoIcons.leaf_arrow_circlepath,
+              'Tarımsal İpuçları',
+              result.agriculturalTips!.join(' • '),
+              CupertinoColors.activeGreen,
+            ));
+          }
+
+          // Müdahale yöntemleri varsa ekle
+          if (result.interventionMethods != null &&
+              result.interventionMethods!.isNotEmpty) {
+            if (careItems.isNotEmpty)
+              careItems.add(SizedBox(height: dim.spaceM));
+            careItems.add(_buildCareItem(
+              CupertinoIcons.gear_alt_fill,
+              'Müdahale Yöntemleri',
+              result.interventionMethods!.join(' • '),
+              CupertinoColors.systemBlue,
+            ));
+          }
+
+          // Eğer hiç bakım bilgisi yoksa bilgi mesajı göster
+          if (careItems.isEmpty) {
+            careItems.add(
+              Container(
+                padding: EdgeInsets.all(dim.paddingM),
+                decoration: BoxDecoration(
+                  color: CupertinoColors.systemBlue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(dim.radiusM),
+                  border: Border.all(
+                    color: CupertinoColors.systemBlue.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      CupertinoIcons.info_circle,
+                      color: CupertinoColors.systemBlue,
+                      size: 20,
+                    ),
+                    SizedBox(width: dim.spaceS),
+                    Expanded(
+                      child: Text(
+                        'Bu analiz için detaylı bakım bilgisi henüz mevcut değil. Genel bitki bakım kurallarını uygulayabilirsiniz.',
+                        style: AppTextTheme.bodyText2.copyWith(
+                          color: AppColors.textSecondary,
+                          fontSize: _currentFontSize * 0.95,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (result.watering != null && result.watering!.isNotEmpty) ...[
-                _buildCareItem(
-                  CupertinoIcons.drop_fill,
-                  'Sulama',
-                  result.watering!,
-                  AppColors.info,
-                ),
-                SizedBox(height: dim.spaceM),
-              ],
-              if (result.sunlight != null && result.sunlight!.isNotEmpty) ...[
-                _buildCareItem(
-                  CupertinoIcons.sun_max_fill,
-                  'Güneş Işığı',
-                  result.sunlight!,
-                  CupertinoColors.systemYellow,
-                ),
-                SizedBox(height: dim.spaceM),
-              ],
-              if (result.soil != null && result.soil!.isNotEmpty) ...[
-                _buildCareItem(
-                  CupertinoIcons.square_stack_3d_down_right_fill,
-                  'Toprak',
-                  result.soil!,
-                  CupertinoColors.systemBrown,
-                ),
-                SizedBox(height: dim.spaceM),
-              ],
-              if (result.climate != null && result.climate!.isNotEmpty) ...[
-                _buildCareItem(
-                  CupertinoIcons.cloud_sun_fill,
-                  'İklim',
-                  result.climate!,
-                  CupertinoColors.systemTeal,
-                ),
-              ],
-            ],
-          ),
-        ),
+            );
+          } else {
+            // Bakım bilgileri konteynerı
+            return Container(
+              padding: EdgeInsets.all(dim.paddingM),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(dim.radiusL),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: careItems,
+              ),
+            );
+          }
+
+          return Column(children: careItems);
+        }(),
       ],
     );
   }
@@ -1546,6 +1823,26 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
 
     String description = result.description;
 
+    // JSON formatındaki açıklamayı temizle
+    if (description.startsWith('{') && description.contains('"description"')) {
+      try {
+        final jsonData = json.decode(description);
+        if (jsonData is Map<String, dynamic> &&
+            jsonData.containsKey('description')) {
+          description = jsonData['description'].toString();
+        }
+      } catch (e) {
+        // JSON parse edilemezse orijinal metni kullan
+        AppLogger.w('Description JSON parse hatası: $e');
+      }
+    }
+
+    // Eğer açıklama boş veya çok kısaysa varsayılan açıklama kullan
+    if (description.isEmpty || description.length < 10) {
+      description =
+          'Bu bitki analiz sonuçlarına göre değerlendirilmiştir. Detaylı bilgiler aşağıdaki bölümlerde yer almaktadır.';
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1574,9 +1871,18 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
           ],
         ),
         const SizedBox(height: 12),
-        Text(
+        SelectableText(
           description,
-          style: AppTextTheme.bodyText2,
+          style: AppTextTheme.bodyText2.copyWith(
+            fontSize: _currentFontSize,
+            height: 1.5,
+          ),
+          toolbarOptions: const ToolbarOptions(
+            copy: true,
+            selectAll: true,
+            cut: false,
+            paste: false,
+          ),
         ),
       ],
     );

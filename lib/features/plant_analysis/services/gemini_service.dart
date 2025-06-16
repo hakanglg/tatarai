@@ -102,6 +102,15 @@ class GeminiService extends BaseService {
       // 3. Analiz promptunu hazırla
       final finalPrompt = _prepareAnalysisPrompt(prompt, locationInfo);
 
+      // DEBUG: Prompt'u logla
+      logInfo(
+          '🔹 Gemini\'ye gönderilen prompt:',
+          finalPrompt.substring(
+                  0, finalPrompt.length > 500 ? 500 : finalPrompt.length) +
+              '...');
+      logInfo('🔹 Konum bilgisi:',
+          locationInfo.isEmpty ? 'Konum belirtilmedi' : locationInfo);
+
       // 4. API anahtarını kontrol et ve model durumunu doğrula
       if (!_validateApiAndModel()) {
         return _getDefaultImageAnalysisResponse(
@@ -123,18 +132,26 @@ class GeminiService extends BaseService {
         final prompt = TextPart(finalPrompt);
         final imagePart = DataPart('image/jpeg', bytes);
 
-        // Gelişmiş model ayarları ile istek gönder
+        // Gelişmiş model ayarları ile istek gönder - JSON'a optimize
         final generationConfig = GenerationConfig(
-          temperature: 0.01, // Çok düşük yaratıcılık, yüksek determinizm
-          topK: 1, // En olası seçeneği seç
-          topP: 0.99, // En yüksek olasılıklı yanıtları seç
-          maxOutputTokens: 2048, // Uzun yanıtlara izin ver
-          responseMimeType: 'application/json', // JSON formatında yanıt iste
+          temperature: 0.0, // Sıfır yaratıcılık, tamamen deterministik
+          topK: 1, // Sadece en olası seçeneği al
+          topP: 0.95, // Olasılığı yüksek yanıtlara odaklan
+          maxOutputTokens: 4096, // Uzun detaylı analiz için
+          responseMimeType: 'application/json', // Kesinlikle JSON formatı
           stopSequences: [
             '```', // Markdown bloklarını durdur
             'Bu analiz',
             'Görüntüdeki bitki',
             'Bu yanıt',
+            'Not:',
+            'Dipnot:',
+            'Açıklama:',
+            'Sonuç:',
+            '\n\n', // Çift satır arası
+            'Bu JSON', // JSON açıklamaları
+            '**', // Bold markdown
+            '##', // Header markdown
           ],
         );
 
@@ -149,6 +166,12 @@ class GeminiService extends BaseService {
           logWarning('Gemini boş yanıt döndürdü');
           return _getDefaultEmptyAnalysisResponse();
         }
+
+        // DEBUG: Ham yanıtı logla
+        logInfo(
+            '🔹 Gemini\'den gelen ham yanıt:',
+            response.text!.substring(0,
+                response.text!.length > 1000 ? 1000 : response.text!.length));
 
         // Yanıtı işle - markdown kod bloklarını temizle
         String responseText = response.text!.trim();
@@ -167,17 +190,32 @@ class GeminiService extends BaseService {
           logInfo('Markdown kod bloğu temizlendi');
         }
 
+        // DEBUG: Temizlenmiş yanıtı logla
+        logInfo(
+            '🔹 Temizlenmiş Gemini yanıtı:',
+            responseText.substring(
+                0, responseText.length > 1000 ? 1000 : responseText.length));
+
         // JSON geçerliliğini test et
         try {
-          json.decode(
-              responseText); // Sadece test için, parse edilebiliyor mu diye
+          final parsedJson = json.decode(responseText);
           logSuccess('Gemini başarılı yanıt döndürdü - geçerli JSON',
               'Karakter sayısı: ${responseText.length}');
+
+          // DEBUG: Parse edilen JSON'u logla
+          logInfo(
+              '🔹 Parse edilen JSON anahtarları:', parsedJson.keys.toString());
+          if (parsedJson['diseases'] != null) {
+            logInfo('🔹 Hastalık sayısı:',
+                parsedJson['diseases'].length.toString());
+          }
         } catch (jsonError) {
           // JSON parse edilemese bile yanıtı döndür, repository sonra işleyecek
           logWarning(
               'Gemini yanıtı JSON olarak ayrıştırılamadı, düz metin olarak işlenecek',
               jsonError.toString());
+          logWarning(
+              '🔹 JSON Parse hatası detayı:', responseText.substring(0, 200));
         }
 
         return responseText;
@@ -314,65 +352,170 @@ class GeminiService extends BaseService {
     }
   }
 
-  /// Analiz promptunu hazırlar
-  String _prepareAnalysisPrompt(String? promptParam, String locationInfo) {
-    // Konum bilgisi varsa prompt'a ekle
-    final String locationPrompt = locationInfo.isNotEmpty
-        ? "Bu bitki $locationInfo bölgesinde yetiştirilmektedir. Bu bölgedeki iklim koşulları ve yerel tarım uygulamaları göz önünde bulundurularak önerilerini vermelisin."
-        : "";
+  /// Gelişmiş analiz promptunu hazırlar
+  ///
+  /// [promptParam] - Özel prompt (opsiyonel)
+  /// [locationInfo] - Coğrafi konum bilgisi
+  /// [analysisType] - Analiz türü ('comprehensive', 'disease', 'care')
+  /// [language] - Yanıt dili ('tr', 'en')
+  String _prepareAnalysisPrompt(
+    String? promptParam,
+    String locationInfo, {
+    String analysisType = 'comprehensive',
+    String language = 'tr',
+  }) {
+    // Özel prompt varsa direkt kullan
+    if (promptParam != null && promptParam.isNotEmpty) {
+      return promptParam;
+    }
 
-    // Prompt varsa kullan, yoksa default prompt
-    return promptParam ??
-        '''[GÖREV] Sen bir uzman ziraat mühendisi ve bitki patoloji uzmanısın. Bu görüntüdeki bitkiyi analiz etmeni istiyorum.
+    // Dinamik bileşenler oluştur
+    final locationContext = _buildLocationContext(locationInfo);
+    final expertRole = _buildExpertRole(analysisType);
+    final analysisInstructions =
+        _buildAnalysisInstructions(analysisType, language);
+    final jsonSchema = _buildJsonSchema(analysisType);
+    final criticalWarnings = _buildCriticalWarnings(language);
 
-[FORMAT] SADECE ve YALNIZCA JSON formatında yanıt vereceksin. Cevabın başında veya sonunda herhangi bir açıklama olmadan, tamamen saf JSON döndüreceksin.
+    return '''$expertRole
 
-[ANALİZ TALİMATLARI]
-1. Bitkiyi teşhis et: Türkçe ve Latince adını belirt.
-2. Sağlık durumunu kontrol et: Hastalık belirtileri var mı? (sararmış yapraklar, lekeler, kurumalar, deformasyonlar vb.)
-3. Bitki hakkında genel bilgi ver.
-4. Bakım önerileri hazırla.
-5. Bitki hastalık varsa, tedavi önerileri ekle.
+$analysisInstructions
 
-$locationPrompt
+$locationContext
 
-[KRİTİK UYARI]
-Verdiğin cevap YALNIZCA bu JSON nesnesi olacaktır. HİÇBİR ön söz, açıklama veya son söz EKLEME.
-JSON dışında TEK BİR KARAKTER bile yazma.
-Markdown biçimlendirme KULLANMA (```json, ``` gibi).
+$criticalWarnings
 
-[JSON FORMATI - TAM OLARAK BU ŞABLONU DOLDUR]
+$jsonSchema
+
+${_buildMandatoryRules(language)}''';
+  }
+
+  /// Uzman rolü ve görev tanımını oluşturur
+  String _buildExpertRole(String analysisType) {
+    switch (analysisType) {
+      case 'disease':
+        return '''[UZMAN ROL] Sen bir bitki patolojisi uzmanısın. Sadece hastalık teşhisi ve tedavi önerileri ile ilgileniyorsun.''';
+      case 'care':
+        return '''[UZMAN ROL] Sen bir ziraat mühendisisin. Bitki bakımı ve yetiştirme koşulları konusunda uzmansın.''';
+      default:
+        return '''[UZMAN ROL] Sen bir uzman ziraat mühendisi ve bitki patoloji uzmanısın. Bu görüntüdeki bitkiyi kapsamlı bir şekilde analiz etmeni istiyorum.''';
+    }
+  }
+
+  /// Konum bağlamını oluşturur
+  String _buildLocationContext(String locationInfo) {
+    if (locationInfo.isEmpty) {
+      return '''[KONUM BİLGİSİ] Konum belirtilmemiş. Genel öneriler ver.''';
+    }
+
+    return '''[KONUM BİLGİSİ] Bu bitki $locationInfo bölgesinde yetiştirilmektedir. 
+Bu bölgenin:
+- İklim koşulları (sıcaklık, nem, yağış)
+- Toprak özellikleri
+- Yerel tarım uygulamaları
+- Bölgesel hastalık riskleri
+- Mevsimsel faktörler
+göz önünde bulundurularak önerilerini vermelisin.''';
+  }
+
+  /// Analiz talimatlarını oluşturur
+  String _buildAnalysisInstructions(String analysisType, String language) {
+    final baseInstructions = '''[ANALİZ TALİMATLARI]
+1. 🔍 BİTKİ TEŞHİSİ: Bitkiyi kesin olarak teşhis et (Türkçe ve Latince adı)
+2. 🩺 SAĞLIK DURUMU: Detaylı sağlık analizi yap
+   - Yaprak rengi ve dokusu
+   - Gövde durumu  
+   - Kök sistemi görünümü
+   - Meyve/çiçek durumu
+3. 🦠 HASTALIK TESPİTİ: Hastalık belirtilerini tespit et
+   - Fungal hastalıklar
+   - Bakteriyel hastalıklar
+   - Viral hastalıklar
+   - Zararlı böcek hasarları
+   - Besin eksiklikleri
+4. 📊 GELİŞİM DEĞERLENDİRMESİ: Bitki gelişim durumunu skorla (0-100)
+5. 💊 TEDAVİ ÖNERİLERİ: Spesifik tedavi yöntemleri öner
+6. 🌱 BAKIM TAVSİYELERİ: Comprehensive bakım planı hazırla''';
+
+    switch (analysisType) {
+      case 'disease':
+        return '''$baseInstructions
+        
+[ÖZEL FOKUS] Hastalık teşhisi ve tedavi önerilerine odaklan.''';
+      case 'care':
+        return '''$baseInstructions
+        
+[ÖZEL FOKUS] Bakım tavsiyeleri ve yetiştirme koşullarına odaklan.''';
+      default:
+        return baseInstructions;
+    }
+  }
+
+  /// JSON şemasını oluşturur
+  String _buildJsonSchema(String analysisType) {
+    return '''[JSON FORMATI - ZORUNLU ŞABLON]
 {
   "plantName": "Domates (Solanum lycopersicum)",
+  "probability": 0.95,
   "isHealthy": false,
-  "description": "Bu bitki orta boylu bir domates bitkisidir. Yapraklarda sararmalar görülmektedir.",
+  "description": "Detaylı bitki açıklaması. Görsel analiz sonuçları ve genel durum değerlendirmesi.",
   "diseases": [
     {
-      "name": "Erken Yaprak Yanıklığı",
-      "description": "Alt yapraklarda başlayıp yukarı doğru ilerleyen kahverengi lekeler",
-      "probability": 0.8,
-      "treatments": ["Etkilenen yaprakları uzaklaştırın", "Bakır bazlı fungisit uygulayın"]
+      "name": "Hastalık Adı",
+      "description": "Hastalığın detaylı açıklaması ve belirtileri",
+      "probability": 0.85,
+      "treatments": ["Spesifik tedavi önerisi 1", "Spesifik tedavi önerisi 2"],
+      "interventionMethods": ["Müdahale yöntemi 1", "Müdahale yöntemi 2"],
+      "pesticideSuggestions": ["İlaç önerisi 1", "İlaç önerisi 2"],
+      "preventiveMeasures": ["Önleyici tedbir 1", "Önleyici tedbir 2"],
+      "symptoms": ["Belirti 1", "Belirti 2"]
     }
   ],
-  "suggestions": ["Haftada iki kez sulayın", "Güneşli bir konumda tutun", "Düzenli gübreleme yapın"],
-  "interventionMethods": ["Damlama sulama sistemi kullanın", "Organik malçlama yapın"],
-  "agriculturalTips": ["Destek çubukları kullanın", "Yan dalları budayın"],
-  "watering": "Haftada 2-3 kez, toprağın üst kısmı kuruduğunda",
-  "sunlight": "Tam güneş, günde en az 6 saat",
-  "soil": "Organik maddece zengin, iyi drene olan toprak",
-  "climate": "Ilıman iklim, 18-29°C arası sıcaklık",
-  "growthStage": "Meyve olgunlaşma dönemi",
+  "suggestions": ["Genel öneri 1", "Genel öneri 2", "Genel öneri 3"],
+  "interventionMethods": ["Kapsamlı müdahale 1", "Kapsamlı müdahale 2"],
+  "agriculturalTips": ["Tarımsal ipucu 1", "Tarımsal ipucu 2"],
+  "watering": "Detaylı sulama talimatı - sıklık, miktar, yöntem",
+  "sunlight": "Işık gereksinimi - süre, yoğunluk, konum",
+  "soil": "Toprak özellikleri - pH, drenaj, besin",
+  "climate": "İklim gereksinimleri - sıcaklık, nem, rüzgar",
+  "growthStage": "Mevcut gelişim aşaması",
   "growthScore": 75,
-  "growthComment": "Bitki normal gelişim göstermekte ancak hastalık belirtileri mevcut"
-}
+  "growthComment": "Gelişim durumu hakkında detaylı yorum"
+}''';
+  }
 
-[ZORUNLU TALİMATLAR]
-1. YUKARIDAKİ JSON ŞABLONUNU KULLAN. Farklı alanlar ekleme veya çıkarma.
-2. BİR JSON OLUŞTUR, BİRDEN FAZLA DEĞİL.
-3. JSON SÖZDİZİMİNE KESİNLİKLE UYGUN OLSUN (çift tırnak kullan, virgüller doğru yerde olsun).
-4. TÜM GEREKLİ ALANLARI DOLDUR, boş bırakma.
-5. "isHealthy" değeri boolean olmalı (true/false). Bitki tamamen sağlıklıysa true, herhangi bir hastalık belirtisi varsa false.
-6. BU TALİMATLAR KISMI DAHİL CEVABINDA HİÇBİR METİN VEYA AÇIKLAMA OLMASIN, SADECE JSON DÖNDÜR.''';
+  /// Kritik uyarıları oluşturur
+  String _buildCriticalWarnings(String language) {
+    return '''[🚨 KRİTİK UYARILAR - MUTLAKA UYULACAK] 
+🔴 SADECE VE YALNIZCA JSON formatında yanıt ver - başka hiçbir şey yok
+🔴 CEVABININ İLK KARAKTERI { OLMALI, SON KARAKTERI } OLMALI
+🔴 HİÇBİR ön söz, açıklama, not veya son söz EKLEME
+🔴 JSON dışında TEK BİR KARAKTER bile yazma (nokta, açıklama, emoji yok)
+🔴 Markdown biçimlendirme KULLANMA (```json, ``` vb.)
+🔴 Türkçe karakterleri doğru kullan (ç, ğ, ı, ş, ü, ö)
+🔴 Tüm string değerleri çift tırnak içinde yaz
+🔴 Boolean değerler: sadece true/false (tırnak yok)
+🔴 Sayısal değerler: tırnak olmadan (örn: 0.85)
+🔴 Array'ler köşeli parantez içinde: ["item1", "item2"]
+🔴 Null değer kullanma - boş string "" veya boş array [] kullan
+🔴 Trailing comma kullanma (son öğeden sonra virgül yok)
+🔴 Unicode kaçış karakterleri kullanma (\\u0000 vb.)''';
+  }
+
+  /// Zorunlu kuralları oluşturur
+  String _buildMandatoryRules(String language) {
+    return '''[ZORUNLU KURALLAR]
+1. ✅ YUKARIDAKİ JSON ŞABLONUNU KULLAN - Alanları değiştirme
+2. ✅ TEK JSON OLUŞTUR - Birden fazla obje veya array değil
+3. ✅ JSON SÖZDİZİMİ KURALLARINA UYGUN OLSUN
+4. ✅ TÜM ALANLARI DOLDUR - Boş string yerine anlamlı içerik
+5. ✅ "isHealthy" boolean değeri: true (sağlıklı) / false (hasta)
+6. ✅ "diseases" array'i: Hastalık yoksa boş array []
+7. ✅ "probability" değerleri: 0.0 ile 1.0 arası ondalık sayı
+8. ✅ "growthScore": 0 ile 100 arası tam sayı
+9. ✅ SADECE JSON DÖNDÜR - Bu talimatları cevaba dahil etme
+
+[BAŞLA] Şimdi görüntüyü analiz et ve yukarıdaki JSON formatında yanıt ver:''';
   }
 
   /// Görsel analizi yapar

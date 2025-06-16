@@ -554,6 +554,25 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
       }
     }
 
+    // Kullanıcının analiz kredilerini kontrol et
+    final authenticatedState =
+        context.read<AuthCubit>().state as AuthAuthenticated;
+    final currentUser = authenticatedState.user;
+
+    AppLogger.i(
+        'Kullanıcının analiz kredileri kontrol ediliyor: ${currentUser.analysisCredits}, Premium: ${currentUser.isPremium}');
+
+    // Eğer kullanıcı premium değilse ve kredisi yoksa, premium satın alma popup'ı göster
+    if (!currentUser.isPremium && currentUser.analysisCredits <= 0) {
+      AppLogger.w(
+          'Kullanıcının analiz kredisi yok, premium popup gösteriliyor');
+      await _showErrorDialog(
+        'Ücretsiz analiz hakkınızı kullandınız. Premium üyelik satın alarak sınırsız analiz yapabilirsiniz.',
+        needsPremium: true,
+      );
+      return;
+    }
+
     // Firebase Auth current user kontrolü
     final firebaseUser = FirebaseAuth.instance.currentUser;
     AppLogger.i(
@@ -584,14 +603,10 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
         ? _fieldNameController.text.trim()
         : null;
 
-    // Güncel auth state'i al
-    final currentAuthState =
-        context.read<AuthCubit>().state as AuthAuthenticated;
-
     // Plant Analysis Cubit'i üzerinden analizi başlat
     context.read<PlantAnalysisCubit>().analyzeAndSave(
           _selectedImage!,
-          currentAuthState.user, // Gerçek kullanıcıyı AuthCubit'den al
+          currentUser, // Daha önce tanımlanan currentUser'ı kullan
         );
   }
 

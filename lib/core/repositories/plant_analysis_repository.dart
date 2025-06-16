@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 import '../models/user_model.dart';
 import '../../features/plant_analysis/domain/entities/plant_analysis_entity.dart';
@@ -14,6 +16,8 @@ import '../../features/plant_analysis/services/plant_analysis_service.dart';
 import '../services/firestore/firestore_service_interface.dart';
 import '../utils/logger.dart';
 import '../utils/validation_util.dart';
+import 'package:tatarai/features/plant_analysis/services/gemini_response_parser.dart';
+import 'package:tatarai/core/utils/cache_manager.dart';
 
 /// Bitki analizi repository interface'i (Domain katmanı)
 ///
@@ -337,12 +341,36 @@ class PlantAnalysisRepositoryImpl implements PlantAnalysisRepository {
         rethrow;
       }
 
-      // === STEP 4: Comprehensive plant analysis with validations ===
+      // === STEP 4: Upload image to Firebase Storage ===
+      String imageDownloadUrl;
+      try {
+        AppLogger.logWithContext(
+          _serviceName,
+          '📤 STEP 4 - Firebase Storage a gorsel yukleniyor...',
+        );
+
+        imageDownloadUrl = await _analysisService.uploadImage(imageFile);
+
+        AppLogger.successWithContext(
+          _serviceName,
+          '✅ STEP 4 - Görsel yükleme başarılı',
+          'URL: $imageDownloadUrl',
+        );
+      } catch (uploadError) {
+        AppLogger.errorWithContext(
+          _serviceName,
+          '❌ STEP 4 - Görsel yükleme hatası',
+          uploadError,
+        );
+        rethrow;
+      }
+
+      // === STEP 5: Comprehensive plant analysis with validations ===
       AnalysisResponse analysisResponse;
       try {
         AppLogger.logWithContext(
           _serviceName,
-          '🤖 STEP 4 - Comprehensive plant analysis başlatılıyor...',
+          '🤖 STEP 5 - Comprehensive plant analysis başlatılıyor...',
         );
 
         analysisResponse = await _analysisService.analyzePlant(
@@ -358,42 +386,73 @@ class PlantAnalysisRepositoryImpl implements PlantAnalysisRepository {
 
         AppLogger.successWithContext(
           _serviceName,
-          '✅ STEP 4 - Comprehensive plant analysis başarılı',
+          '✅ STEP 5 - Comprehensive plant analysis başarılı',
           'Response: ${analysisResponse.message}',
         );
       } catch (analysisError) {
         AppLogger.errorWithContext(
           _serviceName,
-          '❌ STEP 4 - Comprehensive plant analysis hatası',
+          '❌ STEP 5 - Comprehensive plant analysis hatası',
           analysisError,
         );
         rethrow;
       }
 
-      // === STEP 5: Create analysis model from response ===
+      // === STEP 5: Parse Gemini response and create analysis model ===
       PlantAnalysisModel analysisModel;
       try {
         AppLogger.logWithContext(
           _serviceName,
-          '🔄 STEP 5 - Model oluşturma başlatılıyor...',
+          '🔄 STEP 5 - Gemini yanıtını parse ediyoruz...',
         );
 
-        // analysisResponse.result AI'dan gelen text response'dur
-        // Şimdilik basit bir model oluşturalım - gelecekte AI response parsing eklenecek
+        // DEBUG: Gemini response'ını logla
+        AppLogger.logWithContext(
+          _serviceName,
+          '🔹 Gemini Service yanıtı:',
+          analysisResponse.result?.substring(
+                  0,
+                  analysisResponse.result!.length > 500
+                      ? 500
+                      : analysisResponse.result!.length) ??
+              'null',
+        );
+
+        // Gemini yanıtını PlantAnalysisResult'a parse et
+        final plantAnalysisResult = await _parseGeminiResponse(
+          analysisResponse.result ?? '{}',
+          imageDownloadUrl, // Yüklenen görüntü URL'i
+          analysisResponse.location ?? '',
+          analysisResponse.fieldName,
+        );
+
+        // PlantAnalysisResult'tan PlantAnalysisModel'e dönüştür
         analysisModel = PlantAnalysisModel(
           id: '',
-          plantName: 'AI Analizi Tamamlandı', // TODO: Parse from AI response
-          probability: 0.95, // TODO: Parse from AI response
-          isHealthy: true, // TODO: Parse from AI response
-          diseases: [], // TODO: Parse from AI response
-          description: analysisResponse.result ?? 'AI analizi tamamlandı',
-          suggestions: [
-            'AI analizi başarıyla tamamlandı',
-            'Detaylı sonuçlar için geliştirme devam ediyor',
-          ], // TODO: Parse from AI response
-          imageUrl: '', // Image URL will be set during upload
-          similarImages: [],
+          plantName: plantAnalysisResult.plantName,
+          probability: plantAnalysisResult.probability,
+          isHealthy: plantAnalysisResult.isHealthy,
+          diseases: _convertDiseases(plantAnalysisResult.diseases),
+          description: plantAnalysisResult.description,
+          suggestions: plantAnalysisResult.suggestions,
+          imageUrl: plantAnalysisResult.imageUrl,
+          similarImages: plantAnalysisResult.similarImages,
           timestamp: DateTime.now().millisecondsSinceEpoch,
+          // Ek detaylı alanlar
+          watering: plantAnalysisResult.watering,
+          sunlight: plantAnalysisResult.sunlight,
+          soil: plantAnalysisResult.soil,
+          climate: plantAnalysisResult.climate,
+          growthStage: plantAnalysisResult.growthStage,
+          growthScore: plantAnalysisResult.growthScore,
+          growthComment: plantAnalysisResult.growthComment,
+          interventionMethods: plantAnalysisResult.interventionMethods,
+          agriculturalTips: plantAnalysisResult.agriculturalTips,
+          regionalInfo: plantAnalysisResult.regionalInfo,
+          location: plantAnalysisResult.location,
+          fieldName: plantAnalysisResult.fieldName,
+          geminiAnalysis:
+              analysisResponse.result, // Ham Gemini yanıtını da sakla
         );
 
         AppLogger.logWithContext(
@@ -798,9 +857,68 @@ class PlantAnalysisRepositoryImpl implements PlantAnalysisRepository {
     String? userId,
     int limit = 20,
   }) async {
-    // TODO: Implement disease-specific search using array-contains
-    // For now, return unhealthy analyses
-    return getUnhealthyAnalyses(userId: userId, limit: limit);
+    try {
+      final targetUserId =
+          userId ?? FirebaseAuth.instance.currentUser?.uid ?? 'anonymous';
+
+      // Hastalık adına göre arama yap - diseases array'inde bu hastalığı içeren analizler
+      final Query query = _firestoreService.firestore
+          .collection(_analysesCollection)
+          .where('userId', isEqualTo: targetUserId)
+          .where('isHealthy', isEqualTo: false)
+          .orderBy('timestamp', descending: true)
+          .limit(limit);
+
+      final QuerySnapshot snapshot = await query.get();
+
+      final List<PlantAnalysisEntity> analyses = [];
+
+      for (final doc in snapshot.docs) {
+        try {
+          final data = doc.data() as Map<String, dynamic>;
+
+          // Hastalık listesini kontrol et
+          final List<dynamic> diseases = data['diseases'] ?? [];
+          bool hasDisease = diseases.any((disease) {
+            if (disease is Map<String, dynamic>) {
+              final String? name = disease['name'];
+              return name?.toLowerCase().contains(diseaseName.toLowerCase()) ??
+                  false;
+            }
+            return false;
+          });
+
+          if (hasDisease) {
+            final data = doc.data() as Map<String, dynamic>;
+            data['id'] = doc.id; // Document ID'yi data'ya ekle
+            final model = PlantAnalysisModel.fromJson(data);
+            analyses.add(model.toEntity());
+          }
+        } catch (e) {
+          AppLogger.warnWithContext(
+            _serviceName,
+            'Hastalık bazlı analiz parse hatası',
+            'Doc ID: ${doc.id}, Error: $e',
+          );
+        }
+      }
+
+      AppLogger.successWithContext(
+        _serviceName,
+        'Hastalık bazlı analizler alındı',
+        'Disease: $diseaseName, Count: ${analyses.length}',
+      );
+
+      return analyses;
+    } catch (e, stackTrace) {
+      AppLogger.errorWithContext(
+        _serviceName,
+        'Hastalık bazlı analiz getirme hatası',
+        e,
+        stackTrace,
+      );
+      return [];
+    }
   }
 
   // ============================================================================
@@ -856,9 +974,59 @@ class PlantAnalysisRepositoryImpl implements PlantAnalysisRepository {
     String? userId,
     int limit = 10,
   }) async {
-    // TODO: Implement aggregation query
-    // For now return empty map
-    return {};
+    try {
+      final targetUserId =
+          userId ?? FirebaseAuth.instance.currentUser?.uid ?? 'anonymous';
+
+      AppLogger.logWithContext(
+        _serviceName,
+        'En çok analiz edilen bitkiler getiriliyor',
+        'UserId: $targetUserId, Limit: $limit',
+      );
+
+      // Kullanıcının tüm analizlerini al
+      final models =
+          await _firestoreService.getDocumentsWithQuery<PlantAnalysisModel>(
+        collection: _analysesCollection,
+        fromJson: PlantAnalysisModel.fromJson,
+        queryBuilder: (collection) => collection
+            .where('userId', isEqualTo: targetUserId)
+            .orderBy('timestamp', descending: true),
+      );
+
+      // Bitki adlarını say
+      final Map<String, int> plantCounts = {};
+      for (final model in models) {
+        final plantName = model.plantName.trim();
+        if (plantName.isNotEmpty && plantName != 'Bilinmeyen Bitki') {
+          plantCounts[plantName] = (plantCounts[plantName] ?? 0) + 1;
+        }
+      }
+
+      // En çok analizlenenleri sırala ve limit'le
+      final sortedEntries = plantCounts.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+
+      final result = Map<String, int>.fromEntries(
+        sortedEntries.take(limit),
+      );
+
+      AppLogger.successWithContext(
+        _serviceName,
+        'En çok analiz edilen bitkiler alındı',
+        'Plant count: ${result.length}',
+      );
+
+      return result;
+    } catch (e, stackTrace) {
+      AppLogger.errorWithContext(
+        _serviceName,
+        'En çok analiz edilen bitkiler getirme hatası',
+        e,
+        stackTrace,
+      );
+      return {};
+    }
   }
 
   // ============================================================================
@@ -867,15 +1035,62 @@ class PlantAnalysisRepositoryImpl implements PlantAnalysisRepository {
 
   @override
   Future<bool> isConnected() async {
-    return true; // TODO: Implement connectivity check
+    try {
+      // Connectivity kontrolü
+      final connectivityResult = await Connectivity().checkConnectivity();
+      final hasConnection = connectivityResult != ConnectivityResult.none;
+
+      if (!hasConnection) {
+        return false;
+      }
+
+      // Firebase bağlantısı test et
+      try {
+        await _firestoreService.firestore
+            .collection('_connection_test')
+            .limit(1)
+            .get()
+            .timeout(const Duration(seconds: 5));
+        return true;
+      } catch (e) {
+        AppLogger.warnWithContext(
+          _serviceName,
+          'Firebase bağlantı testi başarısız',
+          e.toString(),
+        );
+        return false;
+      }
+    } catch (e) {
+      AppLogger.errorWithContext(
+        _serviceName,
+        'Bağlantı kontrolü hatası',
+        e,
+      );
+      return false;
+    }
   }
 
   @override
   Future<bool> clearCache() async {
     try {
-      // TODO: Implement cache clearing
-      return true;
+      // CacheManager kullanarak önbelleği temizle
+      final cacheManager = CacheManager();
+      await cacheManager.init();
+      final success = await cacheManager.clearCache();
+
+      AppLogger.logWithContext(
+        _serviceName,
+        'Önbellek temizleme sonucu',
+        'Success: $success',
+      );
+
+      return success;
     } catch (e) {
+      AppLogger.errorWithContext(
+        _serviceName,
+        'Önbellek temizleme hatası',
+        e,
+      );
       return false;
     }
   }
@@ -883,9 +1098,76 @@ class PlantAnalysisRepositoryImpl implements PlantAnalysisRepository {
   @override
   Future<int> syncOfflineAnalyses() async {
     try {
-      // TODO: Implement offline sync
-      return 0;
+      // Offline analizleri kontrol et ve senkronize et
+      final cacheManager = CacheManager();
+      await cacheManager.init();
+
+      // Önbellekten offline analizleri al
+      final cachedAnalyses = await cacheManager.getCachedAnalysisResults();
+
+      int syncedCount = 0;
+
+      for (final analysis in cachedAnalyses) {
+        try {
+          // Online olup olmadığını kontrol et
+          final isOnline = await isConnected();
+          if (!isOnline) {
+            break;
+          }
+
+          // Firestore'da bu analiz var mı kontrol et
+          final existingDoc = await _firestoreService.firestore
+              .collection(_analysesCollection)
+              .doc(analysis.id)
+              .get();
+
+          // Eğer yoksa, yükle
+          if (!existingDoc.exists) {
+            final model = PlantAnalysisModel(
+              id: analysis.id,
+              plantName: analysis.plantName,
+              probability: analysis.probability,
+              isHealthy: analysis.isHealthy,
+              diseases: [], // Cached analizlerde disease detayları eksik olabilir
+              description: analysis.description,
+              suggestions: analysis.suggestions,
+              imageUrl: analysis.imageUrl,
+              similarImages: analysis.similarImages,
+              timestamp: analysis.timestamp,
+              location: analysis.location,
+              fieldName: analysis.fieldName,
+            );
+
+            await _firestoreService.setDocument(
+              collection: _analysesCollection,
+              documentId: analysis.id,
+              data: model.toJson(),
+            );
+
+            syncedCount++;
+          }
+        } catch (e) {
+          AppLogger.warnWithContext(
+            _serviceName,
+            'Analiz senkronizasyon hatası',
+            'ID: ${analysis.id}, Error: $e',
+          );
+        }
+      }
+
+      AppLogger.successWithContext(
+        _serviceName,
+        'Offline analiz senkronizasyonu tamamlandı',
+        'Senkronize edilen: $syncedCount',
+      );
+
+      return syncedCount;
     } catch (e) {
+      AppLogger.errorWithContext(
+        _serviceName,
+        'Offline senkronizasyon hatası',
+        e,
+      );
       return 0;
     }
   }
@@ -905,6 +1187,54 @@ class PlantAnalysisRepositoryImpl implements PlantAnalysisRepository {
         severity: new_disease.DiseaseSeverity.fromString(oldDisease.severity),
       );
     }).toList();
+  }
+
+  /// Gemini servisinden dönen JSON yanıtını PlantAnalysisResult'a parse eder
+  Future<PlantAnalysisResult> _parseGeminiResponse(
+    String geminiJsonResponse,
+    String imageUrl,
+    String location,
+    String? fieldName,
+  ) async {
+    try {
+      AppLogger.logWithContext(
+        _serviceName,
+        '🔄 Gemini JSON parsing başlatılıyor...',
+        'Response length: ${geminiJsonResponse.length}',
+      );
+
+      // Yeni GeminiResponseParser kullan
+      final parsedResult = await GeminiResponseParser.parseAnalysisResponse(
+        rawResponse: geminiJsonResponse,
+        imageUrl: imageUrl,
+        location: location,
+        fieldName: fieldName,
+      );
+
+      AppLogger.successWithContext(
+        _serviceName,
+        '✅ Gemini JSON parsing başarılı',
+        'Plant: ${parsedResult.plantName}, Diseases: ${parsedResult.diseases.length}',
+      );
+
+      return parsedResult;
+    } catch (e, stackTrace) {
+      AppLogger.errorWithContext(
+        _serviceName,
+        '❌ Gemini JSON parsing hatası',
+        e,
+        stackTrace,
+      );
+
+      // Parse hata durumunda fallback response döndür
+      return PlantAnalysisResult.createEmpty(
+        imageUrl: imageUrl,
+        location: location,
+        fieldName: fieldName,
+        errorMessage: 'Gemini yanıtı parse edilemedi: ${e.toString()}',
+        originalText: geminiJsonResponse,
+      );
+    }
   }
 
   /// Analizi Firestore'a kaydeder
