@@ -1,7 +1,7 @@
 rules_version = '2';
 
-// Firebase Storage Security Rules
-// TatarAI uygulaması için güvenlik kuralları
+// Firebase Storage Security Rules for TatarAI
+// GEÇİCİ TEST KURALLARI - DEVELOPMENT İÇİN
 service firebase.storage {
   match /b/{bucket}/o {
     
@@ -14,107 +14,41 @@ service firebase.storage {
       return request.auth != null;
     }
     
-    /// Kullanıcı kendi dosyasına mı erişiyor?
-    function isOwner(userId) {
-      return request.auth != null && request.auth.uid == userId;
-    }
-    
-    /// Dosya boyutu limiti kontrolü (10MB)
+    /// Dosya boyutu kontrolü (20MB limit)
     function isValidSize() {
-      return request.resource.size < 10 * 1024 * 1024;
+      return request.resource.size < 20 * 1024 * 1024;
     }
     
     /// Geçerli görüntü formatı mı?
     function isValidImageType() {
-      return request.resource.contentType.matches('image/.*');
+      return request.resource.contentType != null && 
+             request.resource.contentType.matches('image/.*');
     }
     
     // ============================================================================
-    // PLANT ANALYSIS IMAGES
+    // DEVELOPMENT RULES - GEÇİCİ AÇIK ERİŞİM
     // ============================================================================
     
-    /// Bitki analizi görüntüleri
-    /// Path: analyses/{analysisId}/{fileName}
-    match /analyses/{analysisId}/{fileName} {
-      // Kimlik doğrulaması yapılmış kullanıcılar yükleyebilir
-      allow create: if isAuthenticated() 
-                    && isValidImageType() 
-                    && isValidSize();
-      
-      // Herkes okuyabilir (analiz sonuçları paylaşılabilir)
-      allow read: if true;
-      
-      // Sadece yükleyen kullanıcı silebilir
-      allow delete: if isAuthenticated();
-    }
-    
-    /// Alternatif path: analyses/{fileName}
-    match /analyses/{fileName} {
-      allow create: if isAuthenticated() 
-                    && isValidImageType() 
-                    && isValidSize();
-      allow read: if true;
-      allow delete: if isAuthenticated();
-    }
-    
-    // ============================================================================
-    // PROFILE IMAGES
-    // ============================================================================
-    
-    /// Profil fotoğrafları
-    /// Path: profile_images/{fileName}
-    match /profile_images/{fileName} {
-      // Kimlik doğrulaması yapılmış kullanıcılar yükleyebilir
-      allow create: if isAuthenticated() 
-                    && isValidImageType() 
-                    && isValidSize();
-      
-      // Herkes okuyabilir
-      allow read: if true;
-      
-      // Sadece yükleyen kullanıcı güncelleyebilir/silebilir
-      allow update, delete: if isAuthenticated();
-    }
-    
-    // ============================================================================
-    // USER SPECIFIC FILES
-    // ============================================================================
-    
-    /// Kullanıcıya özel dosyalar
-    /// Path: users/{userId}/{fileName}
-    match /users/{userId}/{fileName} {
-      // Sadece dosya sahibi erişebilir
-      allow read, write: if isOwner(userId) 
-                         && isValidSize();
-    }
-    
-    // ============================================================================
-    // TEMPORARY FILES
-    // ============================================================================
-    
-    /// Geçici dosyalar (24 saat sonra silinir)
-    /// Path: temp/{fileName}
-    match /temp/{fileName} {
-      // Kimlik doğrulaması yapılmış kullanıcılar yükleyebilir
-      allow create: if isAuthenticated() 
-                    && isValidSize();
-      
-      // Herkes okuyabilir
-      allow read: if true;
-      
-      // Kimlik doğrulaması yapılmış kullanıcılar silebilir
-      allow delete: if isAuthenticated();
-    }
-    
-    // ============================================================================
-    // DEVELOPMENT RULES (GEÇICI)
-    // ============================================================================
-    
-    /// Development ortamı için geçici kural
-    /// ÖNEMLİ: Production'da kaldırılmalı!
+    /// GEÇİCİ: Herkes her şeyi yapabilir (test için)
     match /{allPaths=**} {
-      // Kimlik doğrulaması yapılmış tüm kullanıcılar erişebilir
-      allow read, write: if isAuthenticated() && isValidSize();
+      allow read, write: if true; // GEÇİCİ: Herkes erişebilir
     }
+    
+    // ============================================================================
+    // PLANT ANALYSIS IMAGES (YORUM SATIRINDA)
+    // ============================================================================
+    
+    // /// Bitki analizi görüntüleri - Basit kural
+    // /// Path: analyses/{fileName}
+    // match /analyses/{fileName} {
+    //   // Authenticated kullanıcılar yükleyebilir
+    //   allow create: if isAuthenticated() && isValidSize();
+    //   
+    //   // Herkes okuyabilir
+    //   allow read: if true;
+    //   
+    //   // Authenticated kullanıcılar silebilir
+    //   allow delete: if isAuthenticated();
+    // }
   }
-} 
+}

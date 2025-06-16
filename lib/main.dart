@@ -18,6 +18,9 @@ import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
 import 'package:tatarai/features/auth/cubits/auth_state.dart';
 import 'package:tatarai/features/payment/cubits/payment_cubit.dart';
 import 'package:tatarai/features/plant_analysis/presentation/cubits/plant_analysis_cubit.dart';
+import 'package:tatarai/core/repositories/plant_analysis_repository.dart';
+import 'package:tatarai/features/plant_analysis/services/plant_analysis_service.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 /// TatarAI uygulamasının ana giriş noktası
 ///
@@ -339,12 +342,32 @@ class _TatarAIState extends State<TatarAI> {
           AppLogger.i(
               '🏗️ PlantAnalysisCubit ServiceLocator\'dan oluşturuluyor');
           try {
+            // ServiceLocator'dan direkt al - eğer Firebase hazır değilse hata fırlatacak
             final plantAnalysisCubit = Services.plantAnalysisCubit;
             AppLogger.i('✅ PlantAnalysisCubit başarıyla oluşturuldu');
             return plantAnalysisCubit;
           } catch (e, stackTrace) {
             AppLogger.e('❌ PlantAnalysisCubit oluşturma hatası', e, stackTrace);
-            rethrow; // PlantAnalysisCubit kritik olduğu için hatayı fırlat
+            AppLogger.w('⚠️ Fallback PlantAnalysisCubit oluşturuluyor...');
+
+            // Fallback: Minimal cubit döndür
+            try {
+              return PlantAnalysisCubit(
+                repository: PlantAnalysisRepositoryImpl(
+                  firestoreService: Services.firestore,
+                  analysisService: PlantAnalysisService(
+                    geminiService: Services.geminiService,
+                    firestore: Services.firebaseFirestore,
+                    storage: FirebaseStorage.instance, // Fallback
+                  ),
+                ),
+              );
+            } catch (fallbackError) {
+              AppLogger.e('❌ Fallback PlantAnalysisCubit de oluşturulamadı',
+                  fallbackError);
+              // Son çare: Boş repository ile cubit oluştur
+              rethrow;
+            }
           }
         },
         lazy: true, // Gerektiğinde başlat

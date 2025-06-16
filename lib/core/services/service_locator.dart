@@ -100,7 +100,38 @@ class ServiceLocator {
     );
 
     _getIt.registerLazySingleton<FirebaseStorage>(
-      () => FirebaseStorage.instance,
+      () {
+        // FirebaseManager'ın başlatılıp başlatılmadığını kontrol et
+        final firebaseManager = FirebaseManager();
+
+        if (!firebaseManager.isInitialized) {
+          AppLogger.errorWithContext('ServiceLocator',
+              'Firebase henüz başlatılmamış - Storage kullanılamıyor');
+          throw StateError(
+              'Firebase henüz başlatılmamış - Storage kullanılamıyor');
+        }
+
+        // Firebase başlatıldıysa Storage'ı al
+        try {
+          AppLogger.logWithContext('ServiceLocator',
+              'FirebaseManager\'dan Storage instance alınıyor');
+          return firebaseManager.storage;
+        } catch (e) {
+          AppLogger.warnWithContext(
+              'ServiceLocator', 'FirebaseManager\'dan Storage alınamadı: $e');
+
+          // Fallback: Default instance
+          try {
+            AppLogger.logWithContext('ServiceLocator',
+                'Fallback: Default Storage instance kullanılıyor');
+            return FirebaseStorage.instance;
+          } catch (fallbackError) {
+            AppLogger.errorWithContext('ServiceLocator',
+                'Firebase Storage instance alınamadı: $fallbackError');
+            throw StateError('Firebase Storage kullanılamıyor: $fallbackError');
+          }
+        }
+      },
     );
 
     // Firestore Service
@@ -143,26 +174,40 @@ class ServiceLocator {
 
     // Plant Analysis Service
     _getIt.registerLazySingleton<PlantAnalysisService>(
-      () => PlantAnalysisService(
-        geminiService: _getIt<GeminiService>(),
-        firestore: _getIt<FirebaseFirestore>(),
-        storage: _getIt<FirebaseStorage>(),
-      ),
+      () {
+        // Firebase Storage'ın hazır olup olmadığını kontrol et
+        try {
+          final storage = _getIt<FirebaseStorage>();
+          return PlantAnalysisService(
+            geminiService: _getIt<GeminiService>(),
+            firestore: _getIt<FirebaseFirestore>(),
+            storage: storage,
+          );
+        } catch (e) {
+          AppLogger.errorWithContext('ServiceLocator',
+              'PlantAnalysisService oluşturulamadı - Firebase Storage hazır değil: $e');
+          rethrow;
+        }
+      },
     );
 
     // Plant Analysis Repository
     _getIt.registerLazySingleton<PlantAnalysisRepository>(
-      () => PlantAnalysisRepositoryImpl(
-        firestoreService: _getIt<FirestoreServiceInterface>(),
-        analysisService: _getIt<PlantAnalysisService>(),
-      ),
+      () {
+        return PlantAnalysisRepositoryImpl(
+          firestoreService: _getIt<FirestoreServiceInterface>(),
+          analysisService: _getIt<PlantAnalysisService>(),
+        );
+      },
     );
 
     // Plant Analysis Cubit
     _getIt.registerFactory<PlantAnalysisCubit>(
-      () => PlantAnalysisCubit(
-        repository: _getIt<PlantAnalysisRepository>(),
-      ),
+      () {
+        return PlantAnalysisCubit(
+          repository: _getIt<PlantAnalysisRepository>(),
+        );
+      },
     );
 
     AppLogger.logWithContext(

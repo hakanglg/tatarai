@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:io';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:tatarai/core/constants/app_constants.dart';
 import 'package:tatarai/core/utils/validation_util.dart';
 import 'package:tatarai/core/utils/logger.dart';
@@ -83,6 +86,18 @@ class PlantAnalysisService {
         _firestore = firestore,
         _storage = storage {
     AppLogger.logWithContext(_serviceName, 'Service initialized');
+
+    // Firebase Storage'ın kullanılabilir olup olmadığını kontrol et
+    try {
+      final testRef = _storage.ref('test');
+      AppLogger.logWithContext(
+          _serviceName, 'Firebase Storage erişimi doğrulandı');
+    } catch (e) {
+      AppLogger.errorWithContext(
+          _serviceName, 'Firebase Storage kullanılamıyor: $e');
+      throw Exception(
+          'Firebase Storage kullanılamıyor - Firebase başlatılmamış olabilir: $e');
+    }
   }
 
   // ============================================================================
@@ -313,35 +328,207 @@ class PlantAnalysisService {
   /// @param imageFile - Image file to upload
   /// @return Image download URL
   Future<String> uploadImage(File imageFile) async {
-    try {
-      AppLogger.logWithContext(
-        _serviceName,
-        'Uploading image to storage',
-        'File path: ${imageFile.path}',
-      );
+    AppLogger.logWithContext(_serviceName, '🚀 Image upload başlatılıyor...');
 
-      final fileName = 'analyses/${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final storageRef = _storage.ref().child(fileName);
+    const int maxRetries = 3;
+    const Duration timeoutDuration = Duration(seconds: 30);
 
-      final uploadTask = await storageRef.putFile(imageFile);
-      final imageUrl = await uploadTask.ref.getDownloadURL();
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        AppLogger.logWithContext(
+          _serviceName,
+          '📤 Image upload denemesi (Attempt $attempt/$maxRetries)',
+          'File: ${imageFile.path}',
+        );
 
-      AppLogger.successWithContext(
-        _serviceName,
-        'Image uploaded successfully',
-        imageUrl,
-      );
+        // Dosya kontrolü
+        if (!await imageFile.exists()) {
+          throw Exception('❌ Dosya bulunamadı: ${imageFile.path}');
+        }
 
-      return imageUrl;
-    } catch (e, stackTrace) {
-      AppLogger.errorWithContext(
-        _serviceName,
-        'Image upload error',
-        e,
-        stackTrace,
-      );
-      rethrow;
+        final fileSize = await imageFile.length();
+        AppLogger.logWithContext(_serviceName,
+            '📊 Dosya boyutu: ${(fileSize / 1024).toStringAsFixed(1)}KB');
+
+        if (fileSize == 0) {
+          throw Exception('❌ Dosya boş: ${imageFile.path}');
+        }
+
+        if (fileSize > 10 * 1024 * 1024) {
+          throw Exception(
+              '❌ Dosya çok büyük: ${(fileSize / 1024 / 1024).toStringAsFixed(2)}MB');
+        }
+
+        // Dosya formatı kontrolü
+        final filePath = imageFile.path.toLowerCase();
+        if (!filePath.endsWith('.jpg') &&
+            !filePath.endsWith('.jpeg') &&
+            !filePath.endsWith('.png')) {
+          AppLogger.warnWithContext(
+              _serviceName, '⚠️ Desteklenmeyen dosya formatı: $filePath');
+        }
+
+        // Dosyayı byte array'e çevir - bu daha güvenilir
+        final imageBytes = await imageFile.readAsBytes();
+        final fileName =
+            'analyses/img_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final storageRef = _storage.ref(fileName);
+
+        AppLogger.logWithContext(_serviceName, '📁 Storage ref oluşturuldu',
+            'Full path: ${storageRef.fullPath}');
+
+        // putData kullan - putFile yerine daha güvenilir
+        AppLogger.logWithContext(
+            _serviceName, '⬆️ putData ile upload başlatılıyor...');
+        final uploadTask = storageRef.putData(
+          imageBytes,
+          SettableMetadata(
+            contentType: 'image/jpeg',
+            customMetadata: {
+              'uploadedBy': 'TatarAI',
+              'uploadTime': DateTime.now().toIso8601String(),
+            },
+          ),
+        );
+
+        // Progress listener
+        uploadTask.snapshotEvents.listen((snapshot) {
+          if (snapshot.totalBytes > 0) {
+            final progress =
+                (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            AppLogger.logWithContext(
+                _serviceName, '📈 Progress: ${progress.toStringAsFixed(1)}%');
+          }
+        });
+
+        // Upload'ı bekle
+        AppLogger.logWithContext(_serviceName, '⏳ Upload bekleniyor...');
+        final uploadResult = await uploadTask.timeout(timeoutDuration);
+
+        AppLogger.logWithContext(_serviceName, '✅ Upload tamamlandı!',
+            'State: ${uploadResult.state}, Bytes: ${uploadResult.bytesTransferred}');
+
+        // Download URL al
+        AppLogger.logWithContext(_serviceName, '🔗 Download URL alınıyor...');
+        final downloadUrl = await uploadResult.ref.getDownloadURL();
+
+        AppLogger.successWithContext(
+            _serviceName, '🎉 Upload başarılı!', 'URL: $downloadUrl');
+        return downloadUrl;
+      } on TimeoutException catch (e) {
+        AppLogger.errorWithContext(
+            _serviceName,
+            '⏰ Timeout (Attempt $attempt/$maxRetries)',
+            'Message: ${e.message}');
+
+        if (attempt == maxRetries) {
+          throw Exception('⏰ Upload timeout after $maxRetries attempts');
+        }
+
+        await Future.delayed(Duration(seconds: attempt * 2));
+        continue;
+      } on FirebaseException catch (e) {
+        AppLogger.errorWithContext(
+            _serviceName,
+            '🔥 Firebase Error (Attempt $attempt/$maxRetries)',
+            'Code: ${e.code}, Message: ${e.message}, Plugin: ${e.plugin}');
+
+        // Spesifik hata durumları için özel mesajlar
+        String errorMessage;
+        switch (e.code) {
+          case 'unknown':
+            errorMessage =
+                'Firebase Storage bağlantı hatası - Lütfen tekrar deneyin';
+            break;
+          case 'object-not-found':
+            errorMessage = 'Dosya bulunamadı';
+            break;
+          case 'bucket-not-found':
+            errorMessage = 'Storage bucket bulunamadı';
+            break;
+          case 'project-not-found':
+            errorMessage = 'Firebase projesi bulunamadı';
+            break;
+          case 'quota-exceeded':
+            errorMessage = 'Storage kotası aşıldı';
+            break;
+          case 'unauthenticated':
+            errorMessage = 'Firebase yetkilendirme hatası';
+            break;
+          case 'unauthorized':
+            errorMessage = 'Storage erişim yetkisi yok';
+            break;
+          case 'retry-limit-exceeded':
+            errorMessage = 'Çok fazla deneme yapıldı';
+            break;
+          case 'invalid-checksum':
+            errorMessage = 'Dosya doğrulama hatası';
+            break;
+          case 'canceled':
+            errorMessage = 'Upload iptal edildi';
+            break;
+          default:
+            errorMessage = 'Firebase Storage hatası: ${e.code}';
+        }
+
+        if (attempt == maxRetries || !_isRetryableStorageError(e.code)) {
+          throw Exception('🔥 $errorMessage - ${e.message}');
+        }
+
+        AppLogger.warnWithContext(
+            _serviceName,
+            '🔄 Retry yapılıyor... ($attempt/$maxRetries)',
+            'Hata: $errorMessage');
+        await Future.delayed(Duration(seconds: attempt * 2));
+        continue;
+      } catch (e, stackTrace) {
+        AppLogger.errorWithContext(
+            _serviceName,
+            '❌ Genel hata (Attempt $attempt/$maxRetries)',
+            'Error: $e',
+            stackTrace);
+
+        if (attempt == maxRetries) {
+          throw Exception('❌ Upload failed: $e');
+        }
+
+        await Future.delayed(Duration(seconds: attempt * 2));
+        continue;
+      }
     }
+
+    throw Exception('❌ Upload failed after $maxRetries attempts');
+  }
+
+  /// Firebase Storage error kodlarının retry yapılabilir olup olmadığını kontrol eder
+  bool _isRetryableStorageError(String errorCode) {
+    const retryableErrors = [
+      'unknown', // En yaygın retry yapılabilir hata
+      'retry-limit-exceeded',
+      'server-file-wrong-size',
+      'network-request-failed',
+      'timeout',
+      'canceled', // İptal edilen işlemler retry yapılabilir
+      'invalid-checksum', // Doğrulama hataları retry yapılabilir
+    ];
+
+    // Kesinlikle retry yapılmaması gereken hatalar
+    const nonRetryableErrors = [
+      'object-not-found',
+      'bucket-not-found',
+      'project-not-found',
+      'quota-exceeded',
+      'unauthenticated',
+      'unauthorized',
+    ];
+
+    // Eğer kesinlikle retry yapılmaması gereken bir hata ise false döndür
+    if (nonRetryableErrors.contains(errorCode)) {
+      return false;
+    }
+
+    // Diğer durumlarda retry yapılabilir hatalar listesini kontrol et
+    return retryableErrors.contains(errorCode);
   }
 
   /// Analyzes image and returns structured result
@@ -430,6 +617,103 @@ class PlantAnalysisService {
         stackTrace,
       );
       rethrow;
+    }
+  }
+
+  /// Firebase Storage'ın çalışıp çalışmadığını test eder
+  ///
+  /// @return Test sonucu
+  Future<bool> testFirebaseStorage() async {
+    try {
+      AppLogger.logWithContext(
+          _serviceName, '🧪 Firebase Storage test başlatılıyor...');
+
+      // Firebase Storage bilgilerini logla
+      AppLogger.logWithContext(_serviceName, '📊 Firebase Storage Info',
+          'Bucket: ${_storage.bucket}, App: ${_storage.app.name}');
+
+      // Test verisi oluştur
+      AppLogger.logWithContext(_serviceName, '📝 Test verisi oluşturuluyor...');
+      final testData =
+          'Firebase Storage Test - ${DateTime.now().millisecondsSinceEpoch}';
+      final testBytes = utf8.encode(testData);
+      AppLogger.logWithContext(_serviceName, '✅ Test verisi oluşturuldu',
+          'Size: ${testBytes.length} bytes');
+
+      // Test dosyası referansı oluştur
+      AppLogger.logWithContext(
+          _serviceName, '📁 Test dosyası referansı oluşturuluyor...');
+      final testFileName =
+          'storage_test_${DateTime.now().millisecondsSinceEpoch}.txt';
+      final testRef = _storage.ref('test/$testFileName');
+      AppLogger.logWithContext(_serviceName, '✅ Test referansı oluşturuldu',
+          'Path: ${testRef.fullPath}, Bucket: ${testRef.bucket}');
+
+      // Test dosyasını yükle
+      AppLogger.logWithContext(_serviceName, '📤 Upload task oluşturuluyor...');
+      final uploadTask = testRef.putData(
+        Uint8List.fromList(testBytes),
+        SettableMetadata(contentType: 'text/plain'),
+      );
+      AppLogger.logWithContext(_serviceName, '✅ Upload task oluşturuldu');
+
+      // Upload progress'i izle
+      AppLogger.logWithContext(_serviceName, '👀 Upload progress izleniyor...');
+      uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
+        final progress =
+            (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        AppLogger.logWithContext(_serviceName,
+            '📊 Test upload progress: ${progress.toStringAsFixed(1)}%');
+      });
+
+      // Upload'ı bekle (5 saniye timeout)
+      AppLogger.logWithContext(
+          _serviceName, '⏳ Upload bekleniyor (5 saniye timeout)...');
+      final uploadResult = await uploadTask.timeout(const Duration(seconds: 5));
+
+      AppLogger.logWithContext(_serviceName, '✅ Test dosyası yüklendi',
+          'State: ${uploadResult.state}, Bytes: ${uploadResult.bytesTransferred}/${uploadResult.totalBytes}');
+
+      // Download URL'i al
+      AppLogger.logWithContext(_serviceName, '🔗 Download URL alınıyor...');
+      final downloadUrl = await uploadResult.ref.getDownloadURL();
+
+      AppLogger.successWithContext(_serviceName,
+          '🎉 Firebase Storage test başarılı!', 'URL: $downloadUrl');
+
+      // Test dosyasını sil
+      try {
+        AppLogger.logWithContext(_serviceName, '🗑️ Test dosyası siliniyor...');
+        await testRef.delete();
+        AppLogger.logWithContext(_serviceName, '✅ Test dosyası silindi');
+      } catch (deleteError) {
+        AppLogger.warnWithContext(
+            _serviceName, 'Test dosyası silinemedi: $deleteError');
+      }
+
+      return true;
+    } catch (e, stackTrace) {
+      AppLogger.errorWithContext(
+          _serviceName,
+          '❌ Firebase Storage test başarısız',
+          'Error Type: ${e.runtimeType}, Error: $e',
+          stackTrace);
+
+      // Eğer FirebaseException ise detayları logla
+      if (e is FirebaseException) {
+        AppLogger.errorWithContext(
+            _serviceName,
+            '🔥 Firebase Exception Details',
+            'Code: ${e.code}, Message: ${e.message}, Plugin: ${e.plugin}');
+      }
+
+      // Eğer TimeoutException ise detayları logla
+      if (e is TimeoutException) {
+        AppLogger.errorWithContext(_serviceName, '⏰ Timeout Exception Details',
+            'Duration: ${e.duration}, Message: ${e.message}');
+      }
+
+      return false;
     }
   }
 

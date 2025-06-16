@@ -30,12 +30,18 @@ service cloud.firestore {
       allow read, write: if isOwner(userId);
     }
     
-    // Alternatif koleksiyon yapısı - Belirli analiz ID'sine göre erişim
-    match /analyses/{analysisId} {
-      // Analizin sahibi olan kullanıcı erişebilir
-      allow read, write: if isAuth() && resource.data.userId == request.auth.uid;
+    // Ana plant_analyses koleksiyonu - Güvenli ve açık erişim kuralları (Production için)
+    match /plant_analyses/{analysisId} {
+      // OKUMA: Analizin sahibi okuyabilir (var olan document için)
+      allow read: if isAuth() && resource.data.userId == request.auth.uid;
       
-      // Yeni analiz oluşturulurken geçerli kullanıcı ID'si ile oluşturulmalı
+      // GÜNCELLEME: Analizin sahibi güncelleyebilir (var olan document için)  
+      allow update: if isAuth() && resource.data.userId == request.auth.uid;
+      
+      // SİLME: Analizin sahibi silebilir (var olan document için)
+      allow delete: if isAuth() && resource.data.userId == request.auth.uid;
+      
+      // OLUŞTURMA: Authenticated kullanıcı kendi ID'si ile oluşturabilir
       allow create: if isAuth() && request.resource.data.userId == request.auth.uid;
     }
     
@@ -56,9 +62,20 @@ service cloud.firestore {
       allow read: if isAuth();
     }
 
+    // ============================================================================
+    // GEÇİCİ DEVELOPMENT RULES - PRODUCTION'DA KALDIRILMALI!
+    // ============================================================================
+    
     // Geçici çözüm: Tüm kullanıcı belgelerine yazma erişimi
-    // ÖNEMLİ: Bu kural sadece sorun çözülene kadar geçici olarak kullanılmalıdır!
+    // ÖNEMLİ: Bu kural sadece development için geçici!
     match /users/{userId} {
+      allow read, write: if isAuth();
+    }
+    
+    // Plant analyses koleksiyonu için geçici açık erişim - DEVELOPMENT ONLY!
+    // ÖNEMLİ: Production'da kaldırılmalı ve üstteki spesifik kurallar kullanılmalı!
+    match /plant_analyses/{analysisId} {
+      // Development için geçici - authenticated kullanıcılar yazabilir
       allow read, write: if isAuth();
     }
   }

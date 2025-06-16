@@ -554,6 +554,27 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
       }
     }
 
+    // Firebase Auth current user kontrolü
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    AppLogger.i(
+        'Firebase Auth current user: ${firebaseUser?.uid ?? "null"} (anonim: ${firebaseUser?.isAnonymous ?? false})');
+
+    if (firebaseUser == null) {
+      AppLogger.w('Firebase Auth current user null, 2 saniye bekleniyor...');
+      // 2 saniye bekle ve tekrar kontrol et
+      await Future.delayed(const Duration(seconds: 2));
+      final retryFirebaseUser = FirebaseAuth.instance.currentUser;
+
+      if (retryFirebaseUser == null) {
+        _showErrorDialog(
+            'Firebase Authentication hatası. Lütfen uygulamayı yeniden başlatın.');
+        return;
+      }
+
+      AppLogger.i(
+          'Firebase Auth current user (retry): ${retryFirebaseUser.uid} (anonim: ${retryFirebaseUser.isAnonymous})');
+    }
+
     // Haptic feedback ekle
     HapticFeedback.heavyImpact();
 
