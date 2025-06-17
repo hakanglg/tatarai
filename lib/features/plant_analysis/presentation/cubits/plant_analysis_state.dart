@@ -365,7 +365,16 @@ enum ErrorType {
   notFound,
 
   /// Bilinmeyen hata
-  unknown;
+  unknown,
+
+  /// API hata (Gemini AI)
+  apiError,
+
+  /// Kredi/limit hatası
+  creditError,
+
+  /// Premium abonelik gerekli
+  premiumRequired;
 
   /// Türkçe adını döner
   String get displayName {
@@ -394,6 +403,12 @@ enum ErrorType {
         return 'Bulunamadı';
       case ErrorType.unknown:
         return 'Bilinmeyen Hata';
+      case ErrorType.apiError:
+        return 'API Hatası';
+      case ErrorType.creditError:
+        return 'Kredi Hatası';
+      case ErrorType.premiumRequired:
+        return 'Premium Gerekli';
     }
   }
 
@@ -424,6 +439,12 @@ enum ErrorType {
         return 'İstenen öğe bulunamadı';
       case ErrorType.unknown:
         return 'Tanımlanamayan bir hata oluştu';
+      case ErrorType.apiError:
+        return 'AI servisi ile bağlantı kurulamadı';
+      case ErrorType.creditError:
+        return 'Günlük analiz limitiniz doldu';
+      case ErrorType.premiumRequired:
+        return 'Bu özellik premium üyelik gerektirir';
     }
   }
 
@@ -454,6 +475,12 @@ enum ErrorType {
         return 'magnifyingglass';
       case ErrorType.unknown:
         return 'questionmark.circle';
+      case ErrorType.apiError:
+        return 'brain.head.profile';
+      case ErrorType.creditError:
+        return 'creditcard.trianglebadge.exclamationmark';
+      case ErrorType.premiumRequired:
+        return 'crown.fill';
     }
   }
 
@@ -479,6 +506,48 @@ enum ErrorType {
       case ErrorType.unauthorized:
       case ErrorType.notFound:
         return 'gray';
+      case ErrorType.apiError:
+        return 'red';
+      case ErrorType.creditError:
+        return 'orange';
+      case ErrorType.premiumRequired:
+        return 'purple';
     }
   }
+}
+
+// ==============================================================================
+// EKSİK STATE SINIFLAR - Care Advice ve Disease Recommendations için
+// ==============================================================================
+
+/// Bitki bakım tavsiyesi yüklendi durumu
+class PlantAnalysisCareAdviceLoaded extends PlantAnalysisState {
+  /// Bakım tavsiyesi modeli
+  final dynamic careAdvice; // PlantCareAdviceModel tipinde olacak
+
+  const PlantAnalysisCareAdviceLoaded({required this.careAdvice});
+
+  @override
+  List<Object?> get props => [careAdvice];
+
+  @override
+  String toString() => 'PlantAnalysisCareAdviceLoaded(careAdvice: $careAdvice)';
+}
+
+/// Hastalık tedavi önerileri yüklendi durumu
+class PlantAnalysisDiseaseRecommendationsLoaded extends PlantAnalysisState {
+  /// Hastalık tedavi önerileri modeli
+  final dynamic
+      diseaseRecommendations; // DiseaseRecommendationsModel tipinde olacak
+
+  const PlantAnalysisDiseaseRecommendationsLoaded({
+    required this.diseaseRecommendations,
+  });
+
+  @override
+  List<Object?> get props => [diseaseRecommendations];
+
+  @override
+  String toString() =>
+      'PlantAnalysisDiseaseRecommendationsLoaded(diseaseRecommendations: $diseaseRecommendations)';
 }

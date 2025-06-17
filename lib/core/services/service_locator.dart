@@ -8,8 +8,9 @@ import 'firestore/firestore_service_interface.dart';
 import 'firestore/firestore_service.dart';
 import '../repositories/auth_repository.dart';
 import '../../features/plant_analysis/services/gemini_service.dart';
+import '../../core/services/ai/gemini_service_interface.dart';
 import '../../features/plant_analysis/services/location_service.dart';
-import '../../features/plant_analysis/presentation/cubits/plant_analysis_cubit.dart';
+import '../../features/plant_analysis/presentation/cubits/plant_analysis_cubit_direct.dart';
 import '../../core/repositories/plant_analysis_repository.dart';
 import '../../features/payment/cubits/payment_cubit.dart';
 import '../../features/home/cubits/home_cubit.dart';
@@ -201,10 +202,11 @@ class ServiceLocator {
       },
     );
 
-    // Plant Analysis Cubit
-    _getIt.registerFactory<PlantAnalysisCubit>(
+    // Plant Analysis Cubit Direct
+    _getIt.registerFactory<PlantAnalysisCubitDirect>(
       () {
-        return PlantAnalysisCubit(
+        return PlantAnalysisCubitDirect(
+          geminiService: _getIt<GeminiService>() as GeminiServiceInterface,
           repository: _getIt<PlantAnalysisRepository>(),
         );
       },
@@ -364,13 +366,13 @@ class Services {
   /// Home cubit'ini döner (Factory)
   static HomeCubit get homeCubit => ServiceLocator.get<HomeCubit>();
 
-  /// Plant Analysis cubit'ini döner (Factory)
-  static PlantAnalysisCubit get plantAnalysisCubit =>
-      ServiceLocator.get<PlantAnalysisCubit>();
-
   /// Plant Analysis repository'yi döner
   static PlantAnalysisRepository get plantAnalysisRepository =>
       ServiceLocator.get<PlantAnalysisRepository>();
+
+  /// Plant Analysis Cubit Direct'i döner (Factory)
+  static PlantAnalysisCubitDirect get plantAnalysisCubitDirect =>
+      ServiceLocator.get<PlantAnalysisCubitDirect>();
 }
 
 /// Service locator mixin
@@ -403,9 +405,6 @@ mixin ServiceLocatorMixin {
 
   /// Gemini service
   GeminiService get geminiService => getService<GeminiService>();
-
-  /// Plant Analysis cubit
-  PlantAnalysisCubit get plantAnalysisCubit => getService<PlantAnalysisCubit>();
 
   /// Plant Analysis repository
   PlantAnalysisRepository get plantAnalysisRepository =>

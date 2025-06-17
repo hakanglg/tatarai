@@ -17,9 +17,10 @@ import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
 import 'package:tatarai/features/auth/cubits/auth_state.dart';
 import 'package:tatarai/features/payment/cubits/payment_cubit.dart';
-import 'package:tatarai/features/plant_analysis/presentation/cubits/plant_analysis_cubit.dart';
+import 'package:tatarai/features/plant_analysis/presentation/cubits/plant_analysis_cubit_direct.dart';
 import 'package:tatarai/core/repositories/plant_analysis_repository.dart';
 import 'package:tatarai/features/plant_analysis/services/plant_analysis_service.dart';
+import 'package:tatarai/core/services/ai/gemini_service_interface.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 /// TatarAI uygulamasının ana giriş noktası
@@ -337,22 +338,28 @@ class _TatarAIState extends State<TatarAI> {
       ),
 
       // Plant Analysis Cubit - ServiceLocator'dan
-      BlocProvider<PlantAnalysisCubit>(
+      BlocProvider<PlantAnalysisCubitDirect>(
         create: (context) {
           AppLogger.i(
               '🏗️ PlantAnalysisCubit ServiceLocator\'dan oluşturuluyor');
           try {
-            // ServiceLocator'dan direkt al - eğer Firebase hazır değilse hata fırlatacak
-            final plantAnalysisCubit = Services.plantAnalysisCubit;
-            AppLogger.i('✅ PlantAnalysisCubit başarıyla oluşturuldu');
+            // PlantAnalysisCubitDirect'i manuel olarak oluştur
+            final plantAnalysisCubit = PlantAnalysisCubitDirect(
+              geminiService: Services.geminiService as GeminiServiceInterface,
+              repository: Services.plantAnalysisRepository,
+            );
+            AppLogger.i('✅ PlantAnalysisCubitDirect başarıyla oluşturuldu');
             return plantAnalysisCubit;
           } catch (e, stackTrace) {
-            AppLogger.e('❌ PlantAnalysisCubit oluşturma hatası', e, stackTrace);
-            AppLogger.w('⚠️ Fallback PlantAnalysisCubit oluşturuluyor...');
+            AppLogger.e(
+                '❌ PlantAnalysisCubitDirect oluşturma hatası', e, stackTrace);
+            AppLogger.w(
+                '⚠️ Fallback PlantAnalysisCubitDirect oluşturuluyor...');
 
             // Fallback: Minimal cubit döndür
             try {
-              return PlantAnalysisCubit(
+              return PlantAnalysisCubitDirect(
+                geminiService: Services.geminiService as GeminiServiceInterface,
                 repository: PlantAnalysisRepositoryImpl(
                   firestoreService: Services.firestore,
                   analysisService: PlantAnalysisService(
@@ -363,7 +370,8 @@ class _TatarAIState extends State<TatarAI> {
                 ),
               );
             } catch (fallbackError) {
-              AppLogger.e('❌ Fallback PlantAnalysisCubit de oluşturulamadı',
+              AppLogger.e(
+                  '❌ Fallback PlantAnalysisCubitDirect de oluşturulamadı',
                   fallbackError);
               // Son çare: Boş repository ile cubit oluştur
               rethrow;

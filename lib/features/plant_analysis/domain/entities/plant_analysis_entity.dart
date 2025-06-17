@@ -43,6 +43,49 @@ class PlantAnalysisEntity extends Equatable {
   /// Zaman damgası
   final DateTime? timestamp;
 
+  // ============================================================================
+  // YENİ ALANLAR - Gelişmiş tarımsal analiz bilgileri
+  // ============================================================================
+
+  /// Ana hastalık adı (tekil)
+  final String? diseaseName;
+
+  /// Ana hastalık açıklaması
+  final String? diseaseDescription;
+
+  /// Önerilen tedavi/ilaç adı
+  final String? treatmentName;
+
+  /// Dekar başına dozaj bilgisi
+  final String? dosagePerDecare;
+
+  /// Uygulama yöntemi (yapraktan, topraktan vs.)
+  final String? applicationMethod;
+
+  /// Uygulama zamanı (saat, gün, hava koşulu)
+  final String? applicationTime;
+
+  /// Uygulama sıklığı (kaç günde bir vs.)
+  final String? applicationFrequency;
+
+  /// Hasat öncesi bekleme süresi
+  final String? waitingPeriod;
+
+  /// Tedavi etkinlik oranı
+  final String? effectiveness;
+
+  /// Ek notlar ve uyarılar
+  final String? notes;
+
+  /// Tek öneri (ana öneri)
+  final String? suggestion;
+
+  /// Ana müdahale yöntemi
+  final String? intervention;
+
+  /// Ana tarımsal ipucu
+  final String? agriculturalTip;
+
   /// Constructor
   const PlantAnalysisEntity({
     required this.id,
@@ -57,6 +100,20 @@ class PlantAnalysisEntity extends Equatable {
     this.location,
     this.fieldName,
     this.timestamp,
+    // Yeni alanlar
+    this.diseaseName,
+    this.diseaseDescription,
+    this.treatmentName,
+    this.dosagePerDecare,
+    this.applicationMethod,
+    this.applicationTime,
+    this.applicationFrequency,
+    this.waitingPeriod,
+    this.effectiveness,
+    this.notes,
+    this.suggestion,
+    this.intervention,
+    this.agriculturalTip,
   });
 
   /// Entity kopyalama metodu
@@ -73,6 +130,20 @@ class PlantAnalysisEntity extends Equatable {
     String? location,
     String? fieldName,
     DateTime? timestamp,
+    // Yeni alanlar
+    String? diseaseName,
+    String? diseaseDescription,
+    String? treatmentName,
+    String? dosagePerDecare,
+    String? applicationMethod,
+    String? applicationTime,
+    String? applicationFrequency,
+    String? waitingPeriod,
+    String? effectiveness,
+    String? notes,
+    String? suggestion,
+    String? intervention,
+    String? agriculturalTip,
   }) {
     return PlantAnalysisEntity(
       id: id ?? this.id,
@@ -87,6 +158,20 @@ class PlantAnalysisEntity extends Equatable {
       location: location ?? this.location,
       fieldName: fieldName ?? this.fieldName,
       timestamp: timestamp ?? this.timestamp,
+      // Yeni alanlar
+      diseaseName: diseaseName ?? this.diseaseName,
+      diseaseDescription: diseaseDescription ?? this.diseaseDescription,
+      treatmentName: treatmentName ?? this.treatmentName,
+      dosagePerDecare: dosagePerDecare ?? this.dosagePerDecare,
+      applicationMethod: applicationMethod ?? this.applicationMethod,
+      applicationTime: applicationTime ?? this.applicationTime,
+      applicationFrequency: applicationFrequency ?? this.applicationFrequency,
+      waitingPeriod: waitingPeriod ?? this.waitingPeriod,
+      effectiveness: effectiveness ?? this.effectiveness,
+      notes: notes ?? this.notes,
+      suggestion: suggestion ?? this.suggestion,
+      intervention: intervention ?? this.intervention,
+      agriculturalTip: agriculturalTip ?? this.agriculturalTip,
     );
   }
 
@@ -104,6 +189,20 @@ class PlantAnalysisEntity extends Equatable {
         location,
         fieldName,
         timestamp,
+        // Yeni alanlar
+        diseaseName,
+        diseaseDescription,
+        treatmentName,
+        dosagePerDecare,
+        applicationMethod,
+        applicationTime,
+        applicationFrequency,
+        waitingPeriod,
+        effectiveness,
+        notes,
+        suggestion,
+        intervention,
+        agriculturalTip,
       ];
 
   @override

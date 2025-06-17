@@ -87,6 +87,49 @@ class PlantAnalysisModel {
   /// API'dan gelen ham yanıt
   final Map<String, dynamic>? rawResponse;
 
+  // ============================================================================
+  // YENİ ALANLAR - Gelişmiş tarımsal analiz bilgileri
+  // ============================================================================
+
+  /// Ana hastalık adı (tekil)
+  final String? diseaseName;
+
+  /// Ana hastalık açıklaması
+  final String? diseaseDescription;
+
+  /// Önerilen tedavi/ilaç adı
+  final String? treatmentName;
+
+  /// Dekar başına dozaj bilgisi
+  final String? dosagePerDecare;
+
+  /// Uygulama yöntemi (yapraktan, topraktan vs.)
+  final String? applicationMethod;
+
+  /// Uygulama zamanı (saat, gün, hava koşulu)
+  final String? applicationTime;
+
+  /// Uygulama sıklığı (kaç günde bir vs.)
+  final String? applicationFrequency;
+
+  /// Hasat öncesi bekleme süresi
+  final String? waitingPeriod;
+
+  /// Tedavi etkinlik oranı
+  final String? effectiveness;
+
+  /// Ek notlar ve uyarılar
+  final String? notes;
+
+  /// Tek öneri (ana öneri)
+  final String? suggestion;
+
+  /// Ana müdahale yöntemi
+  final String? intervention;
+
+  /// Ana tarımsal ipucu
+  final String? agriculturalTip;
+
   /// Constructor
   const PlantAnalysisModel({
     required this.id,
@@ -116,6 +159,20 @@ class PlantAnalysisModel {
     this.agriculturalTips,
     this.regionalInfo,
     this.rawResponse,
+    // Yeni alanlar
+    this.diseaseName,
+    this.diseaseDescription,
+    this.treatmentName,
+    this.dosagePerDecare,
+    this.applicationMethod,
+    this.applicationTime,
+    this.applicationFrequency,
+    this.waitingPeriod,
+    this.effectiveness,
+    this.notes,
+    this.suggestion,
+    this.intervention,
+    this.agriculturalTip,
   });
 
   /// JSON'dan PlantAnalysisModel oluşturur
@@ -184,6 +241,29 @@ class PlantAnalysisModel {
             ? List<String>.from(json['regional_info'] as List)
             : null,
         rawResponse: json['raw_response'] as Map<String, dynamic>?,
+        // Yeni alanları parse et
+        diseaseName:
+            json['diseaseName'] as String? ?? json['disease_name'] as String?,
+        diseaseDescription: json['diseaseDescription'] as String? ??
+            json['disease_description'] as String?,
+        treatmentName: json['treatmentName'] as String? ??
+            json['treatment_name'] as String?,
+        dosagePerDecare: json['dosagePerDecare'] as String? ??
+            json['dosage_per_decare'] as String?,
+        applicationMethod: json['applicationMethod'] as String? ??
+            json['application_method'] as String?,
+        applicationTime: json['applicationTime'] as String? ??
+            json['application_time'] as String?,
+        applicationFrequency: json['applicationFrequency'] as String? ??
+            json['application_frequency'] as String?,
+        waitingPeriod: json['waitingPeriod'] as String? ??
+            json['waiting_period'] as String?,
+        effectiveness: json['effectiveness'] as String?,
+        notes: json['notes'] as String?,
+        suggestion: json['suggestion'] as String?,
+        intervention: json['intervention'] as String?,
+        agriculturalTip: json['agriculturalTip'] as String? ??
+            json['agricultural_tip'] as String?,
       );
     } catch (e) {
       throw FormatException('PlantAnalysisModel.fromJson parse error: $e');
@@ -220,6 +300,20 @@ class PlantAnalysisModel {
       'agricultural_tips': agriculturalTips,
       'regional_info': regionalInfo,
       'raw_response': rawResponse,
+      // Yeni alanlar
+      'disease_name': diseaseName,
+      'disease_description': diseaseDescription,
+      'treatment_name': treatmentName,
+      'dosage_per_decare': dosagePerDecare,
+      'application_method': applicationMethod,
+      'application_time': applicationTime,
+      'application_frequency': applicationFrequency,
+      'waiting_period': waitingPeriod,
+      'effectiveness': effectiveness,
+      'notes': notes,
+      'suggestion': suggestion,
+      'intervention': intervention,
+      'agricultural_tip': agriculturalTip,
     };
   }
 
@@ -240,6 +334,20 @@ class PlantAnalysisModel {
       timestamp: timestamp != null
           ? DateTime.fromMillisecondsSinceEpoch(timestamp!)
           : null,
+      // Yeni alanlar
+      diseaseName: diseaseName,
+      diseaseDescription: diseaseDescription,
+      treatmentName: treatmentName,
+      dosagePerDecare: dosagePerDecare,
+      applicationMethod: applicationMethod,
+      applicationTime: applicationTime,
+      applicationFrequency: applicationFrequency,
+      waitingPeriod: waitingPeriod,
+      effectiveness: effectiveness,
+      notes: notes,
+      suggestion: suggestion,
+      intervention: intervention,
+      agriculturalTip: agriculturalTip,
     );
   }
 
@@ -258,6 +366,20 @@ class PlantAnalysisModel {
       location: entity.location,
       fieldName: entity.fieldName,
       timestamp: entity.timestamp?.millisecondsSinceEpoch,
+      // Yeni alanlar
+      diseaseName: entity.diseaseName,
+      diseaseDescription: entity.diseaseDescription,
+      treatmentName: entity.treatmentName,
+      dosagePerDecare: entity.dosagePerDecare,
+      applicationMethod: entity.applicationMethod,
+      applicationTime: entity.applicationTime,
+      applicationFrequency: entity.applicationFrequency,
+      waitingPeriod: entity.waitingPeriod,
+      effectiveness: entity.effectiveness,
+      notes: entity.notes,
+      suggestion: entity.suggestion,
+      intervention: entity.intervention,
+      agriculturalTip: entity.agriculturalTip,
     );
   }
 
@@ -290,6 +412,20 @@ class PlantAnalysisModel {
     List<String>? agriculturalTips,
     List<String>? regionalInfo,
     Map<String, dynamic>? rawResponse,
+    // Yeni alanlar
+    String? diseaseName,
+    String? diseaseDescription,
+    String? treatmentName,
+    String? dosagePerDecare,
+    String? applicationMethod,
+    String? applicationTime,
+    String? applicationFrequency,
+    String? waitingPeriod,
+    String? effectiveness,
+    String? notes,
+    String? suggestion,
+    String? intervention,
+    String? agriculturalTip,
   }) {
     return PlantAnalysisModel(
       id: id ?? this.id,
@@ -319,6 +455,20 @@ class PlantAnalysisModel {
       agriculturalTips: agriculturalTips ?? this.agriculturalTips,
       regionalInfo: regionalInfo ?? this.regionalInfo,
       rawResponse: rawResponse ?? this.rawResponse,
+      // Yeni alanlar
+      diseaseName: diseaseName ?? this.diseaseName,
+      diseaseDescription: diseaseDescription ?? this.diseaseDescription,
+      treatmentName: treatmentName ?? this.treatmentName,
+      dosagePerDecare: dosagePerDecare ?? this.dosagePerDecare,
+      applicationMethod: applicationMethod ?? this.applicationMethod,
+      applicationTime: applicationTime ?? this.applicationTime,
+      applicationFrequency: applicationFrequency ?? this.applicationFrequency,
+      waitingPeriod: waitingPeriod ?? this.waitingPeriod,
+      effectiveness: effectiveness ?? this.effectiveness,
+      notes: notes ?? this.notes,
+      suggestion: suggestion ?? this.suggestion,
+      intervention: intervention ?? this.intervention,
+      agriculturalTip: agriculturalTip ?? this.agriculturalTip,
     );
   }
 

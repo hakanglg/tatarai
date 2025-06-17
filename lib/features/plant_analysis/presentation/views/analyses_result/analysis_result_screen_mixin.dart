@@ -49,7 +49,7 @@ mixin _AnalysisScreenResultMixin on State<AnalysisResultScreen> {
         _errorMessage = null;
       });
 
-      final cubit = context.read<PlantAnalysisCubit>();
+      final cubit = context.read<PlantAnalysisCubitDirect>();
       final completer = Completer<PlantAnalysisResult?>();
 
       final subscription = cubit.stream.listen((state) {
@@ -135,7 +135,7 @@ mixin _AnalysisScreenResultMixin on State<AnalysisResultScreen> {
       location: entity.location,
       fieldName: entity.fieldName,
       timestamp: entity.timestamp?.millisecondsSinceEpoch,
-      // Optional fields with defaults for UI layer
+      // Optional fields - entity'den alınan gerçek değerler
       taxonomy: null,
       edibleParts: null,
       propagationMethods: null,
@@ -151,6 +151,20 @@ mixin _AnalysisScreenResultMixin on State<AnalysisResultScreen> {
       agriculturalTips: null,
       regionalInfo: null,
       rawResponse: null,
+      // YENİ ALANLAR - Entity'den alınan gerçek değerler
+      diseaseName: entity.diseaseName,
+      diseaseDescription: entity.diseaseDescription,
+      treatmentName: entity.treatmentName,
+      dosagePerDecare: entity.dosagePerDecare,
+      applicationMethod: entity.applicationMethod,
+      applicationTime: entity.applicationTime,
+      applicationFrequency: entity.applicationFrequency,
+      waitingPeriod: entity.waitingPeriod,
+      effectiveness: entity.effectiveness,
+      notes: entity.notes,
+      suggestion: entity.suggestion,
+      intervention: entity.intervention,
+      agriculturalTip: entity.agriculturalTip,
     );
   }
 

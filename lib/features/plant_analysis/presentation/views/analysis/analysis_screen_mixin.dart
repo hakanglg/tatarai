@@ -13,22 +13,18 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
 
   // Cihaz bilgisi için
   final DeviceInfoPlugin _deviceInfoPlugin = DeviceInfoPlugin();
-  bool _isEmulator = false;
 
   // Konum seçim verileri
   List<Province> _provinces = [];
   List<District> _districts = [];
   List<Neighborhood> _neighborhoods = [];
 
-  // Seçim indeksleri
-  final int _selectedProvinceIndex = 0;
-  final int _selectedDistrictIndex = 0;
-  final int _selectedNeighborhoodIndex = 0;
-
-  // Veri yükleme durumları
-  final bool _districtsLoaded = false;
-  final bool _neighborhoodsLoaded = false;
-  String? _fieldName;
+  // Gelecekte kullanılabilecek değişkenler (şu an pasif)
+  // final int _selectedProvinceIndex = 0;
+  // final int _selectedDistrictIndex = 0;
+  // final int _selectedNeighborhoodIndex = 0;
+  // final bool _districtsLoaded = false;
+  // final bool _neighborhoodsLoaded = false;
 
   // Seçilen konum değerleri
   Province? _selectedProvince;
@@ -106,15 +102,10 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
     }
   }
 
-  // Emülatör kontrolü
+  // Emülatör kontrolü (şu an kullanılmıyor ama gelecekte yararlı olabilir)
   Future<void> _checkEmulator() async {
-    if (Platform.isIOS) {
-      final iosInfo = await _deviceInfoPlugin.iosInfo;
-      _isEmulator = !iosInfo.isPhysicalDevice;
-    } else if (Platform.isAndroid) {
-      final androidInfo = await _deviceInfoPlugin.androidInfo;
-      _isEmulator = !androidInfo.isPhysicalDevice;
-    }
+    // TODO: Emülatör kontrolü gerekirse buraya kod eklenebilir
+    AppLogger.i('Device check completed');
   }
 
   // Fotoğraf seçim menüsünü göster
@@ -268,7 +259,7 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
 
     if (needsPremium) {
       // Premium satın alma diyaloğunu göster
-      final result = await AppDialogManager.showPremiumRequiredDialog(
+      await AppDialogManager.showPremiumRequiredDialog(
         context: context,
         message: message,
         onPremiumButtonPressed: () {
@@ -597,16 +588,17 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
     // Haptic feedback ekle
     HapticFeedback.heavyImpact();
 
-    // Konum ve tarla adını hazırla
-    final String location = _locationController.text.trim();
-    final String? fieldName = _fieldNameController.text.trim().isNotEmpty
-        ? _fieldNameController.text.trim()
-        : null;
-
-    // Plant Analysis Cubit'i üzerinden analizi başlat
-    context.read<PlantAnalysisCubit>().analyzeAndSave(
-          _selectedImage!,
-          currentUser, // Daha önce tanımlanan currentUser'ı kullan
+    // Plant Analysis Cubit Direct üzerinden analizi başlat
+    context.read<PlantAnalysisCubitDirect>().analyzeImageDirect(
+          imageFile: _selectedImage!,
+          user: currentUser,
+          location: _locationController.text.trim(),
+          province: _selectedProvince?.name,
+          district: _selectedDistrict?.name,
+          neighborhood: _selectedNeighborhood?.name,
+          fieldName: _fieldNameController.text.trim().isNotEmpty
+              ? _fieldNameController.text.trim()
+              : null,
         );
   }
 
@@ -722,18 +714,5 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
     _locationController.text = locationText;
   }
 
-  /// Premium sayfasına yönlendir
-  void _navigateToPremium() {
-    if (!mounted) return;
-
-    // Context extension'ı kullanarak paywall'ı aç
-    context.showPaywall(
-        // onComplete: (_) {
-        //   // Paywall kapandıktan sonra kullanıcı bilgilerini yenile
-        //   if (mounted) {
-        //     context.read<ProfileCubit>().refreshUserData();
-        //   }
-        // },
-        );
-  }
+  // Premium navigation artık HomePremiumCard widget'ı içinde handle ediliyor
 }

@@ -12,7 +12,7 @@ import 'package:tatarai/core/theme/dimensions.dart'; // AppDimensions için impo
 import 'package:tatarai/core/theme/text_theme.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/core/widgets/app_button.dart';
-import 'package:tatarai/features/plant_analysis/presentation/cubits/plant_analysis_cubit.dart';
+import 'package:tatarai/features/plant_analysis/presentation/cubits/plant_analysis_cubit_direct.dart';
 import 'package:tatarai/features/plant_analysis/data/models/plant_analysis_result.dart';
 import 'package:tatarai/features/plant_analysis/domain/entities/plant_analysis_entity.dart';
 import 'package:tatarai/features/plant_analysis/data/models/disease_model.dart'
@@ -1249,130 +1249,21 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                 ),
                 // Gelişim Durumu ve Bakım Tavsiyeleri - Her zaman göster
                 Padding(
-                  padding: EdgeInsets.fromLTRB(
-                      dim.paddingM, dim.paddingL, dim.paddingM, dim.paddingXS),
-                  child: Text(
-                    'Gelişim Durumu ve Bakım Tavsiyeleri',
-                    style: AppTextTheme.headline5.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                      fontSize: dim.fontSizeL,
-                    ),
-                  ),
-                ),
-                Padding(
                   padding: EdgeInsets.symmetric(horizontal: dim.paddingM),
                   child: _buildCareInfo(result),
                 ),
 
-                // Eski kontrol - kaldırıldı
-                if (false) ...[
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(dim.paddingM, dim.paddingL,
-                        dim.paddingM, dim.paddingXS),
-                    child: Text(
-                      'Gelişim Durumu ve Bakım Tavsiyeleri',
-                      style: AppTextTheme.headline5.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
-                        fontSize: dim.fontSizeL,
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: dim.paddingM),
-                    child: _buildCareInfo(result),
-                  ),
-                ],
-                if (result.suggestions.isNotEmpty) ...[
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      dim.paddingM,
-                      dim.paddingL,
-                      dim.paddingM,
-                      dim.paddingXS,
-                    ),
-                    child: Text(
-                      'Öneriler',
-                      style: AppTextTheme.headline5.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
-                        fontSize: dim.fontSizeL,
-                      ),
-                    ),
-                  ),
+                // YENİ BÖLÜM: Gelişmiş Tarımsal Bilgiler
+                if (_hasAdvancedAgriculturalInfo(result)) ...[
                   Padding(
                     padding: EdgeInsets.symmetric(
-                      horizontal: dim.paddingM,
-                    ),
-                    child: _buildSuggestionsList(result.suggestions),
+                        horizontal: dim.paddingM, vertical: dim.spaceL),
+                    child: _buildAdvancedAgriculturalInfo(result),
                   ),
                 ],
-                if (result.similarImages.isNotEmpty) ...[
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(dim.paddingM, dim.paddingL,
-                        dim.paddingM, dim.paddingXS),
-                    child: Text(
-                      'Benzer Bitkiler',
-                      style: AppTextTheme.headline5.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
-                        fontSize: dim.fontSizeL,
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: dim.spaceXS),
-                  SizedBox(
-                    height: dim.screenHeight * 0.18,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      physics: const BouncingScrollPhysics(),
-                      padding: EdgeInsets.symmetric(horizontal: dim.paddingM),
-                      itemCount: result.similarImages.length,
-                      itemBuilder: (context, index) {
-                        return Container(
-                          margin: EdgeInsets.only(right: dim.spaceS),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(dim.radiusL),
-                            boxShadow: [
-                              BoxShadow(
-                                color: CupertinoColors.systemGrey5
-                                    .withOpacity(0.5),
-                                blurRadius: dim.spaceXS,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(dim.radiusL),
-                            child:
-                                _buildImageWidget(result.similarImages[index]),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-                Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    dim.paddingM,
-                    dim.paddingL,
-                    dim.paddingM,
-                    dim.paddingL,
-                  ),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: AppButton(
-                      text: 'Yeni Analiz',
-                      icon: CupertinoIcons.camera_fill,
-                      type: AppButtonType.primary,
-                      onPressed: () {
-                        HapticFeedback.mediumImpact();
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                  ),
-                ),
+
+                // Alt boşluk
+                SizedBox(height: dim.spaceXXL),
               ],
             ),
           ),
@@ -1520,106 +1411,6 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  // Öneriler listesi - modern görünüm için güncellendi
-  Widget _buildSuggestionsList(List<String> suggestions) {
-    return Container(
-      padding: EdgeInsets.all(context.dimensions.paddingL),
-      decoration: BoxDecoration(
-        color: CupertinoColors.systemBackground,
-        borderRadius: BorderRadius.circular(context.dimensions.radiusL),
-        boxShadow: [
-          BoxShadow(
-            color: CupertinoColors.systemGrey5.withOpacity(0.5),
-            blurRadius: context.dimensions.radiusL,
-            offset: const Offset(0, 2),
-            spreadRadius: 1,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              FontSizeControl(
-                fontSizeLevel: _fontSizeLevel,
-                onFontSizeChanged: (newLevel) {
-                  setState(() {
-                    _fontSizeLevel = newLevel;
-                  });
-                },
-                labelText: 'Yazı',
-              ),
-            ],
-          ),
-          SizedBox(height: context.dimensions.spaceM),
-          Divider(color: AppColors.primary.withOpacity(0.2), height: 1),
-          SizedBox(height: context.dimensions.spaceM),
-          ...suggestions.map((suggestion) => Container(
-                margin: EdgeInsets.only(bottom: context.dimensions.spaceM),
-                padding: EdgeInsets.all(context.dimensions.paddingM),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.07),
-                  borderRadius:
-                      BorderRadius.circular(context.dimensions.radiusM),
-                  border: Border.all(
-                    color: AppColors.primary.withOpacity(0.15),
-                    width: 1.5,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withOpacity(0.05),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      margin: const EdgeInsets.only(top: 2),
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.2),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primary.withOpacity(0.1),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Icon(
-                        CupertinoIcons.leaf_arrow_circlepath,
-                        color: AppColors.primary,
-                        size: 20,
-                      ),
-                    ),
-                    SizedBox(width: context.dimensions.spaceM),
-                    Expanded(
-                      child: Text(
-                        suggestion,
-                        style: AppTextTheme.bodyText1.copyWith(
-                          height: 1.5,
-                          fontSize: context.dimensions.fontSizeM +
-                              (_fontSizeLevel * 2),
-                          fontWeight: FontWeight.w500,
-                          color: Colors.black,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              )),
         ],
       ),
     );
@@ -2038,5 +1829,259 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
   // Tarih formatlamak için yardımcı metot
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';
+  }
+
+  /// Gelişmiş tarımsal bilgilerin var olup olmadığını kontrol eder
+  bool _hasAdvancedAgriculturalInfo(PlantAnalysisResult result) {
+    return result.diseaseName != null ||
+        result.diseaseDescription != null ||
+        result.treatmentName != null ||
+        result.dosagePerDecare != null ||
+        result.applicationMethod != null ||
+        result.applicationTime != null ||
+        result.applicationFrequency != null ||
+        result.waitingPeriod != null ||
+        result.effectiveness != null ||
+        result.notes != null ||
+        result.suggestion != null ||
+        result.intervention != null ||
+        result.agriculturalTip != null;
+  }
+
+  /// Gelişmiş tarımsal bilgiler bölümünü oluşturur
+  Widget _buildAdvancedAgriculturalInfo(PlantAnalysisResult result) {
+    final dim = context.dimensions;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(dim.radiusL),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.black.withOpacity(0.1),
+            blurRadius: 12,
+            offset: const Offset(0, 2),
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Başlık
+          Container(
+            padding: EdgeInsets.all(dim.paddingL),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.08),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(dim.radiusL),
+                topRight: Radius.circular(dim.radiusL),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    CupertinoIcons.lab_flask_solid,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
+                ),
+                SizedBox(width: dim.spaceM),
+                Text(
+                  'Gelişmiş Tarımsal Analiz',
+                  style: AppTextTheme.headline5.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // İçerik
+          Padding(
+            padding: EdgeInsets.all(dim.paddingL),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Hastalık Bilgileri
+                if (result.diseaseName != null ||
+                    result.diseaseDescription != null) ...[
+                  _buildAgriculturalSection(
+                    title: 'Hastalık Bilgileri',
+                    icon: CupertinoIcons.exclamationmark_triangle_fill,
+                    iconColor: AppColors.error,
+                    items: [
+                      if (result.diseaseName != null)
+                        _buildAgriculturalItem(
+                            'Hastalık Adı', result.diseaseName!),
+                      if (result.diseaseDescription != null)
+                        _buildAgriculturalItem(
+                            'Açıklama', result.diseaseDescription!),
+                    ],
+                  ),
+                  SizedBox(height: dim.spaceL),
+                ],
+
+                // Tedavi Bilgileri
+                if (result.treatmentName != null ||
+                    result.dosagePerDecare != null ||
+                    result.applicationMethod != null ||
+                    result.applicationTime != null ||
+                    result.applicationFrequency != null ||
+                    result.waitingPeriod != null ||
+                    result.effectiveness != null) ...[
+                  _buildAgriculturalSection(
+                    title: 'Tedavi ve Uygulama',
+                    icon: CupertinoIcons.bandage_fill,
+                    iconColor: AppColors.info,
+                    items: [
+                      if (result.treatmentName != null)
+                        _buildAgriculturalItem(
+                            'Tedavi/İlaç', result.treatmentName!),
+                      if (result.dosagePerDecare != null)
+                        _buildAgriculturalItem(
+                            'Dozaj (Dekar başına)', result.dosagePerDecare!),
+                      if (result.applicationMethod != null)
+                        _buildAgriculturalItem(
+                            'Uygulama Yöntemi', result.applicationMethod!),
+                      if (result.applicationTime != null)
+                        _buildAgriculturalItem(
+                            'Uygulama Zamanı', result.applicationTime!),
+                      if (result.applicationFrequency != null)
+                        _buildAgriculturalItem(
+                            'Uygulama Sıklığı', result.applicationFrequency!),
+                      if (result.waitingPeriod != null)
+                        _buildAgriculturalItem(
+                            'Bekleme Süresi', result.waitingPeriod!),
+                      if (result.effectiveness != null)
+                        _buildAgriculturalItem(
+                            'Etkinlik', result.effectiveness!),
+                    ],
+                  ),
+                  SizedBox(height: dim.spaceL),
+                ],
+
+                // Öneriler ve Notlar
+                if (result.notes != null ||
+                    result.suggestion != null ||
+                    result.intervention != null ||
+                    result.agriculturalTip != null) ...[
+                  _buildAgriculturalSection(
+                    title: 'Öneriler ve İpuçları',
+                    icon: CupertinoIcons.lightbulb_fill,
+                    iconColor: CupertinoColors.systemYellow,
+                    items: [
+                      if (result.suggestion != null)
+                        _buildAgriculturalItem('Ana Öneri', result.suggestion!),
+                      if (result.intervention != null)
+                        _buildAgriculturalItem(
+                            'Müdahale', result.intervention!),
+                      if (result.agriculturalTip != null)
+                        _buildAgriculturalItem(
+                            'Tarımsal İpucu', result.agriculturalTip!),
+                      if (result.notes != null)
+                        _buildAgriculturalItem('Ek Notlar', result.notes!),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Tarımsal bilgi bölümü oluşturucu
+  Widget _buildAgriculturalSection({
+    required String title,
+    required IconData icon,
+    required Color iconColor,
+    required List<Widget> items,
+  }) {
+    final dim = context.dimensions;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: iconColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                icon,
+                color: iconColor,
+                size: 16,
+              ),
+            ),
+            SizedBox(width: dim.spaceS),
+            Text(
+              title,
+              style: AppTextTheme.bodyText1.copyWith(
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: dim.spaceM),
+        ...items,
+      ],
+    );
+  }
+
+  /// Tarımsal bilgi item'ı oluşturucu
+  Widget _buildAgriculturalItem(String label, String value) {
+    final dim = context.dimensions;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: dim.spaceS),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            margin: EdgeInsets.only(top: 6),
+            width: 4,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              shape: BoxShape.circle,
+            ),
+          ),
+          SizedBox(width: dim.spaceS),
+          Expanded(
+            child: RichText(
+              text: TextSpan(
+                style: AppTextTheme.bodyText2.copyWith(
+                  color: AppColors.textSecondary,
+                  fontSize: _currentFontSize,
+                ),
+                children: [
+                  TextSpan(
+                    text: '$label: ',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  TextSpan(text: value),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

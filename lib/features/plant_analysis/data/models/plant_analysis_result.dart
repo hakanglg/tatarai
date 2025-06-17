@@ -32,6 +32,20 @@ class PlantAnalysisResult extends Equatable {
     this.regionalInfo,
     this.growthComment,
     this.rawResponse,
+    // Yeni alanlar
+    this.diseaseName,
+    this.diseaseDescription,
+    this.treatmentName,
+    this.dosagePerDecare,
+    this.applicationMethod,
+    this.applicationTime,
+    this.applicationFrequency,
+    this.waitingPeriod,
+    this.effectiveness,
+    this.notes,
+    this.suggestion,
+    this.intervention,
+    this.agriculturalTip,
   });
 
   /// Analiz benzersiz tanımlayıcısı
@@ -115,6 +129,49 @@ class PlantAnalysisResult extends Equatable {
   /// Görüntü analizinin tam metni
   final Map<String, dynamic>? rawResponse;
 
+  // ============================================================================
+  // YENİ ALANLAR - Gelişmiş tarımsal analiz bilgileri
+  // ============================================================================
+
+  /// Ana hastalık adı (tekil)
+  final String? diseaseName;
+
+  /// Ana hastalık açıklaması
+  final String? diseaseDescription;
+
+  /// Önerilen tedavi/ilaç adı
+  final String? treatmentName;
+
+  /// Dekar başına dozaj bilgisi
+  final String? dosagePerDecare;
+
+  /// Uygulama yöntemi (yapraktan, topraktan vs.)
+  final String? applicationMethod;
+
+  /// Uygulama zamanı (saat, gün, hava koşulu)
+  final String? applicationTime;
+
+  /// Uygulama sıklığı (kaç günde bir vs.)
+  final String? applicationFrequency;
+
+  /// Hasat öncesi bekleme süresi
+  final String? waitingPeriod;
+
+  /// Tedavi etkinlik oranı
+  final String? effectiveness;
+
+  /// Ek notlar ve uyarılar
+  final String? notes;
+
+  /// Tek öneri (ana öneri)
+  final String? suggestion;
+
+  /// Ana müdahale yöntemi
+  final String? intervention;
+
+  /// Ana tarımsal ipucu
+  final String? agriculturalTip;
+
   /// Sınıfın mevcut değerlerini koruyarak yeni bir örnek oluşturur
   PlantAnalysisResult copyWith({
     String? id,
@@ -144,6 +201,20 @@ class PlantAnalysisResult extends Equatable {
     List<String>? regionalInfo,
     String? growthComment,
     Map<String, dynamic>? rawResponse,
+    // Yeni alanlar
+    String? diseaseName,
+    String? diseaseDescription,
+    String? treatmentName,
+    String? dosagePerDecare,
+    String? applicationMethod,
+    String? applicationTime,
+    String? applicationFrequency,
+    String? waitingPeriod,
+    String? effectiveness,
+    String? notes,
+    String? suggestion,
+    String? intervention,
+    String? agriculturalTip,
   }) {
     return PlantAnalysisResult(
       id: id ?? this.id,
@@ -173,6 +244,20 @@ class PlantAnalysisResult extends Equatable {
       regionalInfo: regionalInfo ?? this.regionalInfo,
       growthComment: growthComment ?? this.growthComment,
       rawResponse: rawResponse ?? this.rawResponse,
+      // Yeni alanlar
+      diseaseName: diseaseName ?? this.diseaseName,
+      diseaseDescription: diseaseDescription ?? this.diseaseDescription,
+      treatmentName: treatmentName ?? this.treatmentName,
+      dosagePerDecare: dosagePerDecare ?? this.dosagePerDecare,
+      applicationMethod: applicationMethod ?? this.applicationMethod,
+      applicationTime: applicationTime ?? this.applicationTime,
+      applicationFrequency: applicationFrequency ?? this.applicationFrequency,
+      waitingPeriod: waitingPeriod ?? this.waitingPeriod,
+      effectiveness: effectiveness ?? this.effectiveness,
+      notes: notes ?? this.notes,
+      suggestion: suggestion ?? this.suggestion,
+      intervention: intervention ?? this.intervention,
+      agriculturalTip: agriculturalTip ?? this.agriculturalTip,
     );
   }
 
@@ -287,6 +372,29 @@ class PlantAnalysisResult extends Equatable {
             plantDetails['regional_info'],
           ),
           rawResponse: json,
+          // Yeni alanlar - API response parsing
+          diseaseName:
+              plantDetails['diseaseName'] ?? plantDetails['disease_name'],
+          diseaseDescription: plantDetails['diseaseDescription'] ??
+              plantDetails['disease_description'],
+          treatmentName:
+              plantDetails['treatmentName'] ?? plantDetails['treatment_name'],
+          dosagePerDecare: plantDetails['dosagePerDecare'] ??
+              plantDetails['dosage_per_decare'],
+          applicationMethod: plantDetails['applicationMethod'] ??
+              plantDetails['application_method'],
+          applicationTime: plantDetails['applicationTime'] ??
+              plantDetails['application_time'],
+          applicationFrequency: plantDetails['applicationFrequency'] ??
+              plantDetails['application_frequency'],
+          waitingPeriod:
+              plantDetails['waitingPeriod'] ?? plantDetails['waiting_period'],
+          effectiveness: plantDetails['effectiveness'],
+          notes: plantDetails['notes'],
+          suggestion: plantDetails['suggestion'],
+          intervention: plantDetails['intervention'],
+          agriculturalTip: plantDetails['agriculturalTip'] ??
+              plantDetails['agricultural_tip'],
         );
       }
     }
@@ -361,6 +469,29 @@ class PlantAnalysisResult extends Equatable {
         agriculturalTips: null,
         regionalInfo: null,
         rawResponse: json,
+        // Yeni alanlar - health assessment parsing
+        diseaseName:
+            plantDetails['diseaseName'] ?? plantDetails['disease_name'],
+        diseaseDescription: plantDetails['diseaseDescription'] ??
+            plantDetails['disease_description'],
+        treatmentName:
+            plantDetails['treatmentName'] ?? plantDetails['treatment_name'],
+        dosagePerDecare: plantDetails['dosagePerDecare'] ??
+            plantDetails['dosage_per_decare'],
+        applicationMethod: plantDetails['applicationMethod'] ??
+            plantDetails['application_method'],
+        applicationTime:
+            plantDetails['applicationTime'] ?? plantDetails['application_time'],
+        applicationFrequency: plantDetails['applicationFrequency'] ??
+            plantDetails['application_frequency'],
+        waitingPeriod:
+            plantDetails['waitingPeriod'] ?? plantDetails['waiting_period'],
+        effectiveness: plantDetails['effectiveness'],
+        notes: plantDetails['notes'],
+        suggestion: plantDetails['suggestion'],
+        intervention: plantDetails['intervention'],
+        agriculturalTip:
+            plantDetails['agriculturalTip'] ?? plantDetails['agricultural_tip'],
       );
     }
 
@@ -467,6 +598,20 @@ class PlantAnalysisResult extends Equatable {
           json['regionalInfo'],
         ),
         rawResponse: json,
+        // Yeni alanlar - Firestore'dan parsing
+        diseaseName: json['diseaseName'],
+        diseaseDescription: json['diseaseDescription'],
+        treatmentName: json['treatmentName'],
+        dosagePerDecare: json['dosagePerDecare'],
+        applicationMethod: json['applicationMethod'],
+        applicationTime: json['applicationTime'],
+        applicationFrequency: json['applicationFrequency'],
+        waitingPeriod: json['waitingPeriod'],
+        effectiveness: json['effectiveness'],
+        notes: json['notes'],
+        suggestion: json['suggestion'],
+        intervention: json['intervention'],
+        agriculturalTip: json['agriculturalTip'],
       );
     } catch (e) {
       print('PlantAnalysisResult.fromJson hata: $e');
@@ -483,6 +628,20 @@ class PlantAnalysisResult extends Equatable {
         similarImages: [],
         growthComment: '',
         rawResponse: null,
+        // Yeni alanlar - hata durumu için null
+        diseaseName: null,
+        diseaseDescription: null,
+        treatmentName: null,
+        dosagePerDecare: null,
+        applicationMethod: null,
+        applicationTime: null,
+        applicationFrequency: null,
+        waitingPeriod: null,
+        effectiveness: null,
+        notes: null,
+        suggestion: null,
+        intervention: null,
+        agriculturalTip: null,
       );
     }
   }
@@ -684,6 +843,20 @@ class PlantAnalysisResult extends Equatable {
         agriculturalTips,
         regionalInfo,
         rawResponse,
+        // Yeni alanlar - Equatable karşılaştırması için
+        diseaseName,
+        diseaseDescription,
+        treatmentName,
+        dosagePerDecare,
+        applicationMethod,
+        applicationTime,
+        applicationFrequency,
+        waitingPeriod,
+        effectiveness,
+        notes,
+        suggestion,
+        intervention,
+        agriculturalTip,
       ];
 
   /// Boş bir analiz sonucu oluşturur
@@ -722,6 +895,20 @@ class PlantAnalysisResult extends Equatable {
       agriculturalTips: [],
       regionalInfo: [],
       rawResponse: originalText != null ? {'original': originalText} : null,
+      // Yeni alanlar - empty değerler
+      diseaseName: null,
+      diseaseDescription: null,
+      treatmentName: null,
+      dosagePerDecare: null,
+      applicationMethod: null,
+      applicationTime: null,
+      applicationFrequency: null,
+      waitingPeriod: null,
+      effectiveness: null,
+      notes: null,
+      suggestion: null,
+      intervention: null,
+      agriculturalTip: null,
     );
   }
 }
@@ -960,6 +1147,20 @@ extension PlantAnalysisResultJsonSerialization on PlantAnalysisResult {
       'agriculturalTips': agriculturalTips,
       'regionalInfo': regionalInfo,
       'rawResponse': rawResponse,
+      // Yeni alanlar - JSON serialization
+      'diseaseName': diseaseName,
+      'diseaseDescription': diseaseDescription,
+      'treatmentName': treatmentName,
+      'dosagePerDecare': dosagePerDecare,
+      'applicationMethod': applicationMethod,
+      'applicationTime': applicationTime,
+      'applicationFrequency': applicationFrequency,
+      'waitingPeriod': waitingPeriod,
+      'effectiveness': effectiveness,
+      'notes': notes,
+      'suggestion': suggestion,
+      'intervention': intervention,
+      'agriculturalTip': agriculturalTip,
     };
   }
 }

@@ -6,7 +6,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:sprung/sprung.dart';
 import 'package:tatarai/core/utils/permission_manager.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:tatarai/core/constants/app_constants.dart';
 import 'package:tatarai/core/extensions/string_extension.dart';
 import 'package:tatarai/core/widgets/app_dialog_manager.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
@@ -14,9 +13,8 @@ import 'package:tatarai/core/theme/dimensions.dart';
 import 'package:tatarai/core/theme/text_theme.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/core/widgets/app_button.dart';
-import 'package:tatarai/core/widgets/premium_button.dart';
 import 'package:tatarai/features/home/widgets/home_premium_card.dart';
-import 'package:tatarai/features/plant_analysis/presentation/cubits/plant_analysis_cubit.dart';
+import 'package:tatarai/features/plant_analysis/presentation/cubits/plant_analysis_cubit_direct.dart';
 import 'package:tatarai/features/plant_analysis/data/models/location_models.dart';
 import 'package:tatarai/features/plant_analysis/presentation/cubits/plant_analysis_state.dart';
 import 'package:tatarai/features/plant_analysis/services/location_service.dart';
@@ -25,7 +23,6 @@ import 'package:tatarai/core/extensions/context_extensions.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
 import 'package:tatarai/features/auth/cubits/auth_state.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:tatarai/core/models/user_model.dart';
 
 part 'analysis_screen_mixin.dart';
 
@@ -72,7 +69,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
         ),
       ),
       child: SafeArea(
-        child: BlocConsumer<PlantAnalysisCubit, PlantAnalysisState>(
+        child: BlocConsumer<PlantAnalysisCubitDirect, PlantAnalysisState>(
           listener: (context, state) async {
             AppLogger.i(
                 'AnalysisScreen - BlocConsumer listener tetiklendi: ${state.runtimeType}');
@@ -101,7 +98,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                       .then((_) {
                     // Sonuç ekranından dönüldüğünde state'i sıfırla
                     if (mounted) {
-                      context.read<PlantAnalysisCubit>().resetState();
+                      context.read<PlantAnalysisCubitDirect>().resetState();
                       // Navigation ID'sini temizle
                       _lastNavigatedAnalysisId = null;
                     }

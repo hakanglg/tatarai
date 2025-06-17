@@ -4,7 +4,7 @@ import 'package:tatarai/core/theme/color_scheme.dart';
 import 'package:tatarai/core/theme/dimensions.dart';
 import 'package:tatarai/core/theme/text_theme.dart';
 import 'package:tatarai/core/widgets/app_button.dart';
-import 'package:tatarai/features/plant_analysis/presentation/cubits/plant_analysis_cubit.dart';
+import 'package:tatarai/features/plant_analysis/presentation/cubits/plant_analysis_cubit_direct.dart';
 import 'package:tatarai/features/plant_analysis/data/models/plant_analysis_result.dart'
     as model;
 import 'package:tatarai/features/plant_analysis/data/models/disease_model.dart'
@@ -52,7 +52,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen> {
 
   /// Loads past analyses from the cubit
   void _loadAnalyses() {
-    context.read<PlantAnalysisCubit>().loadPastAnalyses();
+    context.read<PlantAnalysisCubitDirect>().loadPastAnalyses();
   }
 
   /// Handles refresh action
@@ -73,10 +73,8 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen> {
 
   /// Converts PlantAnalysisEntity to PlantAnalysisResult
   ///
-  /// Entity'den Result model'ine çeviri yapar UI widget'ları için.
-  /// Eksik alanlar default değerlerle doldurulur.
-  model.PlantAnalysisResult _convertToPlantAnalysisResult(
-      PlantAnalysisEntity entity) {
+  /// Entity'den result model'ine çeviri yapar UI widget'ları için
+  model.PlantAnalysisResult _convertEntityToModel(PlantAnalysisEntity entity) {
     return model.PlantAnalysisResult(
       id: entity.id,
       plantName: entity.plantName,
@@ -107,6 +105,20 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen> {
       agriculturalTips: null,
       regionalInfo: null,
       rawResponse: null,
+      // YENİ ALANLAR - Entity'den alınan gerçek değerler
+      diseaseName: entity.diseaseName,
+      diseaseDescription: entity.diseaseDescription,
+      treatmentName: entity.treatmentName,
+      dosagePerDecare: entity.dosagePerDecare,
+      applicationMethod: entity.applicationMethod,
+      applicationTime: entity.applicationTime,
+      applicationFrequency: entity.applicationFrequency,
+      waitingPeriod: entity.waitingPeriod,
+      effectiveness: entity.effectiveness,
+      notes: entity.notes,
+      suggestion: entity.suggestion,
+      intervention: entity.intervention,
+      agriculturalTip: entity.agriculturalTip,
     );
   }
 
@@ -152,7 +164,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen> {
         ),
       ),
       child: SafeArea(
-        child: BlocBuilder<PlantAnalysisCubit, PlantAnalysisState>(
+        child: BlocBuilder<PlantAnalysisCubitDirect, PlantAnalysisState>(
           builder: (context, state) {
             // Loading state
             if (state.isLoading) {
@@ -224,7 +236,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen> {
                     bottom: context.dimensions.spaceM,
                   ),
                   child: AnalysisCard(
-                    analysis: _convertToPlantAnalysisResult(analysis),
+                    analysis: _convertEntityToModel(analysis),
                     cardSize: AnalysisCardSize.large,
                     onTap: () => _navigateToAnalysisDetail(analysis),
                   ),
@@ -242,7 +254,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen> {
   Widget _buildErrorView(BuildContext context, String errorMessage) {
     // Get error information based on current state
     final PlantAnalysisState currentState =
-        context.read<PlantAnalysisCubit>().state;
+        context.read<PlantAnalysisCubitDirect>().state;
     final ErrorInfo errorInfo = _getErrorInfo(
       currentState is PlantAnalysisError ? currentState.errorType : null,
     );
