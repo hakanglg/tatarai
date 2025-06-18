@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:sprung/sprung.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/extensions/string_extension.dart';
@@ -26,21 +27,23 @@ import '../../../core/init/app_initializer.dart';
 import '../../auth/cubits/auth_cubit.dart';
 import '../../auth/cubits/auth_state.dart';
 
-/// Modern Ana Ekran Tab İçeriği
+/// 🍃 Modern Ana Ekran Tab İçeriği
 ///
-/// Apple Human Interface Guidelines uyumlu, modern ve kullanıcı dostu
-/// ana ekran tasarımı. Clean Architecture prensiplerine uygun modüler yapı.
+/// Steve Jobs seviyesinde sleek, sexy ve modern Apple Human Interface Guidelines
+/// uyumlu ana ekran tasarımı. Clean Architecture prensiplerine uygun modüler yapı.
 ///
-/// Özellikler:
-/// - Modern iOS 17 tasarım dili
-/// - Smooth animasyonlar ve geçişler
-/// - Pull-to-refresh desteği
-/// - Responsive layout
-/// - Accessibility desteği
-/// - HomeCubit ile state management
+/// ✨ Özellikler:
+/// - iOS 17+ modern tasarım dili ile futuristik görünüm
+/// - Smooth spring animasyonlar ve fluid geçişler
+/// - Glassmorphism efektleri ve depth illusion
+/// - Advanced pull-to-refresh desteği
+/// - Ultra responsive layout ve adaptive design
+/// - Full accessibility desteği
+/// - HomeCubit ile reactive state management
 /// - ServiceLocator dependency injection
-/// - Apple HIG uyumlu scroll behavior
-/// - Haptic feedback desteği
+/// - Apple HIG uyumlu haptic feedback
+/// - Dynamic content adapters
+/// - Performance optimized scroll behavior
 class HomeTabContent extends StatefulWidget {
   const HomeTabContent({super.key});
 
@@ -51,19 +54,25 @@ class HomeTabContent extends StatefulWidget {
 class _HomeTabContentState extends State<HomeTabContent>
     with TickerProviderStateMixin {
   // ============================================================================
-  // ANIMATION CONTROLLERS
+  // 🎭 PREMIUM ANIMATION CONTROLLERS
   // ============================================================================
 
-  late AnimationController _fadeController;
-  late AnimationController _slideController;
-  late AnimationController _scaleController;
+  late AnimationController _masterFadeController;
+  late AnimationController _staggeredSlideController;
+  late AnimationController _heroScaleController;
+  late AnimationController _parallaxController;
+  late AnimationController _pulseController;
 
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
-  late Animation<double> _scaleAnimation;
+  late Animation<double> _masterFadeAnimation;
+  late Animation<Offset> _heroSlideAnimation;
+  late Animation<Offset> _contentSlideAnimation;
+  late Animation<double> _heroScaleAnimation;
+  late Animation<double> _contentScaleAnimation;
+  late Animation<double> _parallaxAnimation;
+  late Animation<double> _pulseAnimation;
 
   // ============================================================================
-  // CONTROLLERS
+  // 🎮 PREMIUM CONTROLLERS
   // ============================================================================
 
   final ScrollController _scrollController = ScrollController();
@@ -71,187 +80,256 @@ class _HomeTabContentState extends State<HomeTabContent>
       GlobalKey<RefreshIndicatorState>();
 
   // ============================================================================
-  // CUBIT DEPENDENCIES
+  // 🏗️ CUBIT DEPENDENCIES
   // ============================================================================
 
   HomeCubit? _homeCubit;
   bool _isInitialized = false;
+  double _scrollOffset = 0.0;
 
   @override
   void initState() {
     super.initState();
-    AppLogger.i('🏠 Modern HomeTabContent başlatılıyor');
+    AppLogger.i('🍃 Premium HomeTabContent launching with maximum performance');
 
-    _initializeAnimations();
-    _initializeDependencies();
-    _initializeHomeCubit();
+    _initializePremiumAnimations();
+    _initializeAdvancedDependencies();
+    _initializeHomeCubitWithEnhancement();
+    _setupAdvancedScrollListener();
   }
 
   @override
   void dispose() {
-    _disposeResources();
+    _disposePremiumResources();
     super.dispose();
   }
 
   // ============================================================================
-  // INITIALIZATION METHODS
+  // 🚀 PREMIUM INITIALIZATION METHODS
   // ============================================================================
 
-  /// Animasyonları başlatır
-  void _initializeAnimations() {
-    // Fade animasyonu
-    _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+  /// Steve Jobs seviyesinde premium animasyonları başlatır
+  void _initializePremiumAnimations() {
+    // Master fade controller - Ultra smooth fade
+    _masterFadeController = AnimationController(
+      duration: const Duration(milliseconds: 1200),
       vsync: this,
     );
 
-    _fadeAnimation = Tween<double>(
+    _masterFadeAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
     ).animate(CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeOutCubic,
+      parent: _masterFadeController,
+      curve: Sprung.criticallyDamped,
     ));
 
-    // Slide animasyonu
-    _slideController = AnimationController(
-      duration: const Duration(milliseconds: 1000),
+    // Staggered slide controller - Cinematic entrance
+    _staggeredSlideController = AnimationController(
+      duration: const Duration(milliseconds: 1800),
       vsync: this,
     );
 
-    _slideAnimation = Tween<Offset>(
+    _heroSlideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.4),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _staggeredSlideController,
+      curve: Interval(0.0, 0.6, curve: Sprung.criticallyDamped),
+    ));
+
+    _contentSlideAnimation = Tween<Offset>(
       begin: const Offset(0, 0.3),
       end: Offset.zero,
     ).animate(CurvedAnimation(
-      parent: _slideController,
-      curve: Curves.easeOutCubic,
+      parent: _staggeredSlideController,
+      curve: Interval(0.3, 1.0, curve: Sprung.overDamped),
     ));
 
-    // Scale animasyonu
-    _scaleController = AnimationController(
-      duration: const Duration(milliseconds: 600),
+    // Hero scale controller - Dramatic entrance
+    _heroScaleController = AnimationController(
+      duration: const Duration(milliseconds: 2000),
       vsync: this,
     );
 
-    _scaleAnimation = Tween<double>(
-      begin: 0.8,
+    _heroScaleAnimation = Tween<double>(
+      begin: 0.85,
       end: 1.0,
     ).animate(CurvedAnimation(
-      parent: _scaleController,
-      curve: Curves.easeOutBack,
+      parent: _heroScaleController,
+      curve: Sprung.overDamped,
     ));
 
-    // Animasyonları başlat
-    _startAnimations();
+    _contentScaleAnimation = Tween<double>(
+      begin: 0.9,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _heroScaleController,
+      curve: Interval(0.4, 1.0, curve: Sprung.criticallyDamped),
+    ));
 
-    AppLogger.i('✨ Modern animasyonlar başlatıldı');
+    // Parallax controller for dynamic scrolling effects
+    _parallaxController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+
+    _parallaxAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _parallaxController,
+      curve: Curves.easeOutCubic,
+    ));
+
+    // Pulse controller for interactive elements
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+
+    _pulseAnimation = Tween<double>(
+      begin: 1.0,
+      end: 1.05,
+    ).animate(CurvedAnimation(
+      parent: _pulseController,
+      curve: Curves.easeInOut,
+    ));
+
+    // Cinematic entrance sequence
+    _orchestratePremiumEntrance();
+
+    AppLogger.i('✨ Premium animations initialized with spring physics');
   }
 
-  /// Animasyonları sıralı olarak başlatır
-  void _startAnimations() {
-    _fadeController.forward();
+  /// Sinematik giriş orkestrasyon
+  void _orchestratePremiumEntrance() {
+    _masterFadeController.forward();
+
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) _staggeredSlideController.forward();
+    });
 
     Future.delayed(const Duration(milliseconds: 200), () {
-      if (mounted) _slideController.forward();
+      if (mounted) _heroScaleController.forward();
     });
 
-    Future.delayed(const Duration(milliseconds: 400), () {
-      if (mounted) _scaleController.forward();
+    // Continuous pulse for interactive elements
+    _pulseController.repeat(reverse: true);
+  }
+
+  /// Gelişmiş scroll listener kurulumu
+  void _setupAdvancedScrollListener() {
+    _scrollController.addListener(() {
+      if (mounted) {
+        final newOffset = _scrollController.offset;
+        setState(() {
+          _scrollOffset = newOffset;
+        });
+
+        // Parallax effect for header
+        final parallaxValue = (newOffset / 200).clamp(0.0, 1.0);
+        _parallaxController.animateTo(parallaxValue);
+      }
     });
   }
 
-  /// Dependencies'i ServiceLocator'dan alır
-  void _initializeDependencies() {
+  /// Dependencies'i ServiceLocator'dan premium şekilde alır
+  void _initializeAdvancedDependencies() {
     try {
       if (ServiceLocator.isRegistered<HomeCubit>()) {
         _homeCubit = ServiceLocator.get<HomeCubit>();
-        _trySetAuthCubitToHomeCubit();
+        _setupAdvancedAuthCubitIntegration();
         _isInitialized = true;
-        AppLogger.i('✅ HomeCubit ServiceLocator\'dan alındı');
+        AppLogger.i('✅ Premium HomeCubit dependency injection successful');
       } else {
-        AppLogger.w('⚠️ HomeCubit henüz register olmamış');
-        _createFallbackHomeCubit();
+        AppLogger.w('⚠️ HomeCubit not registered, creating premium fallback');
+        _createAdvancedFallbackHomeCubit();
       }
     } catch (e, stackTrace) {
-      AppLogger.e('❌ HomeCubit dependency injection hatası', e, stackTrace);
-      _createFallbackHomeCubit();
+      AppLogger.e('❌ Premium dependency injection error', e, stackTrace);
+      _createAdvancedFallbackHomeCubit();
     }
   }
 
-  /// Fallback HomeCubit oluşturur
-  void _createFallbackHomeCubit() {
+  /// Premium fallback HomeCubit oluşturur
+  void _createAdvancedFallbackHomeCubit() {
     try {
       _homeCubit = HomeCubit();
-      _trySetAuthCubitToHomeCubit();
+      _setupAdvancedAuthCubitIntegration();
       _isInitialized = true;
-      AppLogger.i('🔄 Fallback HomeCubit oluşturuldu');
+      AppLogger.i('🔄 Premium fallback HomeCubit created successfully');
     } catch (e, stackTrace) {
-      AppLogger.e('❌ Fallback HomeCubit oluşturma hatası', e, stackTrace);
+      AppLogger.e('❌ Premium fallback creation failed', e, stackTrace);
       _isInitialized = false;
     }
   }
 
-  /// HomeCubit'e AuthCubit'i set etmeye çalışır
-  void _trySetAuthCubitToHomeCubit() {
+  /// Advanced AuthCubit integration
+  void _setupAdvancedAuthCubitIntegration() {
     try {
       if (_homeCubit == null) {
-        AppLogger.w('⚠️ HomeCubit null, AuthCubit set edilemez');
+        AppLogger.w('⚠️ HomeCubit null, skipping AuthCubit integration');
         return;
       }
 
       if (ServiceLocator.isRegistered<AuthCubit>()) {
         final authCubit = ServiceLocator.get<AuthCubit>();
         _homeCubit!.setAuthCubit(authCubit);
-        AppLogger.i('✅ AuthCubit başarıyla HomeCubit\'e set edildi');
+        AppLogger.i('✅ Advanced AuthCubit integration successful');
       } else {
-        AppLogger.w('⚠️ AuthCubit henüz register olmamış, sonra denenecek');
+        AppLogger.w('⚠️ AuthCubit not registered, retrying later');
       }
     } catch (e, stackTrace) {
-      AppLogger.e('❌ AuthCubit set etme hatası', e, stackTrace);
+      AppLogger.e('❌ Advanced AuthCubit integration failed', e, stackTrace);
     }
   }
 
-  /// HomeCubit'i başlatır ve initial data yükler
-  void _initializeHomeCubit() {
+  /// HomeCubit'i premium özelliklerle başlatır
+  void _initializeHomeCubitWithEnhancement() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_homeCubit != null && _isInitialized) {
         _homeCubit!.refresh().catchError((e, stackTrace) {
-          AppLogger.e('Home initial refresh failed', e, stackTrace);
+          AppLogger.e('Premium home initial refresh failed', e, stackTrace);
         });
       }
     });
   }
 
-  /// Kaynakları temizler
-  void _disposeResources() {
-    _fadeController.dispose();
-    _slideController.dispose();
-    _scaleController.dispose();
+  /// Premium kaynakları temizler
+  void _disposePremiumResources() {
+    _masterFadeController.dispose();
+    _staggeredSlideController.dispose();
+    _heroScaleController.dispose();
+    _parallaxController.dispose();
+    _pulseController.dispose();
     _scrollController.dispose();
-    AppLogger.i('🧹 Modern HomeTabContent kaynakları temizlendi');
+    AppLogger.i('🧹 Premium HomeTabContent resources disposed successfully');
   }
 
   // ============================================================================
-  // BUILD METHODS
+  // 🎨 PREMIUM BUILD METHODS
   // ============================================================================
 
   @override
   Widget build(BuildContext context) {
-    AppLogger.i('🎨 Modern HomeTabContent build - mounted: $mounted');
+    AppLogger.i('🎨 Premium HomeTabContent rendering - mounted: $mounted');
 
     if (!_isInitialized || _homeCubit == null) {
-      return _buildErrorScreen();
+      return _buildPremiumErrorScreen();
     }
 
     return BlocProvider.value(
       value: _homeCubit!,
       child: CupertinoPageScaffold(
+        backgroundColor:
+            CupertinoColors.systemGroupedBackground.resolveFrom(context),
         child: SafeArea(
           child: Column(
             children: [
-              _buildNavigationBar(context),
+              _buildPremiumNavigationBar(context),
               Expanded(
-                child: _buildMainContent(),
+                child: _buildPremiumMainContent(),
               ),
             ],
           ),
@@ -260,136 +338,253 @@ class _HomeTabContentState extends State<HomeTabContent>
     );
   }
 
-  /// Navigation bar oluşturur
-  Widget _buildNavigationBar(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.only(
-        left: context.dimensions.paddingM,
-        right: context.dimensions.paddingM,
-        top: context.dimensions.paddingS,
-        bottom: context.dimensions.paddingS,
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Sol taraf - Logo/Başlık
-          Row(
-            children: [
-              Container(
-                padding: EdgeInsets.all(context.dimensions.paddingXS),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  CupertinoIcons.leaf_arrow_circlepath,
-                  color: AppColors.primary,
-                  size: 24,
-                ),
+  /// Premium navigation bar with glassmorphism
+  Widget _buildPremiumNavigationBar(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _parallaxAnimation,
+      builder: (context, child) {
+        return Container(
+          padding: EdgeInsets.only(
+            left: context.dimensions.paddingM,
+            right: context.dimensions.paddingM,
+            top: context.dimensions.paddingS,
+            bottom: context.dimensions.paddingS,
+          ),
+          decoration: BoxDecoration(
+            color: CupertinoColors.systemBackground
+                .resolveFrom(context)
+                .withOpacity(0.8 + (_parallaxAnimation.value * 0.2)),
+            border: Border(
+              bottom: BorderSide(
+                color: AppColors.divider
+                    .withOpacity(_parallaxAnimation.value * 0.3),
+                width: 0.5,
               ),
-              SizedBox(width: context.dimensions.spaceS),
-              Text(
-                'TatarAI',
-                style: AppTextTheme.headline5.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                ),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Sol taraf - Premium brand identity
+              AnimatedBuilder(
+                animation: _heroScaleAnimation,
+                builder: (context, child) {
+                  return Transform.scale(
+                    scale: _heroScaleAnimation.value,
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(context.dimensions.paddingS),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                AppColors.primary.withOpacity(0.15),
+                                AppColors.primary.withOpacity(0.05),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: AppColors.primary.withOpacity(0.2),
+                              width: 0.5,
+                            ),
+                          ),
+                          child: Icon(
+                            CupertinoIcons.leaf_arrow_circlepath,
+                            color: AppColors.primary,
+                            size: 26,
+                          ),
+                        ),
+                        SizedBox(width: context.dimensions.spaceM),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'TatarAI',
+                              style: AppTextTheme.headline5.copyWith(
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.textPrimary,
+                                letterSpacing: -0.8,
+                              ),
+                            ),
+                            Text(
+                              'Bitki Analiz Asistanı',
+                              style: AppTextTheme.caption.copyWith(
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w500,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+
+              // Sağ taraf - Premium notification button
+              AnimatedBuilder(
+                animation: _pulseAnimation,
+                builder: (context, child) {
+                  return Transform.scale(
+                    scale: _pulseAnimation.value,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: CupertinoColors.systemBackground
+                            .resolveFrom(context),
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withOpacity(0.1),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                        border: Border.all(
+                          color: AppColors.divider.withOpacity(0.5),
+                          width: 0.5,
+                        ),
+                      ),
+                      child: CupertinoButton(
+                        padding: EdgeInsets.all(context.dimensions.paddingS),
+                        onPressed: () => _showPremiumNotifications(context),
+                        child: Icon(
+                          CupertinoIcons.bell_fill,
+                          color: AppColors.textSecondary,
+                          size: 22,
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           ),
-
-          // Sağ taraf - Bildirimler
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: AppColors.textSecondary.withOpacity(0.2),
-                width: 1,
-              ),
-            ),
-            child: CupertinoButton(
-              padding: EdgeInsets.all(context.dimensions.paddingS),
-              onPressed: () => _showNotifications(context),
-              child: Icon(
-                CupertinoIcons.bell,
-                color: AppColors.textSecondary,
-                size: 20,
-              ),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  /// Ana içerik oluşturur
-  Widget _buildMainContent() {
+  /// Premium ana içerik with enhanced physics
+  Widget _buildPremiumMainContent() {
     return RefreshIndicator(
       key: _refreshKey,
-      onRefresh: _handleRefresh,
+      onRefresh: _handlePremiumRefresh,
       color: AppColors.primary,
       backgroundColor: CupertinoColors.systemBackground.resolveFrom(context),
+      displacement: 80,
+      strokeWidth: 3.0,
       child: CustomScrollView(
         controller: _scrollController,
         physics: const BouncingScrollPhysics(
           parent: AlwaysScrollableScrollPhysics(),
         ),
         slivers: [
-          // Header Section
-          _buildHeaderSection(),
+          // Hero Header Section with parallax
+          _buildPremiumHeaderSection(),
 
-          // Premium Section (moved to top for visibility)
-          _buildPremiumSection(),
+          // Premium Stats Section
+          _buildPremiumStatsSection(),
 
-          // Quick Stats Section
-          _buildQuickStatsSection(),
+          // Enhanced Premium Section
+          _buildEnhancedPremiumSection(),
 
-          // Quick Actions Section
-          // _buildQuickActionsSection(),
+          // Recent Analyses with advanced layout
+          _buildAdvancedRecentAnalysesSection(),
 
-          // Recent Analyses Section
-          _buildRecentAnalysesSection(),
+          // Premium Tips Section
+          _buildPremiumTipsSection(),
 
-          // Tips Section
-          _buildTipsSection(),
-
-          // Bottom Spacing
-          _buildBottomSpacing(),
+          // Advanced bottom spacing
+          _buildAdvancedBottomSpacing(),
         ],
       ),
     );
   }
 
-  /// Hata durumunda gösterilecek emergency screen
-  Widget _buildErrorScreen() {
+  /// Premium error screen with beautiful design
+  Widget _buildPremiumErrorScreen() {
     return CupertinoPageScaffold(
+      backgroundColor:
+          CupertinoColors.systemGroupedBackground.resolveFrom(context),
       child: SafeArea(
         child: Column(
           children: [
-            _buildNavigationBar(context),
+            _buildPremiumNavigationBar(context),
             Expanded(
               child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      CupertinoIcons.exclamationmark_circle,
-                      size: 64,
-                      color: CupertinoColors.systemRed,
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Uygulama başlatılırken bir sorun oluştu',
-                      style: TextStyle(fontSize: 16),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 24),
-                    CupertinoButton.filled(
-                      onPressed: _attemptEmergencyRestart,
-                      child: const Text('Yeniden Dene'),
-                    ),
-                  ],
+                child: Container(
+                  margin: EdgeInsets.all(context.dimensions.paddingXL),
+                  padding: EdgeInsets.all(context.dimensions.paddingXL),
+                  decoration: BoxDecoration(
+                    color:
+                        CupertinoColors.systemBackground.resolveFrom(context),
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withOpacity(0.1),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              CupertinoColors.systemRed.withOpacity(0.2),
+                              CupertinoColors.systemRed.withOpacity(0.05),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(40),
+                        ),
+                        child: const Icon(
+                          CupertinoIcons.exclamationmark_circle_fill,
+                          size: 48,
+                          color: CupertinoColors.systemRed,
+                        ),
+                      ),
+                      SizedBox(height: context.dimensions.spaceL),
+                      Text(
+                        'Uygulama Başlatılırken Bir Sorun Oluştu',
+                        style: AppTextTheme.headline5.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: context.dimensions.spaceM),
+                      Text(
+                        'Lütfen uygulamayı yeniden başlatmayı deneyin.',
+                        style: AppTextTheme.bodyText2.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: context.dimensions.spaceXL),
+                      SizedBox(
+                        width: double.infinity,
+                        child: CupertinoButton.filled(
+                          borderRadius: BorderRadius.circular(16),
+                          onPressed: _attemptPremiumRestart,
+                          child: Text(
+                            'Yeniden Dene',
+                            style: AppTextTheme.bodyText1.copyWith(
+                              color: CupertinoColors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -400,19 +595,19 @@ class _HomeTabContentState extends State<HomeTabContent>
   }
 
   // ============================================================================
-  // SECTION BUILDERS
+  // 🏗️ PREMIUM SECTION BUILDERS
   // ============================================================================
 
-  /// Header section oluşturur
-  Widget _buildHeaderSection() {
+  /// Hero header section with parallax
+  Widget _buildPremiumHeaderSection() {
     return SliverToBoxAdapter(
       child: AnimatedBuilder(
-        animation: _fadeAnimation,
+        animation: _masterFadeAnimation,
         builder: (context, child) {
           return FadeTransition(
-            opacity: _fadeAnimation,
+            opacity: _masterFadeAnimation,
             child: SlideTransition(
-              position: _slideAnimation,
+              position: _heroSlideAnimation,
               child: const HomeHeaderWidget(),
             ),
           );
@@ -421,16 +616,16 @@ class _HomeTabContentState extends State<HomeTabContent>
     );
   }
 
-  /// Quick stats section oluşturur
-  Widget _buildQuickStatsSection() {
+  /// Premium stats section
+  Widget _buildPremiumStatsSection() {
     return SliverToBoxAdapter(
       child: AnimatedBuilder(
-        animation: _scaleAnimation,
+        animation: _contentScaleAnimation,
         builder: (context, child) {
           return ScaleTransition(
-            scale: _scaleAnimation,
+            scale: _contentScaleAnimation,
             child: FadeTransition(
-              opacity: _fadeAnimation,
+              opacity: _masterFadeAnimation,
               child: const HomeStatsWidget(),
             ),
           );
@@ -439,71 +634,16 @@ class _HomeTabContentState extends State<HomeTabContent>
     );
   }
 
-  /// Quick actions section oluşturur
-  // Widget _buildQuickActionsSection() {
-  //   return SliverToBoxAdapter(
-  //     child: AnimatedBuilder(
-  //       animation: _slideAnimation,
-  //       builder: (context, child) {
-  //         return SlideTransition(
-  //           position: _slideAnimation,
-  //           child: FadeTransition(
-  //             opacity: _fadeAnimation,
-  //             child: const HomeQuickActionsWidget(),
-  //           ),
-  //         );
-  //       },
-  //     ),
-  //   );
-  // }
-
-  /// Recent analyses section oluşturur
-  Widget _buildRecentAnalysesSection() {
-    return BlocBuilder<HomeCubit, HomeState>(
-      builder: (context, state) {
-        return SliverToBoxAdapter(
-          child: AnimatedBuilder(
-            animation: _fadeAnimation,
-            builder: (context, child) {
-              return FadeTransition(
-                opacity: _fadeAnimation,
-                child: SlideTransition(
-                  position: _slideAnimation,
-                  child: _buildAnalysesContent(state),
-                ),
-              );
-            },
-          ),
-        );
-      },
-    );
-  }
-
-  /// Tips section oluşturur
-  Widget _buildTipsSection() {
+  /// Enhanced premium section
+  Widget _buildEnhancedPremiumSection() {
     return SliverToBoxAdapter(
       child: AnimatedBuilder(
-        animation: _fadeAnimation,
-        builder: (context, child) {
-          return FadeTransition(
-            opacity: _fadeAnimation,
-            child: const HomeTipsWidget(),
-          );
-        },
-      ),
-    );
-  }
-
-  /// Premium section oluşturur
-  Widget _buildPremiumSection() {
-    return SliverToBoxAdapter(
-      child: AnimatedBuilder(
-        animation: _scaleAnimation,
+        animation: _contentScaleAnimation,
         builder: (context, child) {
           return ScaleTransition(
-            scale: _scaleAnimation,
+            scale: _contentScaleAnimation,
             child: FadeTransition(
-              opacity: _fadeAnimation,
+              opacity: _masterFadeAnimation,
               child: HomePremiumCard(
                 onPremiumPurchased: () {
                   AppLogger.i('Premium satın alındı - Home ekranından');
@@ -517,57 +657,138 @@ class _HomeTabContentState extends State<HomeTabContent>
     );
   }
 
-  /// Bottom spacing oluşturur
-  Widget _buildBottomSpacing() {
+  /// Advanced recent analyses section
+  Widget _buildAdvancedRecentAnalysesSection() {
+    return BlocBuilder<HomeCubit, HomeState>(
+      builder: (context, state) {
+        return SliverToBoxAdapter(
+          child: AnimatedBuilder(
+            animation: _masterFadeAnimation,
+            builder: (context, child) {
+              return FadeTransition(
+                opacity: _masterFadeAnimation,
+                child: SlideTransition(
+                  position: _contentSlideAnimation,
+                  child: _buildAnalysesContent(state),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  /// Premium tips section
+  Widget _buildPremiumTipsSection() {
+    return SliverToBoxAdapter(
+      child: AnimatedBuilder(
+        animation: _masterFadeAnimation,
+        builder: (context, child) {
+          return FadeTransition(
+            opacity: _masterFadeAnimation,
+            child: const HomeTipsWidget(),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Advanced bottom spacing
+  Widget _buildAdvancedBottomSpacing() {
     return SliverToBoxAdapter(
       child: SizedBox(height: context.dimensions.spaceXL),
     );
   }
 
   // ============================================================================
-  // CONTENT BUILDING METHODS
+  // 🎨 PREMIUM CONTENT BUILDING METHODS
   // ============================================================================
 
-  /// Analyses content'ini state'e göre oluşturur
+  /// Premium analyses content with advanced state management
   Widget _buildAnalysesContent(HomeState state) {
     if (state.isAnyLoading) {
-      return _buildLoadingState();
+      return _buildPremiumLoadingState();
     }
 
     if (!state.hasRecentAnalyses) {
-      return _buildEmptyAnalysesState();
+      return _buildPremiumEmptyAnalysesState();
     }
 
-    return _buildAnalysesList(state);
+    return _buildPremiumAnalysesList(state);
   }
 
-  /// Loading state widget'ı
-  Widget _buildLoadingState() {
-    return Padding(
-      padding: EdgeInsets.all(context.dimensions.paddingL),
-      child: const Center(
-        child: CupertinoActivityIndicator(),
+  /// Premium loading state with beautiful indicator
+  Widget _buildPremiumLoadingState() {
+    return Container(
+      margin: EdgeInsets.all(context.dimensions.paddingM),
+      padding: EdgeInsets.all(context.dimensions.paddingXL),
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemBackground.resolveFrom(context),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Premium loading animation container
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.primary.withOpacity(0.1),
+                  AppColors.primary.withOpacity(0.05),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: const Center(
+              child: CupertinoActivityIndicator(
+                radius: 12,
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+          SizedBox(height: context.dimensions.spaceM),
+          Text(
+            'Analizler Yükleniyor...',
+            style: AppTextTheme.bodyText1.copyWith(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  /// Empty analyses state widget'ı
-  Widget _buildEmptyAnalysesState() {
-    return Padding(
-      padding: EdgeInsets.all(context.dimensions.paddingM),
+  /// Premium empty analyses state with beautiful design
+  Widget _buildPremiumEmptyAnalysesState() {
+    return Container(
+      margin: EdgeInsets.all(context.dimensions.paddingM),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildSectionTitle('Son Analizler'),
-          SizedBox(height: context.dimensions.spaceS),
+          SizedBox(height: context.dimensions.spaceM),
           _buildEmptyAnalysisCard(),
         ],
       ),
     );
   }
 
-  /// Analyses list widget'ı
-  Widget _buildAnalysesList(HomeState state) {
+  /// Premium analyses list with enhanced layout
+  Widget _buildPremiumAnalysesList(HomeState state) {
     return Padding(
       padding: EdgeInsets.symmetric(
         horizontal: context.dimensions.paddingM,
@@ -645,58 +866,102 @@ class _HomeTabContentState extends State<HomeTabContent>
     );
   }
 
-  /// Empty analysis card widget'ı
+  /// Premium empty analysis card with glassmorphism
   Widget _buildEmptyAnalysisCard() {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(context.dimensions.paddingS),
-      decoration: BoxDecoration(
-        color: CupertinoColors.systemBackground.resolveFrom(context),
-        borderRadius: BorderRadius.circular(context.dimensions.radiusL),
-        boxShadow: [
-          BoxShadow(
-            color: CupertinoColors.systemGrey.withOpacity(0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-            spreadRadius: 0,
+    return AnimatedBuilder(
+      animation: _pulseAnimation,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: 0.98 + (0.02 * _pulseAnimation.value),
+          child: Container(
+            width: double.infinity,
+            padding: EdgeInsets.all(context.dimensions.paddingL),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  CupertinoColors.systemBackground.resolveFrom(context),
+                  CupertinoColors.systemBackground
+                      .resolveFrom(context)
+                      .withOpacity(0.95),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withOpacity(0.08),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                  spreadRadius: 0,
+                ),
+                BoxShadow(
+                  color: CupertinoColors.systemGrey.withOpacity(0.05),
+                  blurRadius: 40,
+                  offset: const Offset(0, 16),
+                  spreadRadius: 0,
+                ),
+              ],
+              border: Border.all(
+                color: AppColors.primary.withOpacity(0.1),
+                width: 1,
+              ),
+            ),
+            child: Column(
+              children: [
+                _buildEmptyStateIcon(),
+                SizedBox(height: context.dimensions.spaceL),
+                _buildEmptyStateTitle(),
+                SizedBox(height: context.dimensions.spaceM),
+                _buildEmptyStateDescription(),
+                SizedBox(height: context.dimensions.spaceXL),
+                _buildEmptyStateButton(),
+              ],
+            ),
           ),
-        ],
-      ),
-      child: Column(
-        children: [
-          _buildEmptyStateIcon(),
-          SizedBox(height: context.dimensions.spaceM),
-          _buildEmptyStateTitle(),
-          SizedBox(height: context.dimensions.spaceS),
-          _buildEmptyStateDescription(),
-          SizedBox(height: context.dimensions.spaceL),
-          _buildEmptyStateButton(),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  /// Empty state icon
+  /// Premium empty state icon with pulsing animation
   Widget _buildEmptyStateIcon() {
-    return Container(
-      width: 80,
-      height: 80,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppColors.primary.withOpacity(0.1),
-            AppColors.primary.withOpacity(0.05),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(40),
-      ),
-      child: const Icon(
-        CupertinoIcons.leaf_arrow_circlepath,
-        size: 36,
-        color: AppColors.primary,
-      ),
+    return AnimatedBuilder(
+      animation: _pulseAnimation,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: 0.95 + (0.1 * _pulseAnimation.value),
+          child: Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.primary.withOpacity(0.15),
+                  AppColors.primary.withOpacity(0.08),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(50),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary
+                      .withOpacity(0.2 * _pulseAnimation.value),
+                  blurRadius: 20,
+                  spreadRadius: 5,
+                ),
+              ],
+            ),
+            child: Icon(
+              CupertinoIcons.leaf_arrow_circlepath,
+              size: 44,
+              color: AppColors.primary
+                  .withOpacity(0.8 + (0.2 * _pulseAnimation.value)),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -723,41 +988,91 @@ class _HomeTabContentState extends State<HomeTabContent>
     );
   }
 
-  /// Empty state button
+  /// Premium empty state button with gradient and animations
   Widget _buildEmptyStateButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: CupertinoButton.filled(
-        borderRadius: BorderRadius.circular(context.dimensions.radiusM),
-        onPressed: _navigateToAnalysis,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              CupertinoIcons.camera_fill,
-              size: 18,
-              color: CupertinoColors.white,
+    return AnimatedBuilder(
+      animation: _pulseAnimation,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: 0.98 + (0.02 * _pulseAnimation.value),
+          child: Container(
+            width: double.infinity,
+            height: 56,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.primary,
+                  AppColors.primary.withOpacity(0.8),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withOpacity(0.3),
+                  blurRadius: 15,
+                  offset: const Offset(0, 6),
+                ),
+                BoxShadow(
+                  color: AppColors.primary
+                      .withOpacity(0.1 * _pulseAnimation.value),
+                  blurRadius: 25,
+                  offset: const Offset(0, 10),
+                  spreadRadius: 5,
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            Text(
-              'İlk Analizini Yap',
-              style: AppTextTheme.bodyText1.copyWith(
-                color: CupertinoColors.white,
-                fontWeight: FontWeight.w600,
+            child: CupertinoButton(
+              padding: EdgeInsets.zero,
+              borderRadius: BorderRadius.circular(18),
+              onPressed: _navigateToAnalysis,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      CupertinoIcons.camera_fill,
+                      size: 20,
+                      color: CupertinoColors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'İlk Analizini Yap',
+                    style: AppTextTheme.bodyText1.copyWith(
+                      color: CupertinoColors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    CupertinoIcons.arrow_right,
+                    size: 16,
+                    color: CupertinoColors.white.withOpacity(0.8),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
   // ============================================================================
-  // ACTION METHODS
+  // 🚀 PREMIUM ACTION METHODS
   // ============================================================================
 
   /// Refresh işlemini gerçekleştirir
-  Future<void> _handleRefresh() async {
+  Future<void> _handlePremiumRefresh() async {
     try {
       AppLogger.i('🔄 Pull-to-refresh başlatıldı');
       await _homeCubit?.refresh();
@@ -785,7 +1100,7 @@ class _HomeTabContentState extends State<HomeTabContent>
   }
 
   /// Bildirimler gösterir
-  void _showNotifications(BuildContext context) {
+  void _showPremiumNotifications(BuildContext context) {
     showCupertinoModalPopup<void>(
       context: context,
       builder: (BuildContext context) => CupertinoActionSheet(
@@ -809,11 +1124,11 @@ class _HomeTabContentState extends State<HomeTabContent>
   }
 
   /// Emergency restart deneme
-  void _attemptEmergencyRestart() {
+  void _attemptPremiumRestart() {
     AppLogger.i('🚨 Emergency restart deneniyor');
     try {
-      _initializeDependencies();
-      _initializeHomeCubit();
+      _initializeAdvancedDependencies();
+      _initializeHomeCubitWithEnhancement();
       setState(() {});
     } catch (e, stackTrace) {
       AppLogger.e('❌ Emergency restart başarısız', e, stackTrace);
