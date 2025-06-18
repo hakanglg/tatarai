@@ -7,7 +7,7 @@ import 'package:tatarai/core/theme/color_scheme.dart';
 import 'package:tatarai/core/theme/dimensions.dart';
 import 'package:tatarai/core/theme/text_theme.dart';
 import 'package:tatarai/core/utils/logger.dart';
-import 'package:tatarai/features/plant_analysis/data/models/plant_analysis_result.dart';
+import 'package:tatarai/features/plant_analysis/data/models/plant_analysis_model.dart';
 import 'package:tatarai/features/plant_analysis/presentation/views/analyses_result/analysis_result_screen.dart';
 
 /// Analiz kartı widget'ı
@@ -16,7 +16,7 @@ import 'package:tatarai/features/plant_analysis/presentation/views/analyses_resu
 /// ortak analiz kartı görünümü widget'ı
 class AnalysisCard extends StatelessWidget {
   /// Gösterilecek analiz verisi
-  final PlantAnalysisResult analysis;
+  final PlantAnalysisModel analysis;
 
   /// Kart boyutu türü - kompakt (ana ekran) veya geniş (analiz listesi)
   final AnalysisCardSize cardSize;

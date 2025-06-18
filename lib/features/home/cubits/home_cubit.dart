@@ -7,7 +7,7 @@ import '../../../core/utils/logger.dart';
 import '../../auth/cubits/auth_cubit.dart';
 import '../../auth/cubits/auth_state.dart';
 import '../../../core/models/user_model.dart';
-import '../../plant_analysis/data/models/plant_analysis_result.dart';
+import '../../plant_analysis/data/models/plant_analysis_model.dart';
 import '../constants/home_constants.dart';
 import 'home_state.dart';
 
@@ -291,7 +291,7 @@ class HomeCubit extends BaseCubit<HomeState> {
       await Future.delayed(
           const Duration(milliseconds: 500)); // Simulate network delay
 
-      final mockAnalyses = <PlantAnalysisResult>[];
+      final mockAnalyses = <PlantAnalysisModel>[];
 
       emit(state.copyWith(recentAnalyses: mockAnalyses));
       logInfo('Recent analyses loaded: ${mockAnalyses.length} items (mock)');

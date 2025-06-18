@@ -9,6 +9,7 @@ import 'firestore/firestore_service.dart';
 import '../repositories/auth_repository.dart';
 import '../../features/plant_analysis/services/gemini_service.dart';
 import '../../core/services/ai/gemini_service_interface.dart';
+import '../../core/services/ai/gemini_service_impl.dart';
 import '../../features/plant_analysis/services/location_service.dart';
 import '../../features/plant_analysis/presentation/cubits/plant_analysis_cubit_direct.dart';
 import '../../core/repositories/plant_analysis_repository.dart';
@@ -145,9 +146,14 @@ class ServiceLocator {
       () => LocationService(),
     );
 
-    // Gemini Service
+    // Legacy Gemini Service (for PlantAnalysisService)
     _getIt.registerLazySingleton<GeminiService>(
       () => GeminiService(),
+    );
+
+    // New Gemini Service Interface Implementation (for PlantAnalysisCubitDirect)
+    _getIt.registerLazySingleton<GeminiServiceInterface>(
+      () => GeminiServiceImpl(),
     );
 
     AppLogger.logWithContext('ServiceLocator', 'Core servisler kayıt edildi');
@@ -206,7 +212,7 @@ class ServiceLocator {
     _getIt.registerFactory<PlantAnalysisCubitDirect>(
       () {
         return PlantAnalysisCubitDirect(
-          geminiService: _getIt<GeminiService>() as GeminiServiceInterface,
+          geminiService: _getIt<GeminiServiceInterface>(),
           repository: _getIt<PlantAnalysisRepository>(),
         );
       },
@@ -357,8 +363,12 @@ class Services {
   static LocationService get locationService =>
       ServiceLocator.get<LocationService>();
 
-  /// Gemini service'ini döner
+  /// Legacy Gemini service'ini döner (eski PlantAnalysisService için)
   static GeminiService get geminiService => ServiceLocator.get<GeminiService>();
+
+  /// New Gemini service interface'ini döner (yeni PlantAnalysisCubitDirect için)
+  static GeminiServiceInterface get geminiServiceInterface =>
+      ServiceLocator.get<GeminiServiceInterface>();
 
   /// Payment cubit'ini döner (Factory)
   static PaymentCubit get paymentCubit => ServiceLocator.get<PaymentCubit>();

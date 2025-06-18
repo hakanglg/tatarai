@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tatarai/core/utils/logger.dart';
-import 'package:tatarai/features/plant_analysis/data/models/plant_analysis_result.dart';
+import 'package:tatarai/features/plant_analysis/data/models/plant_analysis_model.dart';
 
 /// Uygulama verilerini önbelleğe almak için kullanılan yardımcı sınıf
 class CacheManager {
@@ -37,11 +37,10 @@ class CacheManager {
   }
 
   /// Analiz sonucunu önbelleğe alır
-  Future<bool> cacheAnalysisResult(PlantAnalysisResult result) async {
+  Future<bool> cacheAnalysisResult(PlantAnalysisModel result) async {
     try {
       // Mevcut analiz sonuçlarını al
-      final List<PlantAnalysisResult> results =
-          await getCachedAnalysisResults();
+      final List<PlantAnalysisModel> results = await getCachedAnalysisResults();
 
       // Aynı ID ile bir sonuç varsa güncelle, yoksa ekle
       final index = results.indexWhere((item) => item.id == result.id);
@@ -67,7 +66,7 @@ class CacheManager {
   }
 
   /// Önbellekten analiz sonuçlarını alır
-  Future<List<PlantAnalysisResult>> getCachedAnalysisResults() async {
+  Future<List<PlantAnalysisModel>> getCachedAnalysisResults() async {
     try {
       final List<String>? jsonResults = _prefs.getStringList(
         _kAnalysisResultsKey,
@@ -81,13 +80,13 @@ class CacheManager {
           .map((jsonStr) {
             try {
               final Map<String, dynamic> map = jsonDecode(jsonStr);
-              return PlantAnalysisResult.fromJson(map);
+              return PlantAnalysisModel.fromJson(map);
             } catch (e) {
               AppLogger.e('Analiz sonucu ayrıştırma hatası', e);
               return null;
             }
           })
-          .whereType<PlantAnalysisResult>()
+          .whereType<PlantAnalysisModel>()
           .toList();
     } catch (e) {
       AppLogger.e('Önbellekten analiz sonuçları alınamadı', e);
@@ -96,10 +95,9 @@ class CacheManager {
   }
 
   /// Belirli bir analiz sonucunu ID'ye göre önbellekten alır
-  Future<PlantAnalysisResult?> getCachedAnalysisResultById(String id) async {
+  Future<PlantAnalysisModel?> getCachedAnalysisResultById(String id) async {
     try {
-      final List<PlantAnalysisResult> results =
-          await getCachedAnalysisResults();
+      final List<PlantAnalysisModel> results = await getCachedAnalysisResults();
       return results.firstWhere(
         (result) => result.id == id,
         orElse: () => throw Exception('Bulunamadı'),
@@ -194,8 +192,7 @@ class CacheManager {
   Future<bool> removeAnalysisFromCache(String analysisId) async {
     try {
       // Analiz sonucunu sil
-      final List<PlantAnalysisResult> results =
-          await getCachedAnalysisResults();
+      final List<PlantAnalysisModel> results = await getCachedAnalysisResults();
       results.removeWhere((result) => result.id == analysisId);
 
       final List<String> jsonResults =

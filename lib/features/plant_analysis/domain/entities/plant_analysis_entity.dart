@@ -86,6 +86,15 @@ class PlantAnalysisEntity extends Equatable {
   /// Ana tarımsal ipucu
   final String? agriculturalTip;
 
+  /// Gelişim skoru (0-100 arası)
+  final int? growthScore;
+
+  /// Gelişim aşaması/dönem bilgisi
+  final String? growthStage;
+
+  /// Gelişim hakkında açıklama/yorum
+  final String? growthComment;
+
   /// Constructor
   const PlantAnalysisEntity({
     required this.id,
@@ -114,6 +123,10 @@ class PlantAnalysisEntity extends Equatable {
     this.suggestion,
     this.intervention,
     this.agriculturalTip,
+    // Growth alanları
+    this.growthScore,
+    this.growthStage,
+    this.growthComment,
   });
 
   /// Entity kopyalama metodu
@@ -144,6 +157,10 @@ class PlantAnalysisEntity extends Equatable {
     String? suggestion,
     String? intervention,
     String? agriculturalTip,
+    // Growth alanları
+    int? growthScore,
+    String? growthStage,
+    String? growthComment,
   }) {
     return PlantAnalysisEntity(
       id: id ?? this.id,
@@ -172,6 +189,10 @@ class PlantAnalysisEntity extends Equatable {
       suggestion: suggestion ?? this.suggestion,
       intervention: intervention ?? this.intervention,
       agriculturalTip: agriculturalTip ?? this.agriculturalTip,
+      // Growth alanları
+      growthScore: growthScore ?? this.growthScore,
+      growthStage: growthStage ?? this.growthStage,
+      growthComment: growthComment ?? this.growthComment,
     );
   }
 
@@ -203,6 +224,10 @@ class PlantAnalysisEntity extends Equatable {
         suggestion,
         intervention,
         agriculturalTip,
+        // Growth alanları
+        growthScore,
+        growthStage,
+        growthComment,
       ];
 
   @override

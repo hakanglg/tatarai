@@ -16,6 +16,7 @@ import 'package:tatarai/core/widgets/app_button.dart';
 import 'package:tatarai/features/home/widgets/home_premium_card.dart';
 import 'package:tatarai/features/plant_analysis/presentation/cubits/plant_analysis_cubit_direct.dart';
 import 'package:tatarai/features/plant_analysis/data/models/location_models.dart';
+import 'package:tatarai/features/plant_analysis/data/models/plant_analysis_model.dart';
 import 'package:tatarai/features/plant_analysis/presentation/cubits/plant_analysis_state.dart';
 import 'package:tatarai/features/plant_analysis/services/location_service.dart';
 import 'package:tatarai/features/plant_analysis/presentation/views/analyses_result/analysis_result_screen.dart';
@@ -82,17 +83,24 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                 _lastNavigatedAnalysisId = currentAnalysisId;
 
                 final resultId = state.currentAnalysis!.id;
+                final analysisEntity = state.currentAnalysis!;
                 AppLogger.i(
-                  'Analiz sonuç ekranına geçiş - ID: $resultId, Uzunluk: ${resultId.length}',
+                  'Analiz sonuç ekranına geçiş - ID: $resultId, Bitki: ${analysisEntity.plantName}',
                 );
 
                 // Sadece mounted durumunu kontrol et, canPop kontrolünü kaldır
                 if (mounted) {
+                  // Entity'den model'e dönüştür
+                  final analysisModel =
+                      PlantAnalysisModel.fromEntity(analysisEntity);
+
                   await Navigator.of(context)
                       .push(
                     CupertinoPageRoute(
-                      builder: (context) =>
-                          AnalysisResultScreen(analysisId: resultId),
+                      builder: (context) => AnalysisResultScreen(
+                        analysisId: resultId,
+                        analysisResult: analysisModel, // Direkt veriyi geç
+                      ),
                     ),
                   )
                       .then((_) {

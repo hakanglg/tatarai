@@ -11,7 +11,7 @@ import 'package:tatarai/core/utils/validation_util.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/core/models/user_model.dart';
 import 'package:tatarai/features/plant_analysis/services/gemini_service.dart';
-import 'package:tatarai/features/plant_analysis/data/models/plant_analysis_result.dart';
+import 'package:tatarai/features/plant_analysis/data/models/plant_analysis_model.dart';
 
 /// Plant Analysis Service Result Types
 ///
@@ -536,8 +536,8 @@ class PlantAnalysisService {
   /// @param imageUrl - URL of uploaded image
   /// @param location - Location information
   /// @param fieldName - Optional field name
-  /// @return PlantAnalysisResult with structured data
-  Future<PlantAnalysisResult> analyzeImage({
+  /// @return PlantAnalysisModel with structured data
+  Future<PlantAnalysisModel> analyzeImage({
     required String imageUrl,
     required String location,
     String? fieldName,
@@ -551,7 +551,7 @@ class PlantAnalysisService {
 
       // TODO: Integrate with actual AI analysis service
       // This is a placeholder implementation
-      final analysisResult = PlantAnalysisResult(
+      final analysisResult = PlantAnalysisModel(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         plantName: 'Sample Plant',
         probability: 0.95,

@@ -3,28 +3,30 @@ import 'dart:convert'; // Base64 için eklendi
 import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:tatarai/core/theme/app_theme.dart';
+
 import 'package:tatarai/core/theme/color_scheme.dart';
 import 'package:tatarai/core/theme/dimensions.dart'; // AppDimensions için import eklendi
 import 'package:tatarai/core/theme/text_theme.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/core/widgets/app_button.dart';
-import 'package:tatarai/features/plant_analysis/presentation/cubits/plant_analysis_cubit_direct.dart';
-import 'package:tatarai/features/plant_analysis/data/models/plant_analysis_result.dart';
+
+import 'package:tatarai/features/plant_analysis/data/models/plant_analysis_model.dart';
 import 'package:tatarai/features/plant_analysis/domain/entities/plant_analysis_entity.dart';
-import 'package:tatarai/features/plant_analysis/data/models/disease_model.dart'
-    as entity_disease;
+import 'package:tatarai/features/plant_analysis/data/models/disease_model.dart';
+import 'package:tatarai/features/plant_analysis/presentation/cubits/plant_analysis_state.dart';
 import 'package:tatarai/features/plant_analysis/presentation/views/widgets/font_size_control.dart';
 import 'package:tatarai/features/plant_analysis/presentation/views/widgets/info_card_item.dart';
 import 'package:tatarai/core/constants/app_constants.dart';
+import 'package:tatarai/core/services/service_locator.dart';
+import 'package:tatarai/core/repositories/plant_analysis_repository.dart';
 
 part 'analysis_result_screen_mixin.dart';
 
-/// PlantAnalysisResult için UI gösterimine yardımcı uzantılar
-extension PlantAnalysisResultUIExtension on PlantAnalysisResult {
+/// PlantAnalysisModel için UI gösterimine yardımcı uzantılar
+extension PlantAnalysisModelUIExtension on PlantAnalysisModel {
   /// Sağlık durumuna göre renk döndürür
   Color getHealthStatusColor() {
     return isHealthy ? AppColors.primary : AppColors.error;
@@ -133,23 +135,112 @@ extension PlantAnalysisResultUIExtension on PlantAnalysisResult {
 /// Yapay zeka tarafından yapılan bitki analiz sonuçlarını gösterir
 class AnalysisResultScreen extends StatefulWidget {
   /// Default constructor
-  const AnalysisResultScreen({super.key, required this.analysisId});
+  const AnalysisResultScreen({
+    super.key,
+    required this.analysisId,
+    this.analysisResult,
+  });
 
   /// Analiz ID'si
   final String analysisId;
+
+  /// Opsiyonel analiz sonucu (doğrudan veri geçmek için)
+  final PlantAnalysisModel? analysisResult;
 
   @override
   State<AnalysisResultScreen> createState() => _AnalysisResultScreenState();
 }
 
 class _AnalysisResultScreenState extends State<AnalysisResultScreen>
-    with SingleTickerProviderStateMixin, _AnalysisScreenResultMixin {
-  // Analiz sonucunu local olarak tutmak için
+    with SingleTickerProviderStateMixin, AnalysisResultScreenMixin {
+  // Analiz sonucunu local olarak tutmak için - AnalysisResultScreenMixin'den geliyor
 
-  // Yazı tipi boyutu için _currentFontSize state içinde tanımlanmalı.
-  // _AnalysisScreenResultMixin içinde initialize ediliyor olabilir veya burada edilebilir.
-  // Örnek olarak burada başlangıç değeri atayalım:
+  // UI state değişkenleri
+  bool _isLoading = true;
+  String? _errorMessage;
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+
+  // Font size kontrolü
+  int _fontSizeLevel = 0;
   double _currentFontSize = AppTextTheme.bodyText2.fontSize ?? 14.0;
+
+  /// Analiz sonucunu tutacak değişken
+  PlantAnalysisModel? _currentAnalysisResult;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
+    );
+    _currentAnalysisResult = widget.analysisResult;
+    _loadAnalysisResult();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+
+    // Mixin'in dispose method'unu da çağır
+    super.dispose();
+  }
+
+  /// Analiz sonucunu yükler
+  Future<void> _loadAnalysisResult() async {
+    try {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+
+      // Eğer widget oluşturulurken analiz sonucu verilmişse, onu kullan
+      if (widget.analysisResult != null) {
+        _currentAnalysisResult = widget.analysisResult;
+        setAnalysisResult(widget.analysisResult);
+        setState(() {
+          _isLoading = false;
+        });
+        _animationController.forward();
+        logAnalysisResult();
+        return;
+      }
+
+      // Repository'den analiz sonucunu yükle
+      final repository = ServiceLocator.get<PlantAnalysisRepository>();
+      final analysisEntity =
+          await repository.getAnalysisResult(widget.analysisId);
+
+      if (analysisEntity != null) {
+        // Entity'den model'e dönüştür (mixin method'unu kullan)
+        final convertedModel = _convertToPlantAnalysisModel(analysisEntity);
+        _currentAnalysisResult = convertedModel;
+        setAnalysisResult(convertedModel);
+
+        setState(() {
+          _isLoading = false;
+        });
+
+        _animationController.forward();
+        logAnalysisResult();
+      } else {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Belirtilen ID ile analiz sonucu bulunamadı';
+        });
+      }
+    } catch (e, stackTrace) {
+      AppLogger.e('Analiz sonucu yükleme hatası', e, stackTrace);
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Analiz yüklenemedi: ${e.toString()}';
+      });
+    }
+  }
 
   //#####
   // _buildInfoRow metodu, genel bilgi satırlarını oluşturmak için kullanılır.
@@ -170,7 +261,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
   //#####
 
   /// Gelişim skoru widget'ı oluşturur
-  Widget _buildGrowthScoreWidget(PlantAnalysisResult result) {
+  Widget _buildGrowthScoreWidget(PlantAnalysisModel result) {
     final score = result.growthScore ?? 0;
     final color = result.getGrowthScoreColor(score);
     final dim = context.dimensions;
@@ -188,6 +279,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Gelişim skoru başlık ve skor
           Row(
             children: [
               Icon(
@@ -205,7 +297,80 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
               ),
             ],
           ),
+
+          // Gelişim aşaması göster (varsa) - VURGULU
+          if (result.growthStage != null && result.growthStage!.isNotEmpty) ...[
+            SizedBox(height: dim.spaceM),
+            Container(
+              padding: EdgeInsets.all(dim.paddingM),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    color.withOpacity(0.15),
+                    color.withOpacity(0.08),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(dim.radiusM),
+                border: Border.all(
+                  color: color.withOpacity(0.4),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(dim.paddingS),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      CupertinoIcons.clock_fill,
+                      color: color,
+                      size: 20,
+                    ),
+                  ),
+                  SizedBox(width: dim.spaceM),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Gelişim Aşaması',
+                          style: AppTextTheme.captionL.copyWith(
+                            color: color.withOpacity(0.8),
+                            fontWeight: FontWeight.w600,
+                            fontSize: _currentFontSize * 0.85,
+                          ),
+                        ),
+                        SizedBox(height: dim.spaceXS),
+                        Text(
+                          result.growthStage!,
+                          style: AppTextTheme.bodyText1.copyWith(
+                            color: color,
+                            fontSize: _currentFontSize * 1.05,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           SizedBox(height: dim.spaceS),
+
           // Progress bar
           Container(
             height: AppConstants.progressBarHeight,
@@ -227,6 +392,8 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
             ),
           ),
           SizedBox(height: dim.spaceS),
+
+          // Genel durum açıklaması
           Text(
             result.getGrowthScoreText(score),
             style: AppTextTheme.bodyText2.copyWith(
@@ -234,6 +401,54 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
               fontSize: _currentFontSize,
             ),
           ),
+
+          // Detaylı gelişim yorumu (varsa)
+          if (result.growthComment != null &&
+              result.growthComment!.isNotEmpty) ...[
+            SizedBox(height: dim.spaceM),
+            Container(
+              padding: EdgeInsets.all(dim.paddingS),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(dim.radiusS),
+                border: Border.all(
+                  color: color.withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        CupertinoIcons.text_bubble_fill,
+                        color: color.withOpacity(0.7),
+                        size: 16,
+                      ),
+                      SizedBox(width: dim.spaceXS),
+                      Text(
+                        'Gelişim Hakkında',
+                        style: AppTextTheme.captionL.copyWith(
+                          color: color.withOpacity(0.8),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: dim.spaceXS),
+                  Text(
+                    result.growthComment!,
+                    style: AppTextTheme.bodyText2.copyWith(
+                      color: AppColors.textSecondary,
+                      fontSize: _currentFontSize * 0.95,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -243,63 +458,104 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
   Widget _buildExpandedDiseaseInfo(Disease disease) {
     final dim = context.dimensions;
 
-    return Container(
-      margin: EdgeInsets.only(top: dim.spaceS),
-      padding: EdgeInsets.all(dim.paddingM),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(dim.radiusM),
-        border: Border.all(
-          color: CupertinoColors.systemGrey4,
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Hastalık Detayları',
-            style: AppTextTheme.bodyText1.copyWith(
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Hastalık açıklaması (varsa)
+        if (disease.description != null && disease.description!.isNotEmpty) ...[
+          Container(
+            padding: EdgeInsets.all(dim.paddingM),
+            decoration: BoxDecoration(
+              color: CupertinoColors.systemBlue.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(dim.radiusM),
+              border: Border.all(
+                color: CupertinoColors.systemBlue.withOpacity(0.2),
+                width: 1,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      CupertinoIcons.info_circle_fill,
+                      color: CupertinoColors.systemBlue,
+                      size: 18,
+                    ),
+                    SizedBox(width: dim.spaceS),
+                    Text(
+                      'Hastalık Detayları',
+                      style: AppTextTheme.bodyText1.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: CupertinoColors.systemBlue,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: dim.spaceS),
+                SelectableText(
+                  disease.description!,
+                  style: AppTextTheme.bodyText2.copyWith(
+                    color: AppColors.textSecondary,
+                    fontSize: _currentFontSize,
+                    height: 1.4,
+                  ),
+                  toolbarOptions: const ToolbarOptions(
+                    copy: true,
+                    selectAll: true,
+                    cut: false,
+                    paste: false,
+                  ),
+                ),
+              ],
             ),
           ),
           SizedBox(height: dim.spaceM),
+        ],
 
-          if (disease.description != null &&
-              disease.description!.isNotEmpty) ...[
-            Text(
-              disease.description!,
-              style: AppTextTheme.bodyText2.copyWith(
-                color: AppColors.textSecondary,
-                fontSize: _currentFontSize,
+        // Tedavi önerileri
+        if (disease.treatments.isNotEmpty) ...[
+          _buildTreatmentSection('Tedavi Önerileri', disease.treatments),
+          SizedBox(height: dim.spaceM),
+
+          // İlaç önerileri (aynı treatments listesini farklı başlıkla göster)
+          _buildTreatmentSection('İlaç Önerileri', disease.treatments),
+        ] else ...[
+          // Tedavi bilgisi yoksa bilgilendirme mesajı
+          Container(
+            padding: EdgeInsets.all(dim.paddingM),
+            decoration: BoxDecoration(
+              color: CupertinoColors.systemYellow.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(dim.radiusM),
+              border: Border.all(
+                color: CupertinoColors.systemYellow.withOpacity(0.3),
+                width: 1,
               ),
             ),
-            SizedBox(height: dim.spaceM),
-          ],
-
-          // Tedavi önerileri
-          if (disease.treatments != null && disease.treatments!.isNotEmpty) ...[
-            _buildTreatmentSection('Tedavi Önerileri', disease.treatments!),
-          ],
-
-          // İlaç önerileri
-          if (disease.pesticideSuggestions != null &&
-              disease.pesticideSuggestions!.isNotEmpty) ...[
-            SizedBox(height: dim.spaceM),
-            _buildTreatmentSection(
-                'İlaç Önerileri', disease.pesticideSuggestions!),
-          ],
-
-          // Önleme yöntemleri
-          if (disease.preventiveMeasures != null &&
-              disease.preventiveMeasures!.isNotEmpty) ...[
-            SizedBox(height: dim.spaceM),
-            _buildTreatmentSection(
-                'Önleme Yöntemleri', disease.preventiveMeasures!),
-          ],
+            child: Row(
+              children: [
+                Icon(
+                  CupertinoIcons.exclamationmark_triangle,
+                  color: CupertinoColors.systemYellow,
+                  size: 20,
+                ),
+                SizedBox(width: dim.spaceS),
+                Expanded(
+                  child: Text(
+                    'Bu hastalık için detaylı tedavi bilgisi henüz mevcut değil. Genel bitki bakım kurallarına uyarak bitkinizin sağlığını koruyabilirsiniz.',
+                    style: AppTextTheme.bodyText2.copyWith(
+                      color: AppColors.textSecondary,
+                      fontSize: _currentFontSize * 0.95,
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
-      ),
+      ],
     );
   }
 
@@ -374,7 +630,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
     );
   }
 
-  Widget _buildHealthInfo(PlantAnalysisResult result) {
+  Widget _buildHealthInfo(PlantAnalysisModel result) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final dim = context.dimensions;
@@ -577,22 +833,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                       iconColor: AppColors.primary,
                     ),
 
-                    // Gelişim Skoru bölümü
-                    if (result.growthScore != null) ...[
-                      SizedBox(height: dim.spaceM),
-                      _buildGrowthScoreWidget(result),
-                    ],
-
-                    if (result.growthStage != null &&
-                        result.growthStage!.isNotEmpty) ...[
-                      SizedBox(height: dim.spaceM),
-                      InfoCardItem(
-                        icon: CupertinoIcons.chart_bar_alt_fill,
-                        title: 'Gelişim Aşaması',
-                        value: result.growthStage!,
-                        iconColor: AppColors.success,
-                      ),
-                    ],
+                    // Gelişim bilgileri _buildCareInfo içinde gösteriliyor, burada duplikasyon kaldırıldı
                   ],
                 ),
               ),
@@ -797,6 +1038,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                       ],
                     ),
                     children: [
+                      // Detaylı hastalık bilgisi için _buildExpandedDiseaseInfo widget'ını kullan
                       Container(
                         color: CupertinoColors.systemGrey6.withOpacity(0.3),
                         padding: EdgeInsets.only(
@@ -804,165 +1046,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                             bottom: dim.paddingM,
                             left: dim.paddingM,
                             right: dim.paddingM),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (disease.description != null &&
-                                disease.description!.isNotEmpty) ...[
-                              _buildDetailSection(
-                                icon: CupertinoIcons.info_circle_fill,
-                                title: 'Hastalık Detayları',
-                                iconColor: CupertinoColors.systemIndigo,
-                                content: disease.description!,
-                                selectable: true,
-                              ),
-                              Divider(
-                                  height: dim.spaceL,
-                                  thickness: 0.5,
-                                  color: CupertinoColors.systemGrey4
-                                      .withOpacity(0.5)),
-                            ],
-                            // Gerçek Disease verilerini kullan - her hastalık için farklı öneriler
-                            () {
-                              final List<Widget> treatmentWidgets = [];
-
-                              // 1. Genel Tedavi Önerileri (Disease.treatments)
-                              if (disease.treatments != null &&
-                                  disease.treatments!.isNotEmpty) {
-                                treatmentWidgets.add(
-                                  _buildMethodsList(
-                                    baseIcon: CupertinoIcons.wand_stars,
-                                    title: 'Tedavi Yöntemleri',
-                                    iconColor: CupertinoColors.activeGreen,
-                                    methods: disease.treatments!,
-                                  ),
-                                );
-                              }
-
-                              // 2. Müdahale Yöntemleri (Disease.interventionMethods)
-                              if (disease.interventionMethods != null &&
-                                  disease.interventionMethods!.isNotEmpty) {
-                                if (treatmentWidgets.isNotEmpty) {
-                                  treatmentWidgets.add(Divider(
-                                      height: dim.spaceL,
-                                      thickness: 0.5,
-                                      color: CupertinoColors.systemGrey4
-                                          .withOpacity(0.5)));
-                                }
-                                treatmentWidgets.add(
-                                  _buildMethodsList(
-                                    baseIcon: CupertinoIcons.gear_alt_fill,
-                                    title: 'Müdahale Yöntemleri',
-                                    iconColor: CupertinoColors.systemBlue,
-                                    methods: disease.interventionMethods!,
-                                  ),
-                                );
-                              }
-
-                              // 3. İlaç Önerileri (Disease.pesticideSuggestions)
-                              if (disease.pesticideSuggestions != null &&
-                                  disease.pesticideSuggestions!.isNotEmpty) {
-                                if (treatmentWidgets.isNotEmpty) {
-                                  treatmentWidgets.add(Divider(
-                                      height: dim.spaceL,
-                                      thickness: 0.5,
-                                      color: CupertinoColors.systemGrey4
-                                          .withOpacity(0.5)));
-                                }
-                                treatmentWidgets.add(
-                                  _buildMethodsList(
-                                    baseIcon: CupertinoIcons.bandage_fill,
-                                    title: 'İlaç Önerileri',
-                                    iconColor: AppColors.info,
-                                    methods: disease.pesticideSuggestions!,
-                                  ),
-                                );
-                              }
-
-                              // 4. Önleme Yöntemleri (Disease.preventiveMeasures)
-                              if (disease.preventiveMeasures != null &&
-                                  disease.preventiveMeasures!.isNotEmpty) {
-                                if (treatmentWidgets.isNotEmpty) {
-                                  treatmentWidgets.add(Divider(
-                                      height: dim.spaceL,
-                                      thickness: 0.5,
-                                      color: CupertinoColors.systemGrey4
-                                          .withOpacity(0.5)));
-                                }
-                                treatmentWidgets.add(
-                                  _buildMethodsList(
-                                    baseIcon: CupertinoIcons.shield_fill,
-                                    title: 'Önleme Yöntemleri',
-                                    iconColor: CupertinoColors.systemOrange,
-                                    methods: disease.preventiveMeasures!,
-                                  ),
-                                );
-                              }
-
-                              // 5. Belirtiler (Disease.symptoms)
-                              if (disease.symptoms != null &&
-                                  disease.symptoms!.isNotEmpty) {
-                                if (treatmentWidgets.isNotEmpty) {
-                                  treatmentWidgets.add(Divider(
-                                      height: dim.spaceL,
-                                      thickness: 0.5,
-                                      color: CupertinoColors.systemGrey4
-                                          .withOpacity(0.5)));
-                                }
-                                treatmentWidgets.add(
-                                  _buildMethodsList(
-                                    baseIcon: CupertinoIcons.eye_fill,
-                                    title: 'Hastalık Belirtileri',
-                                    iconColor: CupertinoColors.systemRed,
-                                    methods: disease.symptoms!,
-                                  ),
-                                );
-                              }
-
-                              // Eğer hiç veri yoksa uyarı mesajı göster
-                              if (treatmentWidgets.isEmpty) {
-                                treatmentWidgets.add(
-                                  Container(
-                                    padding: EdgeInsets.all(dim.paddingM),
-                                    decoration: BoxDecoration(
-                                      color: CupertinoColors.systemYellow
-                                          .withOpacity(0.1),
-                                      borderRadius:
-                                          BorderRadius.circular(dim.radiusM),
-                                      border: Border.all(
-                                        color: CupertinoColors.systemYellow
-                                            .withOpacity(0.3),
-                                        width: 1,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          CupertinoIcons.info_circle,
-                                          color: CupertinoColors.systemYellow,
-                                          size: 20,
-                                        ),
-                                        SizedBox(width: dim.spaceS),
-                                        Expanded(
-                                          child: Text(
-                                            'Bu hastalık için detaylı tedavi bilgisi henüz mevcut değil. Genel bitki bakım kurallarına uyarak bitkinizin sağlığını koruyabilirsiniz.',
-                                            style:
-                                                AppTextTheme.bodyText2.copyWith(
-                                              color: AppColors.textSecondary,
-                                              fontSize: _currentFontSize * 0.95,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              }
-
-                              return Column(children: treatmentWidgets);
-                            }(),
-                          ],
-                        ),
+                        child: _buildExpandedDiseaseInfo(disease),
                       ),
                     ],
                   ),
@@ -1057,7 +1141,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
       );
     }
 
-    final result = _analysisResult;
+    final result = _currentAnalysisResult;
     if (result == null) {
       return CupertinoPageScaffold(
         navigationBar: CupertinoNavigationBar(
@@ -1078,7 +1162,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
   }
 
   /// Analiz sonucu ekranını oluşturur
-  Widget _buildResultScreen(BuildContext context, PlantAnalysisResult result) {
+  Widget _buildResultScreen(BuildContext context, PlantAnalysisModel result) {
     final dim = context.dimensions;
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
@@ -1129,18 +1213,35 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                           ),
                         ],
                       ),
-                      child: result.imageUrl.isNotEmpty
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(dim.radiusL),
-                              child: _buildImageWidget(result.imageUrl),
-                            )
-                          : const Center(
-                              child: Icon(
-                                CupertinoIcons.photo,
-                                size: 64,
-                                color: CupertinoColors.systemGrey,
-                              ),
+                      child: () {
+                        print('🔍 Image URL Debug:');
+                        print('  - URL: ${result.imageUrl}');
+                        print('  - URL Length: ${result.imageUrl.length}');
+                        print('  - Is Empty: ${result.imageUrl.isEmpty}');
+                        print(
+                            '  - Starts with data:image: ${result.imageUrl.startsWith('data:image')}');
+                        print(
+                            '  - Starts with file://: ${result.imageUrl.startsWith('file://')}');
+                        print(
+                            '  - Starts with http: ${result.imageUrl.startsWith('http')}');
+
+                        if (result.imageUrl.isNotEmpty) {
+                          return ClipRRect(
+                            borderRadius: BorderRadius.circular(dim.radiusL),
+                            child: _buildImageWidget(result.imageUrl),
+                          );
+                        } else {
+                          print(
+                              '  - ❌ Image URL is empty, showing placeholder');
+                          return const Center(
+                            child: Icon(
+                              CupertinoIcons.photo,
+                              size: 64,
+                              color: CupertinoColors.systemGrey,
                             ),
+                          );
+                        }
+                      }(),
                     ),
                   ),
                 ),
@@ -1274,7 +1375,14 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
 
   /// Görüntüyü uygun şekilde oluşturur (base64 veya network)
   Widget _buildImageWidget(String imageUrl) {
+    print('🔍 _buildImageWidget called with URL: $imageUrl');
+    print('  - URL length: ${imageUrl.length}');
+    print('  - Starts with data:image: ${imageUrl.startsWith('data:image')}');
+    print('  - Starts with file://: ${imageUrl.startsWith('file://')}');
+    print('  - Starts with http: ${imageUrl.startsWith('http')}');
+
     if (imageUrl.startsWith('data:image')) {
+      print('  - 🖼️ Processing as base64 image');
       try {
         final base64String = imageUrl.split(',')[1];
         final imageBytes = base64Decode(base64String);
@@ -1303,12 +1411,17 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
         );
       }
     } else if (imageUrl.startsWith('file://')) {
+      print('  - 📁 Processing as file path');
       try {
         final filePath = imageUrl.replaceFirst('file://', '');
+        print('  - Extracted file path: $filePath');
+        print('  - File exists: ${File(filePath).existsSync()}');
+
         return Image.file(
           File(filePath),
           fit: BoxFit.cover,
           errorBuilder: (context, error, stackTrace) {
+            print('  - ❌ File image error: $error');
             AppLogger.e('Dosya görüntü hatası: $error', error, stackTrace);
             return const Center(
               child: Icon(
@@ -1320,6 +1433,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
           },
         );
       } catch (e) {
+        print('  - ❌ File processing exception: $e');
         AppLogger.e('Dosya görüntü hatası', e);
         return const Center(
           child: Icon(
@@ -1330,6 +1444,9 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
         );
       }
     } else {
+      print(
+          '  - 🌐 Processing as network URL (this should NOT happen for file:// URLs!)');
+      print('  - URL being processed as network: $imageUrl');
       return Image.network(
         imageUrl,
         fit: BoxFit.cover,
@@ -1359,7 +1476,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
   }
 
   /// Sağlık durumu widget'ı
-  Widget _buildHealthStatusWidget(PlantAnalysisResult result) {
+  Widget _buildHealthStatusWidget(PlantAnalysisModel result) {
     final dim = context.dimensions;
     return Container(
       margin: EdgeInsets.symmetric(vertical: dim.spaceL),
@@ -1417,17 +1534,38 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
   }
 
   // Bakım bilgileri widget'ı
-  Widget _buildCareInfo(PlantAnalysisResult result) {
+  Widget _buildCareInfo(PlantAnalysisModel result) {
     final dim = context.dimensions;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Gelişim skoru ve aşaması - Sadece gerçek veri varsa göster
-        if (result.growthScore != null || result.growthStage != null) ...[
-          _buildGrowthScoreWidget(result),
-          SizedBox(height: dim.spaceL),
-        ],
+        // Gelişim skoru ve aşaması debug ve gösterim
+        () {
+          final hasGrowthScore = result.growthScore != null;
+          final hasGrowthStage = result.growthStage != null;
+          final hasGrowthComment =
+              result.growthComment != null && result.growthComment!.isNotEmpty;
+
+          print('🔍 UI Growth Debug:');
+          print('  - Score: ${result.growthScore} (has: $hasGrowthScore)');
+          print('  - Stage: ${result.growthStage} (has: $hasGrowthStage)');
+          print(
+              '  - Comment: ${result.growthComment} (has: $hasGrowthComment)');
+
+          if (hasGrowthScore || hasGrowthStage || hasGrowthComment) {
+            print('  - ✅ Showing growth score widget');
+            return Column(
+              children: [
+                _buildGrowthScoreWidget(result),
+                SizedBox(height: dim.spaceL),
+              ],
+            );
+          } else {
+            print('  - ❌ Not showing growth score widget - all null/empty');
+            return const SizedBox.shrink();
+          }
+        }(),
 
         // Bakım bilgileri - Sadece gerçek veri olan alanları göster
         () {
@@ -1609,7 +1747,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
 
   /// Bitki açıklamasını oluşturan widget
   Widget _buildDescriptionSection() {
-    final result = _analysisResult;
+    final result = _currentAnalysisResult;
     if (result == null) return const SizedBox.shrink();
 
     String description = result.description;
@@ -1832,7 +1970,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
   }
 
   /// Gelişmiş tarımsal bilgilerin var olup olmadığını kontrol eder
-  bool _hasAdvancedAgriculturalInfo(PlantAnalysisResult result) {
+  bool _hasAdvancedAgriculturalInfo(PlantAnalysisModel result) {
     return result.diseaseName != null ||
         result.diseaseDescription != null ||
         result.treatmentName != null ||
@@ -1849,7 +1987,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
   }
 
   /// Gelişmiş tarımsal bilgiler bölümünü oluşturur
-  Widget _buildAdvancedAgriculturalInfo(PlantAnalysisResult result) {
+  Widget _buildAdvancedAgriculturalInfo(PlantAnalysisModel result) {
     final dim = context.dimensions;
 
     return Container(
@@ -1894,7 +2032,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                 ),
                 SizedBox(width: dim.spaceM),
                 Text(
-                  'Gelişmiş Tarımsal Analiz',
+                  'Tespit Edilen Hastalıklar',
                   style: AppTextTheme.headline5.copyWith(
                     fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary,

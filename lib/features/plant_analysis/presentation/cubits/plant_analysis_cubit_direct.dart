@@ -133,61 +133,70 @@ class PlantAnalysisCubitDirect extends Cubit<PlantAnalysisState> {
         fieldName: fieldName,
       );
 
+      print(
+          '  - Analysis model imageUrl from Gemini: ${analysisModel.imageUrl}');
+
       AppLogger.successWithContext(
         _serviceName,
         '🎉 Direct AI analysis completed',
         'Plant: ${analysisModel.plantName}, Health: ${analysisModel.isHealthy}',
       );
 
-      // === STEP 4: SAVE TO REPOSITORY ===
+      // === STEP 4: USE DIRECT RESULT FOR NOW (BYPASS REPOSITORY PARSING) ===
       emit(PlantAnalysisAnalyzing(
-        progressMessage: 'Saving analysis result...',
+        progressMessage: 'Finalizing analysis...',
         progress: 0.9,
       ));
 
-      // Convert model to entity for saving
-      final analysisEntity = analysisModel.toEntity();
+      // Convert model to entity with proper ID and image URL
+      print('🔍 Image File Debug:');
+      print('  - Image file path: ${imageFile.path}');
+      print('  - Image file exists: ${await imageFile.exists()}');
+      print('  - Analysis model imageUrl before: ${analysisModel.imageUrl}');
 
-      // Try to save to repository (non-blocking)
+      final updatedModel = analysisModel.copyWith(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        timestamp: DateTime.now().millisecondsSinceEpoch,
+        imageUrl:
+            'file://${imageFile.path}', // Set the image file path with file:// prefix
+      );
+
+      print(
+          '  - Updated model imageUrl after copyWith: ${updatedModel.imageUrl}');
+
+      final analysisEntity = updatedModel.toEntity();
+
+      print(
+          '  - Analysis entity imageUrl after toEntity: ${analysisEntity.imageUrl}');
+
+      // Emit success with direct result (bypass repository for now)
+      emit(PlantAnalysisSuccess(
+        currentAnalysis: analysisEntity,
+        message: 'Analysis completed! 🌱',
+      ));
+
+      AppLogger.successWithContext(
+        _serviceName,
+        '✅ Using direct analysis result (bypassing repository)',
+        'Plant: ${analysisEntity.plantName}',
+      );
+
+      // Try to save to repository in background (non-blocking)
       try {
         final savedEntity = await _repository.analyzeAndSave(imageFile, user);
         if (savedEntity != null) {
           AppLogger.successWithContext(
             _serviceName,
-            '💾 Analysis saved to repository',
+            '💾 Analysis saved to repository in background',
             'ID: ${savedEntity.id}, Plant: ${savedEntity.plantName}',
           );
-
-          // Use saved entity (has proper ID from repository)
-          emit(PlantAnalysisSuccess(
-            currentAnalysis: savedEntity,
-            message: 'Analysis completed and saved! 🌱',
-          ));
-        } else {
-          // If save failed, still show result but log warning
-          AppLogger.warnWithContext(
-            _serviceName,
-            '⚠️ Analysis could not be saved, showing temporary result',
-            'Plant: ${analysisEntity.plantName}',
-          );
-
-          emit(PlantAnalysisSuccess(
-            currentAnalysis: analysisEntity,
-            message: 'Analysis completed! 🌱',
-          ));
         }
       } catch (saveError) {
-        // If save fails, still show the analysis result
         AppLogger.warnWithContext(
           _serviceName,
-          '⚠️ Save failed, showing temporary result',
+          '⚠️ Background save failed (but user sees correct result)',
           saveError.toString(),
         );
-
-        emit(PlantAnalysisSuccess(
-          currentAnalysis: analysisEntity,
-          message: 'Analysis completed! 🌱',
-        ));
       }
 
       AppLogger.successWithContext(

@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -9,9 +8,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import '../models/user_model.dart';
 import '../../features/plant_analysis/domain/entities/plant_analysis_entity.dart';
 import '../../features/plant_analysis/data/models/plant_analysis_model.dart';
-import '../../features/plant_analysis/data/models/plant_analysis_result.dart';
-import '../../features/plant_analysis/data/models/disease_model.dart'
-    as new_disease;
+
 import '../../features/plant_analysis/services/plant_analysis_service.dart';
 import '../services/firestore/firestore_service_interface.dart';
 import '../utils/logger.dart';
@@ -426,34 +423,8 @@ class PlantAnalysisRepositoryImpl implements PlantAnalysisRepository {
           analysisResponse.fieldName,
         );
 
-        // PlantAnalysisResult'tan PlantAnalysisModel'e dönüştür
-        analysisModel = PlantAnalysisModel(
-          id: '',
-          plantName: plantAnalysisResult.plantName,
-          probability: plantAnalysisResult.probability,
-          isHealthy: plantAnalysisResult.isHealthy,
-          diseases: _convertDiseases(plantAnalysisResult.diseases),
-          description: plantAnalysisResult.description,
-          suggestions: plantAnalysisResult.suggestions,
-          imageUrl: plantAnalysisResult.imageUrl,
-          similarImages: plantAnalysisResult.similarImages,
-          timestamp: DateTime.now().millisecondsSinceEpoch,
-          // Ek detaylı alanlar
-          watering: plantAnalysisResult.watering,
-          sunlight: plantAnalysisResult.sunlight,
-          soil: plantAnalysisResult.soil,
-          climate: plantAnalysisResult.climate,
-          growthStage: plantAnalysisResult.growthStage,
-          growthScore: plantAnalysisResult.growthScore,
-          growthComment: plantAnalysisResult.growthComment,
-          interventionMethods: plantAnalysisResult.interventionMethods,
-          agriculturalTips: plantAnalysisResult.agriculturalTips,
-          regionalInfo: plantAnalysisResult.regionalInfo,
-          location: plantAnalysisResult.location,
-          fieldName: plantAnalysisResult.fieldName,
-          geminiAnalysis:
-              analysisResponse.result, // Ham Gemini yanıtını da sakla
-        );
+        // PlantAnalysisModel'den PlantAnalysisModel'e dönüştür (artık aynı model)
+        analysisModel = plantAnalysisResult;
 
         AppLogger.logWithContext(
           _serviceName,
@@ -543,17 +514,9 @@ class PlantAnalysisRepositoryImpl implements PlantAnalysisRepository {
         fieldName: null,
       );
 
-      // Convert to model then entity with proper disease conversion
-      final analysisModel = PlantAnalysisModel(
+      // analysisResult zaten PlantAnalysisModel, ID'sini güncelle
+      final analysisModel = analysisResult.copyWith(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
-        plantName: analysisResult.plantName,
-        probability: analysisResult.probability,
-        isHealthy: analysisResult.isHealthy,
-        diseases: _convertDiseases(analysisResult.diseases),
-        description: analysisResult.description,
-        suggestions: analysisResult.suggestions,
-        imageUrl: analysisResult.imageUrl,
-        similarImages: analysisResult.similarImages,
         timestamp: DateTime.now().millisecondsSinceEpoch,
       );
 
@@ -1176,21 +1139,8 @@ class PlantAnalysisRepositoryImpl implements PlantAnalysisRepository {
   // PRIVATE HELPER METHODS
   // ============================================================================
 
-  /// Eski Disease modellerini yeni Disease modellerine dönüştürür
-  List<new_disease.Disease> _convertDiseases(List<Disease> oldDiseases) {
-    return oldDiseases.map((oldDisease) {
-      return new_disease.Disease(
-        name: oldDisease.name,
-        probability: oldDisease.probability ?? 0.0,
-        description: oldDisease.description ?? '',
-        treatments: oldDisease.treatments ?? [],
-        severity: new_disease.DiseaseSeverity.fromString(oldDisease.severity),
-      );
-    }).toList();
-  }
-
-  /// Gemini servisinden dönen JSON yanıtını PlantAnalysisResult'a parse eder
-  Future<PlantAnalysisResult> _parseGeminiResponse(
+  /// Gemini servisinden dönen JSON yanıtını PlantAnalysisModel'a parse eder
+  Future<PlantAnalysisModel> _parseGeminiResponse(
     String geminiJsonResponse,
     String imageUrl,
     String location,
@@ -1227,7 +1177,7 @@ class PlantAnalysisRepositoryImpl implements PlantAnalysisRepository {
       );
 
       // Parse hata durumunda fallback response döndür
-      return PlantAnalysisResult.createEmpty(
+      return PlantAnalysisModel.createEmpty(
         imageUrl: imageUrl,
         location: location,
         fieldName: fieldName,

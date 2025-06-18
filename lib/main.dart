@@ -343,16 +343,14 @@ class _TatarAIState extends State<TatarAI> {
           AppLogger.i(
               '🏗️ PlantAnalysisCubit ServiceLocator\'dan oluşturuluyor');
           try {
-            // PlantAnalysisCubitDirect'i manuel olarak oluştur
-            final plantAnalysisCubit = PlantAnalysisCubitDirect(
-              geminiService: Services.geminiService as GeminiServiceInterface,
-              repository: Services.plantAnalysisRepository,
-            );
-            AppLogger.i('✅ PlantAnalysisCubitDirect başarıyla oluşturuldu');
+            // ServiceLocator'dan PlantAnalysisCubitDirect'i al
+            final plantAnalysisCubit = Services.plantAnalysisCubitDirect;
+            AppLogger.i(
+                '✅ PlantAnalysisCubitDirect ServiceLocator\'dan alındı');
             return plantAnalysisCubit;
           } catch (e, stackTrace) {
-            AppLogger.e(
-                '❌ PlantAnalysisCubitDirect oluşturma hatası', e, stackTrace);
+            AppLogger.e('❌ ServiceLocator PlantAnalysisCubitDirect hatası', e,
+                stackTrace);
             AppLogger.w(
                 '⚠️ Fallback PlantAnalysisCubitDirect oluşturuluyor...');
 
@@ -360,21 +358,15 @@ class _TatarAIState extends State<TatarAI> {
             try {
               return PlantAnalysisCubitDirect(
                 geminiService: Services.geminiService as GeminiServiceInterface,
-                repository: PlantAnalysisRepositoryImpl(
-                  firestoreService: Services.firestore,
-                  analysisService: PlantAnalysisService(
-                    geminiService: Services.geminiService,
-                    firestore: Services.firebaseFirestore,
-                    storage: FirebaseStorage.instance, // Fallback
-                  ),
-                ),
+                repository: Services.plantAnalysisRepository,
               );
             } catch (fallbackError) {
               AppLogger.e(
                   '❌ Fallback PlantAnalysisCubitDirect de oluşturulamadı',
                   fallbackError);
-              // Son çare: Boş repository ile cubit oluştur
-              rethrow;
+              // Son çare: Empty state cubit oluştur
+              throw Exception(
+                  'PlantAnalysisCubitDirect oluşturulamadı: $fallbackError');
             }
           }
         },

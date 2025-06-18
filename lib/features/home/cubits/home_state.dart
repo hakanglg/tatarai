@@ -1,6 +1,7 @@
 import '../../../core/base/base_state.dart';
 import '../../../core/models/user_model.dart';
-import '../../plant_analysis/data/models/plant_analysis_result.dart';
+import '../../plant_analysis/data/models/plant_analysis_model.dart';
+import 'package:equatable/equatable.dart';
 
 /// Home screen state yönetimi
 ///
@@ -10,7 +11,7 @@ import '../../plant_analysis/data/models/plant_analysis_result.dart';
 ///
 /// State özellikleri:
 /// - Kullanıcı bilgileri (UserModel)
-/// - Son analizler listesi (PlantAnalysisResult)
+/// - Son analizler listesi (PlantAnalysisModel)
 /// - Loading durumu (inherited)
 /// - Error mesajları (inherited)
 ///
@@ -30,7 +31,7 @@ class HomeState extends BaseState {
   /// - Kullanıcı hiç analiz yapmamışsa
   /// - Analizler henüz yüklenmemişse
   /// - Network hatası durumunda
-  final List<PlantAnalysisResult> recentAnalyses;
+  final List<PlantAnalysisModel> recentAnalyses;
 
   /// Home screen data refresh durumu
   ///
@@ -77,7 +78,7 @@ class HomeState extends BaseState {
   /// [clearAnalyses] - analiz listesini temizlemek için
   HomeState copyWith({
     UserModel? user,
-    List<PlantAnalysisResult>? recentAnalyses,
+    List<PlantAnalysisModel>? recentAnalyses,
     bool? isLoading,
     bool? isRefreshing,
     DateTime? lastRefreshTime,

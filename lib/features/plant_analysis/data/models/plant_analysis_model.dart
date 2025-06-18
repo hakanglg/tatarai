@@ -176,8 +176,55 @@ class PlantAnalysisModel {
   });
 
   /// JSON'dan PlantAnalysisModel oluşturur
+  /// Helper method to parse double values from JSON (supports both string and number)
+  static double _parseDoubleValue(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) {
+      return double.tryParse(value) ?? 0.0;
+    }
+    return 0.0;
+  }
+
+  /// Helper method to parse boolean values from JSON (supports both string and boolean)
+  static bool _parseBoolValue(dynamic value) {
+    if (value == null) return true; // Default to healthy
+    if (value is bool) return value;
+    if (value is String) {
+      final lowerValue = value.toLowerCase();
+      return lowerValue == 'true' || lowerValue == '1' || lowerValue == 'yes';
+    }
+    if (value is int) return value != 0;
+    return true; // Default to healthy
+  }
+
+  /// Helper method to parse integer values from JSON (supports both string and number)
+  static int _parseIntValue(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) {
+      return int.tryParse(value) ?? 0;
+    }
+    return 0;
+  }
+
   factory PlantAnalysisModel.fromJson(Map<String, dynamic> json) {
     try {
+      // Debug: Test user's specific JSON
+      print('🔍 PlantAnalysisModel.fromJson START');
+      print('🔍 JSON keys: ${json.keys.toList()}');
+      print('🔍 plantName raw: ${json['plantName']}');
+      print('🔍 isHealthy raw: ${json['isHealthy']}');
+      print('🔍 probability raw: ${json['probability']}');
+      print(
+          '🔍 growthScore raw: ${json['growthScore']} (type: ${json['growthScore']?.runtimeType})');
+      print(
+          '🔍 growthStage raw: ${json['growthStage']} (type: ${json['growthStage']?.runtimeType})');
+      print(
+          '🔍 growthComment raw: ${json['growthComment']} (type: ${json['growthComment']?.runtimeType})');
+
       // Diseases parsing
       List<Disease> diseases = [];
       if (json['diseases'] != null) {
@@ -197,9 +244,8 @@ class PlantAnalysisModel {
         id: json['id'] as String? ?? '',
         plantName:
             json['plant_name'] as String? ?? json['plantName'] as String? ?? '',
-        probability: (json['probability'] as num?)?.toDouble() ?? 0.0,
-        isHealthy:
-            json['is_healthy'] as bool? ?? json['isHealthy'] as bool? ?? true,
+        probability: _parseDoubleValue(json['probability']),
+        isHealthy: _parseBoolValue(json['is_healthy'] ?? json['isHealthy']),
         diseases: diseases,
         description: json['description'] as String? ?? '',
         suggestions: List<String>.from(json['suggestions'] as List? ?? []),
@@ -227,7 +273,7 @@ class PlantAnalysisModel {
         growthStage:
             json['growth_stage'] as String? ?? json['growthStage'] as String?,
         growthScore:
-            json['growth_score'] as int? ?? json['growthScore'] as int?,
+            _parseIntValue(json['growth_score'] ?? json['growthScore']),
         growthComment: json['growth_comment'] as String? ??
             json['growthComment'] as String?,
         timestamp: json['timestamp'] as int?,
@@ -265,8 +311,24 @@ class PlantAnalysisModel {
         agriculturalTip: json['agriculturalTip'] as String? ??
             json['agricultural_tip'] as String?,
       );
-    } catch (e) {
-      throw FormatException('PlantAnalysisModel.fromJson parse error: $e');
+
+      // Success debug'unu constructor'dan sonra yapamayız, çünkü direkt return ediliyor
+      print('🔍 PlantAnalysisModel.fromJson SUCCESS - will return model');
+    } catch (e, stackTrace) {
+      // Debug için JSON içeriğini loglayalım
+      print('🚨 PlantAnalysisModel.fromJson parse error: $e');
+      print('🔍 JSON keys: ${json.keys.toList()}');
+      print(
+          '🔍 JSON plantName: ${json['plantName']} (type: ${json['plantName']?.runtimeType})');
+      print(
+          '🔍 JSON isHealthy: ${json['isHealthy']} (type: ${json['isHealthy']?.runtimeType})');
+      print(
+          '🔍 JSON probability: ${json['probability']} (type: ${json['probability']?.runtimeType})');
+      print(
+          '🔍 Stack trace first line: ${stackTrace.toString().split('\n').first}');
+
+      throw FormatException(
+          'PlantAnalysisModel.fromJson parse error: $e\nJSON keys: ${json.keys.toList()}');
     }
   }
 
@@ -348,6 +410,10 @@ class PlantAnalysisModel {
       suggestion: suggestion,
       intervention: intervention,
       agriculturalTip: agriculturalTip,
+      // Growth alanları
+      growthScore: growthScore,
+      growthStage: growthStage,
+      growthComment: growthComment,
     );
   }
 
@@ -380,6 +446,10 @@ class PlantAnalysisModel {
       suggestion: entity.suggestion,
       intervention: entity.intervention,
       agriculturalTip: entity.agriculturalTip,
+      // Growth alanları
+      growthScore: entity.growthScore,
+      growthStage: entity.growthStage,
+      growthComment: entity.growthComment,
     );
   }
 
@@ -475,5 +545,165 @@ class PlantAnalysisModel {
   @override
   String toString() {
     return 'PlantAnalysisModel(id: $id, plantName: $plantName, isHealthy: $isHealthy)';
+  }
+
+  /// Boş bir analiz sonucu oluşturur
+  static PlantAnalysisModel createEmpty({
+    required String imageUrl,
+    required String location,
+    String? fieldName,
+    String? errorMessage,
+    String? originalText,
+  }) {
+    return PlantAnalysisModel(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      plantName: 'Analiz edilemedi',
+      probability: 0,
+      isHealthy: false,
+      diseases: [],
+      description: errorMessage ?? 'Görüntü analiz edilemedi',
+      suggestions: [
+        'Analiz yapılamadı. Lütfen daha net bir görüntü ile tekrar deneyin.',
+        'Farklı bir açıdan çekim yapmayı deneyebilirsiniz.',
+      ],
+      imageUrl: imageUrl,
+      similarImages: [],
+      location: location,
+      fieldName: fieldName,
+      timestamp: DateTime.now().millisecondsSinceEpoch,
+      // Yeni alanlar - empty değerler
+      diseaseName: null,
+      diseaseDescription: null,
+      treatmentName: null,
+      dosagePerDecare: null,
+      applicationMethod: null,
+      applicationTime: null,
+      applicationFrequency: null,
+      waitingPeriod: null,
+      effectiveness: null,
+      notes: null,
+      suggestion: null,
+      intervention: null,
+      agriculturalTip: null,
+    );
+  }
+}
+
+/// PlantAnalysisModel için UI yardımcı metodları
+extension PlantAnalysisModelUIExtension on PlantAnalysisModel {
+  /// Bitkinin genel durumunu gösteren emoji
+  String get healthEmoji => isHealthy ? '🌱' : '🤒';
+
+  /// Bitkinin durumunu açıklayan metin
+  String get healthStatusText => isHealthy
+      ? 'Sağlıklı Bitki'
+      : diseases.isNotEmpty
+          ? '${diseases.length} Hastalık Tespit Edildi'
+          : 'Sağlık Durumu Belirsiz';
+
+  /// Bitkinin durumunu gösteren renk (tema renklerine bağlı)
+  String get healthColorName => isHealthy ? 'success' : 'error';
+
+  /// Eğer varsa, hastalıkları ve olasılıklarını formatlı metin olarak döndürür
+  String get formattedDiseases {
+    if (diseases.isEmpty) return 'Hastalık tespit edilmedi';
+
+    return diseases.map((disease) {
+      final percentage = disease.probability != null
+          ? (disease.probability! * 100).toStringAsFixed(0)
+          : '0';
+      return '${disease.name} (%$percentage)';
+    }).join(', ');
+  }
+
+  /// Ana bakım önerilerini formatlı bir şekilde döndürür
+  List<String> get formattedSuggestions {
+    final List<String> result = [];
+
+    // Eğer öneriler varsa, ilk 5'ini al
+    if (suggestions.isNotEmpty) {
+      result.addAll(suggestions.take(5));
+    }
+
+    // Eğer müdahale yöntemleri varsa ve listemiz hala kısa ise, onları da ekle
+    if (interventionMethods != null &&
+        interventionMethods!.isNotEmpty &&
+        result.length < 7) {
+      result.addAll(interventionMethods!.take(7 - result.length));
+    }
+
+    return result;
+  }
+
+  /// Gelişim durumunu yüzdelik olarak göster
+  String get growthPercentage {
+    if (growthScore == null) return 'Belirtilmemiş';
+    return '%$growthScore';
+  }
+
+  /// Detaylı yetiştirme bilgilerini özet halinde döndürür
+  Map<String, String> get careDetails {
+    return {
+      'Sulama': watering ?? 'Belirtilmemiş',
+      'Işık': sunlight ?? 'Belirtilmemiş',
+      'Toprak': soil ?? 'Belirtilmemiş',
+      'İklim': climate ?? 'Belirtilmemiş',
+    };
+  }
+
+  /// Eğer herhangi bir bakım önerisi varsa true döndürür
+  bool get hasCareInformation {
+    return watering != null ||
+        sunlight != null ||
+        soil != null ||
+        climate != null ||
+        (suggestions.isNotEmpty) ||
+        (interventionMethods != null && interventionMethods!.isNotEmpty) ||
+        (agriculturalTips != null && agriculturalTips!.isNotEmpty);
+  }
+
+  /// Tam tarih ve saat bilgisini formatlar
+  String get formattedDate {
+    if (timestamp == null) return 'Belirtilmemiş';
+
+    final dateTime = DateTime.fromMillisecondsSinceEpoch(timestamp!);
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inDays == 0) {
+      // Bugün
+      return 'Bugün ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+    } else if (difference.inDays == 1) {
+      // Dün
+      return 'Dün ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+    } else if (difference.inDays < 7) {
+      // Bu hafta
+      return '${_getDayName(dateTime.weekday)} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+    } else {
+      // Daha eski
+      return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
+    }
+  }
+
+  /// Günün adını döndürür
+  String _getDayName(int weekday) {
+    switch (weekday) {
+      case 1:
+        return 'Pazartesi';
+      case 2:
+        return 'Salı';
+      case 3:
+        return 'Çarşamba';
+      case 4:
+        return 'Perşembe';
+      case 5:
+        return 'Cuma';
+      case 6:
+        return 'Cumartesi';
+      case 7:
+        return 'Pazar';
+      default:
+        return '';
+    }
   }
 }

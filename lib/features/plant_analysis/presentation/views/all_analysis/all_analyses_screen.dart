@@ -5,7 +5,7 @@ import 'package:tatarai/core/theme/dimensions.dart';
 import 'package:tatarai/core/theme/text_theme.dart';
 import 'package:tatarai/core/widgets/app_button.dart';
 import 'package:tatarai/features/plant_analysis/presentation/cubits/plant_analysis_cubit_direct.dart';
-import 'package:tatarai/features/plant_analysis/data/models/plant_analysis_result.dart'
+import 'package:tatarai/features/plant_analysis/data/models/plant_analysis_model.dart'
     as model;
 import 'package:tatarai/features/plant_analysis/data/models/disease_model.dart'
     as entity_disease;
@@ -71,17 +71,16 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen> {
     );
   }
 
-  /// Converts PlantAnalysisEntity to PlantAnalysisResult
+  /// Converts PlantAnalysisEntity to PlantAnalysisModel
   ///
-  /// Entity'den result model'ine çeviri yapar UI widget'ları için
-  model.PlantAnalysisResult _convertEntityToModel(PlantAnalysisEntity entity) {
-    return model.PlantAnalysisResult(
+  /// Entity'den UI gösterimi için uygun model formatına dönüştürür
+  model.PlantAnalysisModel _convertEntityToModel(PlantAnalysisEntity entity) {
+    return model.PlantAnalysisModel(
       id: entity.id,
       plantName: entity.plantName,
       probability: entity.probability,
       isHealthy: entity.isHealthy,
-      diseases:
-          entity.diseases.map((disease) => _convertDisease(disease)).toList(),
+      diseases: entity.diseases,
       description: entity.description,
       suggestions: entity.suggestions,
       imageUrl: entity.imageUrl,
@@ -89,23 +88,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen> {
       location: entity.location,
       fieldName: entity.fieldName,
       timestamp: entity.timestamp?.millisecondsSinceEpoch,
-      // Optional fields with defaults
-      taxonomy: null,
-      edibleParts: null,
-      propagationMethods: null,
-      watering: null,
-      sunlight: null,
-      soil: null,
-      climate: null,
-      geminiAnalysis: null,
-      growthStage: null,
-      growthScore: null,
-      growthComment: null,
-      interventionMethods: null,
-      agriculturalTips: null,
-      regionalInfo: null,
-      rawResponse: null,
-      // YENİ ALANLAR - Entity'den alınan gerçek değerler
+      // Yeni alanlar entity'den al
       diseaseName: entity.diseaseName,
       diseaseDescription: entity.diseaseDescription,
       treatmentName: entity.treatmentName,
@@ -122,24 +105,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen> {
     );
   }
 
-  /// Converts entity Disease to model Disease
-  model.Disease _convertDisease(entity_disease.Disease entityDisease) {
-    return model.Disease(
-      name: entityDisease.name,
-      probability: entityDisease.probability,
-      description: entityDisease.description,
-      treatments: entityDisease.treatments,
-      severity: entityDisease.severity.value,
-      symptoms: null,
-      interventionMethods: null,
-      pesticideSuggestions: null,
-      affectedParts: null,
-      causalAgent: null,
-      preventiveMeasures: null,
-      imageUrls: null,
-      similarDiseases: null,
-    );
-  }
+  /// Disease dönüştürme artık gerekmiyor - aynı modeli kullanıyoruz
 
   // ============================================================================
   // BUILD METHODS

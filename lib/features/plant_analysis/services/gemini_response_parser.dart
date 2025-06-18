@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:tatarai/core/utils/logger.dart';
-import 'package:tatarai/features/plant_analysis/data/models/plant_analysis_result.dart';
+import 'package:tatarai/features/plant_analysis/data/models/plant_analysis_model.dart';
+import 'package:tatarai/features/plant_analysis/data/models/disease_model.dart';
 
 /// Gemini API response'larını parse eden service
 ///
@@ -18,7 +19,7 @@ class GeminiResponseParser {
   ///
   /// Returns: Başarıyla parse edilmiş PlantAnalysisResult
   /// Throws: FormatException, JsonUnsupportedObjectError
-  static Future<PlantAnalysisResult> parseAnalysisResponse({
+  static Future<PlantAnalysisModel> parseAnalysisResponse({
     required String rawResponse,
     required String imageUrl,
     String? location,
@@ -43,6 +44,15 @@ class GeminiResponseParser {
           '✅ JSON decode başarılı',
           'Keys: ${jsonData.keys.join(", ")}',
         );
+
+        // Debug: Key değerlerini logla
+        print('🔍 GeminiResponseParser - JSON values:');
+        print(
+            '🔍 plantName: ${jsonData['plantName']} (type: ${jsonData['plantName']?.runtimeType})');
+        print(
+            '🔍 isHealthy: ${jsonData['isHealthy']} (type: ${jsonData['isHealthy']?.runtimeType})');
+        print(
+            '🔍 probability: ${jsonData['probability']} (type: ${jsonData['probability']?.runtimeType})');
       } catch (jsonError) {
         AppLogger.errorWithContext(
           _serviceName,
@@ -111,12 +121,18 @@ class GeminiResponseParser {
       }
 
       // 4. Model Construction
+      print(
+          '🔍 About to build PlantAnalysisResult with jsonData keys: ${jsonData.keys.toList()}');
+
       final result = _buildPlantAnalysisResult(
         jsonData: jsonData,
         imageUrl: imageUrl,
         location: location,
         fieldName: fieldName,
       );
+
+      print(
+          '🔍 Built PlantAnalysisResult: ${result.plantName} (healthy: ${result.isHealthy})');
 
       AppLogger.successWithContext(
         _serviceName,
@@ -368,13 +384,13 @@ class GeminiResponseParser {
   }
 
   /// PlantAnalysisResult model'ini oluşturur
-  static PlantAnalysisResult _buildPlantAnalysisResult({
+  static PlantAnalysisModel _buildPlantAnalysisResult({
     required Map<String, dynamic> jsonData,
     required String imageUrl,
     String? location,
     String? fieldName,
   }) {
-    return PlantAnalysisResult(
+    return PlantAnalysisModel(
       id: _generateAnalysisId(),
       plantName: _extractPlantName(jsonData),
       probability: _extractProbability(jsonData),
@@ -475,20 +491,11 @@ class GeminiResponseParser {
   static Disease _parseDisease(Map<String, dynamic> diseaseJson, int index) {
     return Disease(
       name: _extractString(diseaseJson, 'name') ?? 'Hastalık ${index + 1}',
-      probability: _extractDouble(diseaseJson, 'probability'),
-      description: _extractString(diseaseJson, 'description'),
-      symptoms: _extractStringList(diseaseJson, 'symptoms'),
-      treatments: _extractStringList(diseaseJson, 'treatments'),
-      interventionMethods:
-          _extractStringList(diseaseJson, 'interventionMethods'),
-      pesticideSuggestions:
-          _extractStringList(diseaseJson, 'pesticideSuggestions'),
-      severity: _extractString(diseaseJson, 'severity'),
-      affectedParts: _extractStringList(diseaseJson, 'affectedParts'),
-      causalAgent: _extractString(diseaseJson, 'causalAgent'),
-      preventiveMeasures: _extractStringList(diseaseJson, 'preventiveMeasures'),
-      imageUrls: _extractStringList(diseaseJson, 'imageUrls'),
-      similarDiseases: _extractStringList(diseaseJson, 'similarDiseases'),
+      probability: _extractDouble(diseaseJson, 'probability') ?? 0.0,
+      description: _extractString(diseaseJson, 'description') ?? '',
+      treatments: _extractStringList(diseaseJson, 'treatments') ?? [],
+      severity:
+          DiseaseSeverity.fromString(_extractString(diseaseJson, 'severity')),
     );
   }
 
@@ -561,7 +568,7 @@ class GeminiResponseParser {
   }
 
   /// Fallback response oluşturur (hata durumunda)
-  static PlantAnalysisResult _createFallbackResponse({
+  static PlantAnalysisModel _createFallbackResponse({
     required String rawResponse,
     required String imageUrl,
     String? location,
@@ -620,7 +627,7 @@ class GeminiResponseParser {
       'Plant: $plantName, Error type: ${error.substring(0, 50)}...',
     );
 
-    return PlantAnalysisResult(
+    return PlantAnalysisModel(
       id: _generateAnalysisId(),
       plantName: plantName,
       probability: 0.3, // Kısmi güven
@@ -675,7 +682,7 @@ class GeminiResponseParser {
 
   /// Response quality metrics oluşturur
   static Map<String, dynamic> analyzeResponseQuality(
-      PlantAnalysisResult result) {
+      PlantAnalysisModel result) {
     final metrics = <String, dynamic>{};
 
     // Completeness Score (0-100)
@@ -703,10 +710,8 @@ class GeminiResponseParser {
     metrics['completeness_score'] =
         ((completenessScore / totalFields) * 100).round();
     metrics['total_diseases'] = result.diseases.length;
-    metrics['has_treatment_info'] = result.diseases.any((d) =>
-        (d.treatments?.isNotEmpty ?? false) ||
-        (d.interventionMethods?.isNotEmpty ?? false) ||
-        (d.pesticideSuggestions?.isNotEmpty ?? false));
+    metrics['has_treatment_info'] =
+        result.diseases.any((d) => (d.treatments.isNotEmpty));
     metrics['response_timestamp'] = DateTime.now().toIso8601String();
 
     return metrics;

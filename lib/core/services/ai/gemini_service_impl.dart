@@ -627,7 +627,21 @@ class GeminiServiceImpl extends BaseService implements GeminiServiceInterface {
 
       // Clean and parse JSON
       final cleanedJson = _cleanJsonResponse(jsonResponse);
+
+      // Debug: Log the cleaned JSON
+      print(
+          '🔍 Cleaned JSON (first 1000 chars): ${cleanedJson.substring(0, cleanedJson.length > 1000 ? 1000 : cleanedJson.length)}');
+
       final jsonData = json.decode(cleanedJson) as Map<String, dynamic>;
+
+      // Debug: Log JSON keys and critical values
+      print('🔍 JSON keys: ${jsonData.keys.toList()}');
+      print(
+          '🔍 plantName value: ${jsonData['plantName']} (type: ${jsonData['plantName'].runtimeType})');
+      print(
+          '🔍 isHealthy value: ${jsonData['isHealthy']} (type: ${jsonData['isHealthy'].runtimeType})');
+      print(
+          '🔍 probability value: ${jsonData['probability']} (type: ${jsonData['probability'].runtimeType})');
 
       // Add location info if provided
       final locationInfo = _prepareLocationInfo(
@@ -647,6 +661,7 @@ class GeminiServiceImpl extends BaseService implements GeminiServiceInterface {
         jsonData['id'] = DateTime.now().millisecondsSinceEpoch.toString();
       }
 
+      // imageUrl'i boş bırak - Cubit'te set edilecek
       if (!jsonData.containsKey('imageUrl')) {
         jsonData['imageUrl'] = '';
       }
@@ -658,6 +673,7 @@ class GeminiServiceImpl extends BaseService implements GeminiServiceInterface {
       return model;
     } catch (e, stackTrace) {
       logError('Analysis Response Parsing Failed', e.toString());
+      print('🚨 JSON parsing stackTrace: $stackTrace');
 
       // Return fallback model
       return _createFallbackAnalysisModel(
