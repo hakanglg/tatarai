@@ -11,8 +11,10 @@ import '../../../core/theme/text_theme.dart';
 import '../../../core/utils/logger.dart';
 import '../../../core/widgets/app_button.dart';
 import '../widgets/home_premium_card.dart';
+import '../../plant_analysis/data/models/plant_analysis_model.dart';
 import '../../plant_analysis/presentation/views/all_analysis/all_analyses_screen.dart';
 import '../../plant_analysis/presentation/views/widgets/analysis_card.dart';
+import '../../plant_analysis/presentation/views/analyses_result/analysis_result_screen.dart';
 import '../constants/home_constants.dart';
 import '../cubits/home_cubit.dart';
 import '../cubits/home_state.dart';
@@ -604,7 +606,7 @@ class _HomeTabContentState extends State<HomeTabContent>
   }
 
   /// Analyses items list
-  Widget _buildAnalysesItems(List<dynamic> analyses) {
+  Widget _buildAnalysesItems(List<PlantAnalysisModel> analyses) {
     return Column(
       children: analyses.map((analysis) {
         return Padding(
@@ -612,6 +614,19 @@ class _HomeTabContentState extends State<HomeTabContent>
           child: AnalysisCard(
             analysis: analysis,
             cardSize: AnalysisCardSize.compact,
+            onTap: () {
+              // Analiz detay sayfasına git
+              if (analysis.id.isNotEmpty) {
+                Navigator.of(context).push(
+                  CupertinoPageRoute(
+                    builder: (context) => AnalysisResultScreen(
+                      analysisId: analysis.id,
+                      analysisResult: analysis,
+                    ),
+                  ),
+                );
+              }
+            },
           ),
         );
       }).toList(),

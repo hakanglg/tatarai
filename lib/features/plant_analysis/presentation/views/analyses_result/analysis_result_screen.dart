@@ -185,8 +185,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
   @override
   void dispose() {
     _animationController.dispose();
-
-    // Mixin'in dispose method'unu da çağır
+    cleanupMixin(); // Mixin'in cleanup metodunu çağır
     super.dispose();
   }
 
@@ -200,14 +199,22 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
 
       // Eğer widget oluşturulurken analiz sonucu verilmişse, onu kullan
       if (widget.analysisResult != null) {
-        _currentAnalysisResult = widget.analysisResult;
-        setAnalysisResult(widget.analysisResult);
-        setState(() {
-          _isLoading = false;
-        });
-        _animationController.forward();
-        logAnalysisResult();
-        return;
+        // Eğer analiz sonucu bozuk/eksikse (Analiz Edilemedi), repository'den tekrar çek
+        if (widget.analysisResult!.plantName == 'Analiz edilemedi' ||
+            widget.analysisResult!.plantName == 'Analiz Edilemedi') {
+          AppLogger.w(
+              '⚠️ Başarısız analiz tespit edildi, repository\'den kontrol ediliyor...');
+          // Repository'den tekrar çek - fall through
+        } else {
+          _currentAnalysisResult = widget.analysisResult;
+          setAnalysisResult(widget.analysisResult);
+          setState(() {
+            _isLoading = false;
+          });
+          _animationController.forward();
+          logAnalysisResult();
+          return;
+        }
       }
 
       // Repository'den analiz sonucunu yükle
@@ -218,6 +225,24 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
       if (analysisEntity != null) {
         // Entity'den model'e dönüştür (mixin method'unu kullan)
         final convertedModel = _convertToPlantAnalysisModel(analysisEntity);
+
+        // Eğer repository'den de başarısız analiz geldiyse, kullanıcıyı bilgilendir
+        if (convertedModel.plantName == 'Analiz Edilemedi') {
+          AppLogger.w(
+              '⚠️ Repository\'den de başarısız analiz geldi, ana ekrana yönlendiriliyor');
+          if (mounted) {
+            Navigator.of(context).pop();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                    'Bu analiz başarısız olmuş. Lütfen yeni bir analiz yapın.'),
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+          return;
+        }
+
         _currentAnalysisResult = convertedModel;
         setAnalysisResult(convertedModel);
 
@@ -260,39 +285,123 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
   // İlaç önerileri bölümü de bu metoda entegre edilmiştir.
   //#####
 
-  /// Gelişim skoru widget'ı oluşturur
+  /// Gelişim skoru widget'ı oluşturur - Modern Apple design
   Widget _buildGrowthScoreWidget(PlantAnalysisModel result) {
     final score = result.growthScore ?? 0;
     final color = result.getGrowthScoreColor(score);
     final dim = context.dimensions;
 
     return Container(
-      padding: EdgeInsets.all(dim.paddingM),
+      padding: EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(dim.radiusM),
-        border: Border.all(
-          color: color.withOpacity(0.3),
-          width: 1,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            CupertinoColors.systemBackground,
+            color.withOpacity(0.05),
+          ],
         ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: color.withOpacity(0.2),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.15),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+            spreadRadius: -4,
+          ),
+          BoxShadow(
+            color: CupertinoColors.black.withOpacity(0.05),
+            blurRadius: 1,
+            offset: const Offset(0, 1),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Gelişim skoru başlık ve skor
+          // Modern gelişim skoru başlığı ve circular progress
           Row(
             children: [
-              Icon(
-                CupertinoIcons.chart_bar_alt_fill,
-                color: color,
-                size: AppConstants.iconSizeMedium,
+              // Circular progress indicator
+              Container(
+                width: 64,
+                height: 64,
+                child: Stack(
+                  children: [
+                    // Background circle
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: color.withOpacity(0.1),
+                      ),
+                    ),
+                    // Progress circle
+                    Positioned.fill(
+                      child: CircularProgressIndicator(
+                        value: score / 100,
+                        strokeWidth: 6,
+                        valueColor: AlwaysStoppedAnimation<Color>(color),
+                        backgroundColor: color.withOpacity(0.2),
+                      ),
+                    ),
+                    // Score text in center
+                    Center(
+                      child: Text(
+                        '$score',
+                        style: AppTextTheme.headline6.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: color,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              SizedBox(width: dim.spaceS),
-              Text(
-                'Gelişim Skoru: $score/100',
-                style: AppTextTheme.bodyText1.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: color,
+              SizedBox(width: dim.spaceL),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Gelişim Skoru',
+                      style: AppTextTheme.headline6.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Container(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            color.withOpacity(0.15),
+                            color.withOpacity(0.08),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: color.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        '${score}/100 Puan',
+                        style: AppTextTheme.captionL.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: color,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -640,40 +749,91 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // "Genel Bilgiler" Bölümü - Yeniden Tasarlandı
+        // "Genel Bilgiler" Bölümü - Modern Apple Design
         Container(
-          margin: EdgeInsets.only(bottom: dim.spaceM),
-          child: Row(
+          margin: EdgeInsets.only(bottom: dim.spaceL),
+          padding: EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppColors.primary.withOpacity(0.05),
+                AppColors.info.withOpacity(0.03),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: AppColors.primary.withOpacity(0.1),
+              width: 1,
+            ),
+          ),
+          child: Column(
             children: [
-              Container(
-                padding: EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  CupertinoIcons.doc_chart_fill,
-                  color: AppColors.primary,
-                  size: 20,
-                ),
+              Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.primary,
+                          AppColors.primary.withOpacity(0.8),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      CupertinoIcons.chart_bar_alt_fill,
+                      color: CupertinoColors.white,
+                      size: 20,
+                    ),
+                  ),
+                  SizedBox(width: dim.spaceM),
+                  Expanded(
+                    child: Text(
+                      'Analiz Sonuçları',
+                      style: AppTextTheme.headline5.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: CupertinoColors.systemBackground,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: CupertinoColors.systemGrey4.withOpacity(0.3),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: FontSizeControl(
+                      fontSizeLevel: _fontSizeLevel,
+                      onFontSizeChanged: (int newLevel) {
+                        setState(() {
+                          _fontSizeLevel = newLevel;
+                          _currentFontSize = _calculateFontSize(newLevel);
+                        });
+                      },
+                    ),
+                  ),
+                ],
               ),
-              SizedBox(width: dim.spaceM),
-              Text(
-                'Genel Bilgiler',
-                style: AppTextTheme.headline5.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              Spacer(),
-              FontSizeControl(
-                fontSizeLevel: _fontSizeLevel,
-                onFontSizeChanged: (int newLevel) {
-                  setState(() {
-                    _fontSizeLevel = newLevel;
-                    _currentFontSize = _calculateFontSize(newLevel);
-                  });
-                },
+              SizedBox(height: dim.spaceM),
+              Divider(
+                color: AppColors.primary.withOpacity(0.1),
+                height: 1,
               ),
             ],
           ),
@@ -891,161 +1051,174 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
             final severityText = result.getDiseaseServerityText(disease);
 
             return Container(
-              margin: EdgeInsets.only(bottom: dim.spaceM),
+              margin: EdgeInsets.only(bottom: dim.spaceL),
               decoration: BoxDecoration(
-                color: CupertinoColors.systemBackground,
-                borderRadius: BorderRadius.circular(dim.radiusL),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    CupertinoColors.systemBackground,
+                    severityColor.withOpacity(0.02),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: severityColor.withOpacity(0.2),
+                  width: 1.5,
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: severityColor.withOpacity(0.08),
-                    offset: Offset(0, 4),
-                    blurRadius: 12,
+                    color: severityColor.withOpacity(0.15),
+                    offset: const Offset(0, 8),
+                    blurRadius: 24,
+                    spreadRadius: -4,
                   ),
                   BoxShadow(
-                    color: CupertinoColors.systemGrey4.withOpacity(0.3),
-                    offset: Offset(0, 1),
-                    blurRadius: 3,
+                    color: CupertinoColors.black.withOpacity(0.05),
+                    offset: const Offset(0, 2),
+                    blurRadius: 8,
                   ),
                 ],
-                border: Border.all(
-                  color: severityColor.withOpacity(0.15),
-                  width: 1,
-                ),
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(dim.radiusL),
+                borderRadius: BorderRadius.circular(20),
                 child: Theme(
                   data: Theme.of(context).copyWith(
                     dividerColor: Colors.transparent,
-                    splashColor: severityColor.withOpacity(0.05),
-                    highlightColor: severityColor.withOpacity(0.05),
+                    splashColor: severityColor.withOpacity(0.08),
+                    highlightColor: severityColor.withOpacity(0.08),
                   ),
                   child: ExpansionTile(
                     iconColor: severityColor,
                     collapsedIconColor: severityColor.withOpacity(0.7),
-                    backgroundColor: CupertinoColors.systemBackground,
-                    collapsedBackgroundColor: CupertinoColors.systemBackground,
+                    backgroundColor: Colors.transparent,
+                    collapsedBackgroundColor: Colors.transparent,
                     childrenPadding: EdgeInsets.zero,
                     expandedCrossAxisAlignment: CrossAxisAlignment.start,
-                    tilePadding: EdgeInsets.symmetric(
-                      horizontal: dim.paddingM,
-                      vertical: dim.paddingM,
-                    ),
+                    tilePadding: EdgeInsets.all(20),
                     title: Row(
                       children: [
+                        // Modern probability circle with gradient
                         Container(
-                          width: 48,
-                          height: 48,
+                          width: 56,
+                          height: 56,
                           decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: severityColor.withOpacity(0.1),
-                            border: Border.all(
-                              color: severityColor,
-                              width: 1.5,
+                            gradient: LinearGradient(
+                              colors: [
+                                severityColor,
+                                severityColor.withOpacity(0.7),
+                              ],
                             ),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: severityColor.withOpacity(0.3),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                           ),
                           child: Center(
-                            child: SelectableText(
-                              '$probability%',
-                              style: AppTextTheme.captionL.copyWith(
-                                color: severityColor,
-                                fontWeight: FontWeight.bold,
-                                fontSize: dim.fontSizeXS,
-                              ),
-                              toolbarOptions: const ToolbarOptions(
-                                copy: true,
-                                selectAll: true,
-                                cut: false,
-                                paste: false,
-                              ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  '$probability%',
+                                  style: AppTextTheme.bodyText1.copyWith(
+                                    color: CupertinoColors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                Text(
+                                  'risk',
+                                  style: AppTextTheme.captionL.copyWith(
+                                    color:
+                                        CupertinoColors.white.withOpacity(0.9),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                        SizedBox(width: dim.spaceM),
+                        SizedBox(width: dim.spaceL),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              SelectableText(
+                              Text(
                                 disease.name,
-                                style: AppTextTheme.bodyText1.copyWith(
-                                  fontWeight: FontWeight.w600,
+                                style: AppTextTheme.headline6.copyWith(
+                                  fontWeight: FontWeight.bold,
                                   color: AppColors.textPrimary,
-                                  height: 2.3,
-                                ),
-                                toolbarOptions: const ToolbarOptions(
-                                  copy: true,
-                                  selectAll: true,
-                                  cut: false,
-                                  paste: false,
                                 ),
                               ),
-                              SizedBox(height: dim.spaceXXS),
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: dim.paddingXS,
-                                      vertical: dim.paddingXS,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: severityColor.withOpacity(0.1),
-                                      borderRadius:
-                                          BorderRadius.circular(dim.radiusXS),
-                                    ),
-                                    child: FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      child: SelectableText(
-                                        severityText,
-                                        style: AppTextTheme.captionL.copyWith(
-                                          color: severityColor,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: dim.fontSizeXS *
-                                              AppConstants
-                                                  .fontSizeMultiplierSmall,
-                                        ),
-                                        toolbarOptions: const ToolbarOptions(
-                                          copy: true,
-                                          selectAll: true,
-                                          cut: false,
-                                          paste: false,
-                                        ),
-                                      ),
-                                    ),
+                              SizedBox(height: dim.spaceXS),
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      severityColor.withOpacity(0.15),
+                                      severityColor.withOpacity(0.08),
+                                    ],
                                   ),
-                                  SizedBox(width: dim.spaceXS),
-                                  FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    child: SelectableText(
-                                      'Şiddet Seviyesi',
-                                      style: AppTextTheme.captionL.copyWith(
-                                        color: AppColors.textSecondary,
-                                      ),
-                                      toolbarOptions: const ToolbarOptions(
-                                        copy: true,
-                                        selectAll: true,
-                                        cut: false,
-                                        paste: false,
-                                      ),
-                                    ),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: severityColor.withOpacity(0.3),
+                                    width: 1,
                                   ),
-                                ],
+                                ),
+                                child: Text(
+                                  '${severityText} Şiddet',
+                                  style: AppTextTheme.captionL.copyWith(
+                                    color: severityColor,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ),
                             ],
+                          ),
+                        ),
+                        // Modern expand icon
+                        Container(
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: severityColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            CupertinoIcons.chevron_down,
+                            color: severityColor,
+                            size: 16,
                           ),
                         ),
                       ],
                     ),
                     children: [
-                      // Detaylı hastalık bilgisi için _buildExpandedDiseaseInfo widget'ını kullan
+                      // Enhanced expanded content with glassmorphism
                       Container(
-                        color: CupertinoColors.systemGrey6.withOpacity(0.3),
-                        padding: EdgeInsets.only(
-                            top: dim.paddingS,
-                            bottom: dim.paddingM,
-                            left: dim.paddingM,
-                            right: dim.paddingM),
+                        margin: const EdgeInsets.only(top: 8),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              severityColor.withOpacity(0.03),
+                              severityColor.withOpacity(0.08),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.only(
+                            bottomLeft: Radius.circular(20),
+                            bottomRight: Radius.circular(20),
+                          ),
+                        ),
+                        padding: EdgeInsets.all(20),
                         child: _buildExpandedDiseaseInfo(disease),
                       ),
                     ],
@@ -1143,6 +1316,10 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
 
     final result = _currentAnalysisResult;
     if (result == null) {
+      AppLogger.w(
+          '🔍 BUILD: _currentAnalysisResult null! "Analiz Edilemedi" ekranı gösteriliyor');
+      AppLogger.w(
+          '🔍 BUILD: _isLoading: $_isLoading, _errorMessage: $_errorMessage');
       return CupertinoPageScaffold(
         navigationBar: CupertinoNavigationBar(
           middle: const Text('Analiz Sonucu Bulunamadı'),
@@ -1161,228 +1338,398 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
     return _buildResultScreen(context, result);
   }
 
-  /// Analiz sonucu ekranını oluşturur
+  /// Analiz sonucu ekranını oluşturur - Modern Apple Design ile yeniden tasarlandı
   Widget _buildResultScreen(BuildContext context, PlantAnalysisModel result) {
     final dim = context.dimensions;
     return CupertinoPageScaffold(
+      backgroundColor: CupertinoColors.systemGroupedBackground,
       navigationBar: CupertinoNavigationBar(
+        backgroundColor: CupertinoColors.systemBackground.withOpacity(0.8),
+        border: const Border(),
         middle: Text(
           result.fieldName != null && result.fieldName!.isNotEmpty
               ? result.fieldName!
               : result.plantName,
+          style: AppTextTheme.headline6.copyWith(
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
         ),
         automaticallyImplyLeading: false,
-        leading: GestureDetector(
-          onTap: () => Navigator.of(context).maybePop(),
-          child: const Icon(
-            CupertinoIcons.back,
-            color: Colors.black,
+        leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: () => Navigator.of(context).maybePop(),
+          child: Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: CupertinoColors.systemBackground,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: CupertinoColors.black.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: const Icon(
+              CupertinoIcons.back,
+              color: AppColors.textPrimary,
+              size: 18,
+            ),
           ),
         ),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
-          child: const Icon(CupertinoIcons.share),
           onPressed: () {
-            HapticFeedback.mediumImpact();
+            HapticFeedback.lightImpact();
           },
+          child: Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: AppColors.primary.withOpacity(0.2),
+                width: 1,
+              ),
+            ),
+            child: const Icon(
+              CupertinoIcons.share,
+              color: AppColors.primary,
+              size: 18,
+            ),
+          ),
         ),
       ),
       child: SafeArea(
         child: FadeTransition(
           opacity: _fadeAnimation,
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: dim.paddingM),
-                  child: Hero(
-                    tag: 'plantImage',
-                    child: Container(
-                      height: dim.screenHeight * 0.35,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: CupertinoColors.systemGrey6,
-                        borderRadius: BorderRadius.circular(dim.radiusL),
-                        boxShadow: [
-                          BoxShadow(
-                            color: CupertinoColors.systemGrey4.withOpacity(0.2),
-                            offset: const Offset(0, 4),
-                            blurRadius: 8,
-                          ),
-                        ],
-                      ),
-                      child: () {
-                        print('🔍 Image URL Debug:');
-                        print('  - URL: ${result.imageUrl}');
-                        print('  - URL Length: ${result.imageUrl.length}');
-                        print('  - Is Empty: ${result.imageUrl.isEmpty}');
-                        print(
-                            '  - Starts with data:image: ${result.imageUrl.startsWith('data:image')}');
-                        print(
-                            '  - Starts with file://: ${result.imageUrl.startsWith('file://')}');
-                        print(
-                            '  - Starts with http: ${result.imageUrl.startsWith('http')}');
+          child: CustomScrollView(
+            physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
+            ),
+            slivers: [
+              // Hero Image Section - Glassmorphism effect
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    dim.paddingM,
+                    dim.spaceM,
+                    dim.paddingM,
+                    0,
+                  ),
+                  child: _buildHeroImageSection(result, dim),
+                ),
+              ),
 
-                        if (result.imageUrl.isNotEmpty) {
-                          return ClipRRect(
-                            borderRadius: BorderRadius.circular(dim.radiusL),
-                            child: _buildImageWidget(result.imageUrl),
-                          );
-                        } else {
-                          print(
-                              '  - ❌ Image URL is empty, showing placeholder');
-                          return const Center(
-                            child: Icon(
-                              CupertinoIcons.photo,
-                              size: 64,
-                              color: CupertinoColors.systemGrey,
-                            ),
-                          );
-                        }
-                      }(),
-                    ),
-                  ),
-                ),
-                Padding(
+              // Plant Info Card - Modern gradient design
+              SliverToBoxAdapter(
+                child: Padding(
                   padding: EdgeInsets.symmetric(horizontal: dim.paddingM),
-                  child: _buildHealthStatusWidget(result),
+                  child: _buildModernPlantInfoCard(result, dim),
                 ),
-                Container(
-                  margin: EdgeInsets.fromLTRB(
-                      dim.paddingM, dim.spaceM, dim.paddingM, dim.spaceS),
-                  padding: EdgeInsets.all(dim.paddingL),
-                  decoration: BoxDecoration(
-                    color: AppColors.white,
-                    borderRadius: BorderRadius.circular(dim.radiusL),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.black.withOpacity(0.1),
-                        blurRadius: 12,
-                        offset: const Offset(0, 2),
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        result.plantName,
-                        style: AppTextTheme.headline3.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      if (result.location != null &&
-                          result.location!.isNotEmpty) ...[
-                        SizedBox(height: dim.spaceM),
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withOpacity(0.12),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                CupertinoIcons.location_solid,
-                                color: AppColors.primary,
-                                size: 14,
-                              ),
-                            ),
-                            SizedBox(width: dim.spaceS),
-                            Expanded(
-                              child: Text(
-                                result.location!,
-                                style: AppTextTheme.bodyText2.copyWith(
-                                  color: AppColors.textSecondary,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 2,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                      if (result.fieldName != null &&
-                          result.fieldName!.isNotEmpty) ...[
-                        SizedBox(height: dim.spaceM),
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withOpacity(0.12),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                CupertinoIcons.tag_fill,
-                                color: AppColors.primary,
-                                size: 14,
-                              ),
-                            ),
-                            SizedBox(width: dim.spaceS),
-                            Expanded(
-                              child: Text(
-                                "Tarla: ${result.fieldName!}",
-                                style: AppTextTheme.bodyText2.copyWith(
-                                  color: AppColors.textSecondary,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 2,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                      SizedBox(height: dim.paddingL),
-                      const Divider(height: 1),
-                      SizedBox(height: dim.paddingL),
-                      _buildDescriptionSection(),
-                    ],
-                  ),
-                ),
-                Padding(
+              ),
+
+              // Health Analysis Section
+              SliverToBoxAdapter(
+                child: Padding(
                   padding: EdgeInsets.symmetric(
-                      horizontal: dim.paddingM, vertical: dim.spaceL),
+                    horizontal: dim.paddingM,
+                    vertical: dim.spaceL,
+                  ),
                   child: _buildHealthInfo(result),
                 ),
-                // Gelişim Durumu ve Bakım Tavsiyeleri - Her zaman göster
-                Padding(
+              ),
+
+              // Care Information Section
+              SliverToBoxAdapter(
+                child: Padding(
                   padding: EdgeInsets.symmetric(horizontal: dim.paddingM),
                   child: _buildCareInfo(result),
                 ),
+              ),
 
-                // YENİ BÖLÜM: Gelişmiş Tarımsal Bilgiler
-                if (_hasAdvancedAgriculturalInfo(result)) ...[
-                  Padding(
+              // Advanced Agricultural Information
+              if (_hasAdvancedAgriculturalInfo(result))
+                SliverToBoxAdapter(
+                  child: Padding(
                     padding: EdgeInsets.symmetric(
-                        horizontal: dim.paddingM, vertical: dim.spaceL),
+                      horizontal: dim.paddingM,
+                      vertical: dim.spaceL,
+                    ),
                     child: _buildAdvancedAgriculturalInfo(result),
                   ),
-                ],
+                ),
 
-                // Alt boşluk
-                SizedBox(height: dim.spaceXXL),
-              ],
-            ),
+              // Bottom spacing
+              SliverToBoxAdapter(
+                child: SizedBox(height: dim.spaceXXL * 2),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
+  /// Modern Hero Image Section - Glassmorphism ve gradient efektleriyle
+  Widget _buildHeroImageSection(PlantAnalysisModel result, dynamic dim) {
+    return Hero(
+      tag: 'plantImage_${result.plantName}',
+      child: Container(
+        height: dim.screenHeight * 0.4,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withOpacity(0.15),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+              spreadRadius: -2,
+            ),
+            BoxShadow(
+              color: CupertinoColors.black.withOpacity(0.1),
+              blurRadius: 40,
+              offset: const Offset(0, 16),
+              spreadRadius: -8,
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            // Main Image
+            ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: Container(
+                width: double.infinity,
+                height: double.infinity,
+                child: result.imageUrl.isNotEmpty
+                    ? _buildImageWidget(result.imageUrl)
+                    : Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              AppColors.primary.withOpacity(0.1),
+                              AppColors.info.withOpacity(0.1),
+                            ],
+                          ),
+                        ),
+                        child: const Center(
+                          child: Icon(
+                            CupertinoIcons.leaf_arrow_circlepath,
+                            size: 64,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+              ),
+            ),
+
+            // Gradient Overlay
+            ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.transparent,
+                      CupertinoColors.black.withOpacity(0.3),
+                      CupertinoColors.black.withOpacity(0.7),
+                    ],
+                    stops: const [0.0, 0.5, 0.8, 1.0],
+                  ),
+                ),
+              ),
+            ),
+
+            // Health Status Badge - Floating at top right
+            Positioned(
+              top: 16,
+              right: 16,
+              child: _buildFloatingHealthBadge(result),
+            ),
+
+            // Plant Name at Bottom
+            Positioned(
+              bottom: 20,
+              left: 20,
+              right: 20,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    result.plantName,
+                    style: AppTextTheme.headline4.copyWith(
+                      color: CupertinoColors.white,
+                      fontWeight: FontWeight.bold,
+                      shadows: [
+                        Shadow(
+                          color: CupertinoColors.black.withOpacity(0.5),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (result.location != null &&
+                      result.location!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          CupertinoIcons.location_solid,
+                          size: 14,
+                          color: CupertinoColors.white.withOpacity(0.9),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            result.location!,
+                            style: AppTextTheme.bodyText2.copyWith(
+                              color: CupertinoColors.white.withOpacity(0.9),
+                              fontWeight: FontWeight.w500,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Floating Health Status Badge
+  Widget _buildFloatingHealthBadge(PlantAnalysisModel result) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: result.getHealthStatusColor().withOpacity(0.9),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: CupertinoColors.white.withOpacity(0.3),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: CupertinoColors.black.withOpacity(0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            result.isHealthy
+                ? CupertinoIcons.checkmark_circle_fill
+                : CupertinoIcons.exclamationmark_triangle_fill,
+            size: 16,
+            color: CupertinoColors.white,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            result.isHealthy ? 'Sağlıklı' : 'Dikkat',
+            style: AppTextTheme.captionL.copyWith(
+              color: CupertinoColors.white,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Modern Plant Info Card - Glassmorphism design
+  Widget _buildModernPlantInfoCard(PlantAnalysisModel result, dynamic dim) {
+    return Container(
+      margin: EdgeInsets.only(top: dim.spaceL),
+      padding: EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemBackground,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppColors.primary.withOpacity(0.1),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+            spreadRadius: -4,
+          ),
+          BoxShadow(
+            color: CupertinoColors.systemGrey4.withOpacity(0.3),
+            blurRadius: 1,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with field name
+          if (result.fieldName != null && result.fieldName!.isNotEmpty) ...[
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    CupertinoIcons.tag_fill,
+                    color: AppColors.primary,
+                    size: 16,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    result.fieldName!,
+                    style: AppTextTheme.headline6.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Divider(
+              color: AppColors.primary.withOpacity(0.1),
+              height: 1,
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // Description Section
+          _buildDescriptionSection(),
+        ],
+      ),
+    );
+  }
+
   /// Görüntüyü uygun şekilde oluşturur (base64 veya network)
   Widget _buildImageWidget(String imageUrl) {
-    print('🔍 _buildImageWidget called with URL: $imageUrl');
-    print('  - URL length: ${imageUrl.length}');
-    print('  - Starts with data:image: ${imageUrl.startsWith('data:image')}');
-    print('  - Starts with file://: ${imageUrl.startsWith('file://')}');
-    print('  - Starts with http: ${imageUrl.startsWith('http')}');
-
     if (imageUrl.startsWith('data:image')) {
-      print('  - 🖼️ Processing as base64 image');
       try {
         final base64String = imageUrl.split(',')[1];
         final imageBytes = base64Decode(base64String);
@@ -1411,17 +1758,13 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
         );
       }
     } else if (imageUrl.startsWith('file://')) {
-      print('  - 📁 Processing as file path');
       try {
         final filePath = imageUrl.replaceFirst('file://', '');
-        print('  - Extracted file path: $filePath');
-        print('  - File exists: ${File(filePath).existsSync()}');
 
         return Image.file(
           File(filePath),
           fit: BoxFit.cover,
           errorBuilder: (context, error, stackTrace) {
-            print('  - ❌ File image error: $error');
             AppLogger.e('Dosya görüntü hatası: $error', error, stackTrace);
             return const Center(
               child: Icon(
@@ -1433,7 +1776,6 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
           },
         );
       } catch (e) {
-        print('  - ❌ File processing exception: $e');
         AppLogger.e('Dosya görüntü hatası', e);
         return const Center(
           child: Icon(
@@ -1444,9 +1786,6 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
         );
       }
     } else {
-      print(
-          '  - 🌐 Processing as network URL (this should NOT happen for file:// URLs!)');
-      print('  - URL being processed as network: $imageUrl');
       return Image.network(
         imageUrl,
         fit: BoxFit.cover,
@@ -1540,21 +1879,14 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Gelişim skoru ve aşaması debug ve gösterim
+        // Gelişim skoru ve aşaması gösterimi
         () {
           final hasGrowthScore = result.growthScore != null;
           final hasGrowthStage = result.growthStage != null;
           final hasGrowthComment =
               result.growthComment != null && result.growthComment!.isNotEmpty;
 
-          print('🔍 UI Growth Debug:');
-          print('  - Score: ${result.growthScore} (has: $hasGrowthScore)');
-          print('  - Stage: ${result.growthStage} (has: $hasGrowthStage)');
-          print(
-              '  - Comment: ${result.growthComment} (has: $hasGrowthComment)');
-
           if (hasGrowthScore || hasGrowthStage || hasGrowthComment) {
-            print('  - ✅ Showing growth score widget');
             return Column(
               children: [
                 _buildGrowthScoreWidget(result),
@@ -1562,7 +1894,6 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
               ],
             );
           } else {
-            print('  - ❌ Not showing growth score widget - all null/empty');
             return const SizedBox.shrink();
           }
         }(),
@@ -1701,47 +2032,98 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
     );
   }
 
-  // Bakım öğesi widget'ı
+  // Modern Bakım öğesi widget'ı - Apple design language ile
   Widget _buildCareItem(
       IconData icon, String title, String content, Color color) {
     final dim = context.dimensions;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: EdgeInsets.all(dim.paddingS),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.15),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            icon,
-            color: color,
-            size: dim.iconSizeS,
-          ),
+    return Container(
+      padding: EdgeInsets.all(16),
+      margin: EdgeInsets.only(bottom: dim.spaceM),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            color.withOpacity(0.08),
+            color.withOpacity(0.03),
+          ],
         ),
-        SizedBox(width: dim.spaceM),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: AppTextTheme.bodyText1.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              SizedBox(height: dim.spaceXS),
-              Text(
-                content,
-                style: AppTextTheme.bodyText2.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: color.withOpacity(0.2),
+          width: 1,
         ),
-      ],
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.1),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+            spreadRadius: -2,
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  color,
+                  color.withOpacity(0.8),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Icon(
+              icon,
+              color: CupertinoColors.white,
+              size: 24,
+            ),
+          ),
+          SizedBox(width: dim.spaceL),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: AppTextTheme.headline6.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                SizedBox(height: dim.spaceXS),
+                Text(
+                  content,
+                  style: AppTextTheme.bodyText2.copyWith(
+                    color: AppColors.textSecondary,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Subtle decoration
+          Container(
+            width: 4,
+            height: 32,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

@@ -4,6 +4,7 @@ import 'dart:async';
 import '../../../core/base/base_cubit.dart';
 import '../../../core/services/service_locator.dart';
 import '../../../core/utils/logger.dart';
+import '../../../core/repositories/plant_analysis_repository.dart';
 import '../../auth/cubits/auth_cubit.dart';
 import '../../auth/cubits/auth_state.dart';
 import '../../../core/models/user_model.dart';
@@ -281,22 +282,78 @@ class HomeCubit extends BaseCubit<HomeState> {
     }
   }
 
-  /// Son analizleri yükler (şimdilik mock data)
+  /// Son analizleri yükler (gerçek data)
   Future<void> _loadRecentAnalyses() async {
     try {
-      logInfo('Loading recent analyses (mock data)');
+      logInfo('Loading recent analyses');
 
-      // TODO: PlantAnalysisRepository oluşturulduğunda gerçek data kullanılacak
-      // Şimdilik mock data ile çalışalım
-      await Future.delayed(
-          const Duration(milliseconds: 500)); // Simulate network delay
+      // Repository'den gerçek data çek
+      if (ServiceLocator.isRegistered<PlantAnalysisRepository>()) {
+        final repository = ServiceLocator.get<PlantAnalysisRepository>();
 
-      final mockAnalyses = <PlantAnalysisModel>[];
+        // Son 10 analizi al (başarısız olanları filtreleyeceğiz)
+        final entities = await repository.getPastAnalyses(limit: 10);
 
-      emit(state.copyWith(recentAnalyses: mockAnalyses));
-      logInfo('Recent analyses loaded: ${mockAnalyses.length} items (mock)');
+        // Entity'leri model'e dönüştür ve başarısız olanları filtrele
+        final validModels = <PlantAnalysisModel>[];
+
+        for (final entity in entities) {
+          AppLogger.i('🔍 HomeCubit Entity debug - Plant: ${entity.plantName}');
+          AppLogger.i('🔍 HomeCubit Entity ID: ${entity.id}');
+          AppLogger.i(
+              '🔍 HomeCubit Entity diseases: ${entity.diseases.length}');
+          AppLogger.i('🔍 HomeCubit Entity isHealthy: ${entity.isHealthy}');
+          AppLogger.i('🔍 HomeCubit Entity description: ${entity.description}');
+
+          // Başarısız analiz kontrolü - Firestore seviyesinde
+          final isFailedAnalysis = entity.plantName == null &&
+              entity.isHealthy == null &&
+              entity.diseases.isEmpty &&
+              (entity.description?.contains('yapılamadı') ?? false);
+
+          if (isFailedAnalysis) {
+            AppLogger.w(
+                '⚠️ Başarısız analiz tespit edildi, filtreleniyor - ID: ${entity.id}');
+            continue; // Bu analizi atla
+          }
+
+          final model = PlantAnalysisModel.fromEntity(entity);
+
+          // Model seviyesinde de kontrol et
+          final isFailedModel = model.plantName == 'Analiz Edilemedi' &&
+              model.isHealthy == false &&
+              model.diseases.isEmpty &&
+              model.description.contains('yapılamadı');
+
+          if (isFailedModel) {
+            AppLogger.w(
+                '⚠️ Başarısız model tespit edildi, filtreleniyor - ID: ${model.id}');
+            continue; // Bu modeli atla
+          }
+
+          AppLogger.i('🔍 HomeCubit Model debug - Plant: ${model.plantName}');
+          AppLogger.i('🔍 HomeCubit Model diseases: ${model.diseases.length}');
+          AppLogger.i('🔍 HomeCubit Model isHealthy: ${model.isHealthy}');
+          AppLogger.i('🔍 HomeCubit Model description: ${model.description}');
+
+          validModels.add(model);
+
+          // Maksimum 5 geçerli analiz alsın
+          if (validModels.length >= 5) break;
+        }
+
+        emit(state.copyWith(recentAnalyses: validModels));
+        logInfo(
+            'Recent analyses loaded: ${validModels.length} valid items from Firestore (${entities.length} total fetched)');
+      } else {
+        logWarning('PlantAnalysisRepository not registered');
+        emit(state.copyWith(recentAnalyses: []));
+      }
     } catch (e, stackTrace) {
       AppLogger.e('Recent analyses loading failed', e, stackTrace);
+
+      // Hata durumunda boş liste emit et
+      emit(state.copyWith(recentAnalyses: []));
       rethrow;
     }
   }

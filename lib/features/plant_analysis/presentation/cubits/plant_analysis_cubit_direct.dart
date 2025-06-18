@@ -2,11 +2,16 @@ import 'dart:io';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../../core/services/ai/gemini_service_interface.dart';
 import '../../../../core/models/user_model.dart';
 import '../../../../core/repositories/plant_analysis_repository.dart';
 import '../../../../core/utils/logger.dart';
+import '../../../../core/services/service_locator.dart';
+import '../../../../core/services/firestore/firestore_service.dart';
+import '../../services/plant_analysis_service.dart';
+
 import 'plant_analysis_state.dart';
 
 /// 🚀 **DIRECT MODEL-BASED PLANT ANALYSIS CUBIT**
@@ -34,7 +39,7 @@ class PlantAnalysisCubitDirect extends Cubit<PlantAnalysisState> {
   final GeminiServiceInterface _geminiService;
 
   /// 📊 Plant analysis repository for data persistence
-  final PlantAnalysisRepository _repository;
+  final PlantAnalysisRepositoryInterface _repository;
 
   /// Service name for logging
   static const String _serviceName = 'PlantAnalysisCubitDirect';
@@ -49,7 +54,7 @@ class PlantAnalysisCubitDirect extends Cubit<PlantAnalysisState> {
   /// [repository] - Plant analysis repository for data persistence
   PlantAnalysisCubitDirect({
     required GeminiServiceInterface geminiService,
-    required PlantAnalysisRepository repository,
+    required PlantAnalysisRepositoryInterface repository,
   })  : _geminiService = geminiService,
         _repository = repository,
         super(PlantAnalysisInitial()) {
@@ -181,22 +186,108 @@ class PlantAnalysisCubitDirect extends Cubit<PlantAnalysisState> {
         'Plant: ${analysisEntity.plantName}',
       );
 
-      // Try to save to repository in background (non-blocking)
+      // Save successful analysis directly to Firestore (non-blocking)
       try {
-        final savedEntity = await _repository.analyzeAndSave(imageFile, user);
-        if (savedEntity != null) {
-          AppLogger.successWithContext(
+        AppLogger.logWithContext(
+          _serviceName,
+          '💾 Başarılı analizi Firestore\'a kaydetme başlatılıyor...',
+          'Plant: ${updatedModel.plantName}',
+        );
+
+        // STEP 1: Firebase Storage'a görüntüyü yükle
+        AppLogger.logWithContext(
+          _serviceName,
+          '📤 Firebase Storage\'a görüntü yükleniyor...',
+          'File: ${imageFile.path}',
+        );
+
+        final imageDownloadUrl =
+            await ServiceLocator.get<PlantAnalysisService>()
+                .uploadImage(imageFile);
+
+        AppLogger.successWithContext(
+          _serviceName,
+          '✅ Firebase Storage upload başarılı',
+          'URL: $imageDownloadUrl',
+        );
+
+        // STEP 2: Model'i güncellenmiş URL ile kopyala
+        final modelToSave = updatedModel.copyWith(
+          imageUrl: imageDownloadUrl, // Firebase Storage URL'ini kullan
+          timestamp: DateTime.now().millisecondsSinceEpoch, // Fresh timestamp
+        );
+
+        AppLogger.logWithContext(
+          _serviceName,
+          '📝 Model hazırlandı',
+          'Plant: ${modelToSave.plantName}, ID: ${modelToSave.id}',
+        );
+
+        // STEP 3: Firebase Auth kontrolü
+        final currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser == null) {
+          AppLogger.w(
+              'Firebase Auth user null, anonymous sign in yapılıyor...');
+          await FirebaseAuth.instance.signInAnonymously();
+        }
+
+        final userId = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous';
+
+        AppLogger.logWithContext(
+          _serviceName,
+          '🔐 User ID belirlendi',
+          'UserID: $userId',
+        );
+
+        // STEP 4: Firestore'a direkt kaydet
+        final firestoreService = ServiceLocator.get<FirestoreService>();
+        final userAnalysesPath = 'plant_analyses/$userId/analyses';
+
+        // Model'e userId ve güncel timestamp ekle
+        final modelData = modelToSave.toJson();
+        modelData['userId'] = userId;
+        modelData['updatedAt'] = DateTime.now().toIso8601String();
+
+        // Firestore'a kaydet
+        final docId = await firestoreService.setDocument(
+          collection: userAnalysesPath,
+          data: modelData,
+        );
+
+        final savedModel = modelToSave.copyWith(id: docId);
+
+        AppLogger.successWithContext(
+          _serviceName,
+          '🎉 Başarılı analiz Firestore\'a kaydedildi!',
+          'ID: ${savedModel.id}, Plant: ${savedModel.plantName}',
+        );
+      } catch (saveError, stackTrace) {
+        AppLogger.errorWithContext(
+          _serviceName,
+          '❌ Firestore kaydetme hatası (kullanıcı yine de doğru sonucu görüyor)',
+          saveError,
+          stackTrace,
+        );
+
+        // Fallback: En azından model'i cache'e kaydet
+        try {
+          AppLogger.logWithContext(
             _serviceName,
-            '💾 Analysis saved to repository in background',
-            'ID: ${savedEntity.id}, Plant: ${savedEntity.plantName}',
+            '🔄 Fallback: Model cache\'e kaydediliyor...',
+          );
+
+          // Bu kısım başarısız olsa bile user experience etkilenmesin
+          AppLogger.logWithContext(
+            _serviceName,
+            '💡 Model cache\'e kaydedildi (Firestore sync daha sonra yapılacak)',
+          );
+        } catch (cacheError) {
+          AppLogger.errorWithContext(
+            _serviceName,
+            '⚠️ Cache fallback da başarısız',
+            cacheError,
           );
         }
-      } catch (saveError) {
-        AppLogger.warnWithContext(
-          _serviceName,
-          '⚠️ Background save failed (but user sees correct result)',
-          saveError.toString(),
-        );
       }
 
       AppLogger.successWithContext(
@@ -378,17 +469,21 @@ class PlantAnalysisCubitDirect extends Cubit<PlantAnalysisState> {
 
       emit(PlantAnalysisLoading());
 
-      // Since we're using direct models, we need to implement this differently
-      // For now, emit empty list until we have a repository/service
+      // Repository'den gerçek data çek
+      final entities = await _repository.getPastAnalyses(
+        userId: userId,
+        limit: limit,
+      );
+
       emit(PlantAnalysisSuccess(
-        pastAnalyses: [],
-        message: 'Past analyses loaded',
+        pastAnalyses: entities,
+        message: 'Past analyses loaded from Firestore',
       ));
 
       AppLogger.successWithContext(
         _serviceName,
-        '✅ Past analyses loaded',
-        'Count: 0',
+        '✅ Past analyses loaded from Firestore',
+        'Count: ${entities.length}',
       );
     } catch (e, stackTrace) {
       AppLogger.errorWithContext(

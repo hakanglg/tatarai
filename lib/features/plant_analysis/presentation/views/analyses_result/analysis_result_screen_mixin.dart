@@ -16,11 +16,7 @@ mixin AnalysisResultScreenMixin {
 
   /// İzleme ve loglama (development için)
   void logAnalysisResult() {
-    if (kDebugMode && _analysisResult != null) {
-      print('AnalysisResult loaded: ${_analysisResult!.plantName}');
-      print('Disease count: ${_analysisResult!.diseases.length}');
-      print('Health status: ${_analysisResult!.isHealthy}');
-    }
+    // Debug logları kaldırıldı - production'da gereksiz çıktı oluşturuyor
   }
 
   /// Analiz sonucunu state'den alır
@@ -94,7 +90,7 @@ mixin AnalysisResultScreenMixin {
   /// Resource temizliği
   ///
   /// Widget dispose edildiğinde bu metod çağrılmalıdır.
-  void dispose() {
+  void cleanupMixin() {
     _analysisResult = null;
   }
 

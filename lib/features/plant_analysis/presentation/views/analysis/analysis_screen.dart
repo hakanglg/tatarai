@@ -297,36 +297,36 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                                       ),
 
                                       // Bilgi simgesi (sağ üst köşe)
-                                      Positioned(
-                                        top: context.dimensions.paddingS,
-                                        right: context.dimensions.paddingS,
-                                        child: Container(
-                                          height:
-                                              context.dimensions.buttonHeight *
-                                                  0.7,
-                                          width:
-                                              context.dimensions.buttonHeight *
-                                                  0.7,
-                                          decoration: BoxDecoration(
-                                            color: CupertinoColors.white
-                                                .withOpacity(0.8),
-                                            shape: BoxShape.circle,
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: CupertinoColors.black
-                                                    .withOpacity(0.1),
-                                                blurRadius: 8,
-                                                offset: const Offset(0, 2),
-                                              ),
-                                            ],
-                                          ),
-                                          child: Icon(
-                                            CupertinoIcons.info,
-                                            color: AppColors.primary,
-                                            size: context.dimensions.iconSizeS,
-                                          ),
-                                        ),
-                                      ),
+                                      // Positioned(
+                                      //   top: context.dimensions.paddingS,
+                                      //   right: context.dimensions.paddingS,
+                                      //   child: Container(
+                                      //     height:
+                                      //         context.dimensions.buttonHeight *
+                                      //             0.7,
+                                      //     width:
+                                      //         context.dimensions.buttonHeight *
+                                      //             0.7,
+                                      //     decoration: BoxDecoration(
+                                      //       color: CupertinoColors.white
+                                      //           .withOpacity(0.8),
+                                      //       shape: BoxShape.circle,
+                                      //       boxShadow: [
+                                      //         BoxShadow(
+                                      //           color: CupertinoColors.black
+                                      //               .withOpacity(0.1),
+                                      //           blurRadius: 8,
+                                      //           offset: const Offset(0, 2),
+                                      //         ),
+                                      //       ],
+                                      //     ),
+                                      //     child: Icon(
+                                      //       CupertinoIcons.info,
+                                      //       color: AppColors.primary,
+                                      //       size: context.dimensions.iconSizeS,
+                                      //     ),
+                                      //   ),
+                                      // ),
                                     ],
                                   )
                                 : GestureDetector(

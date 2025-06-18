@@ -20,10 +20,7 @@ import 'package:tatarai/core/utils/cache_manager.dart';
 ///
 /// Clean Architecture prensiplerine uygun olarak domain katmanı
 /// ile data katmanı arasında soyutlama sağlar.
-///
-/// Bu interface domain layer'da tanımlı olmalıydı ama mevcut yapı gereği
-/// core'da tanımlıyoruz. Entity'ler kullanır, implementation detaylarını gizler.
-abstract class PlantAnalysisRepository {
+abstract class PlantAnalysisRepositoryInterface {
   // ============================================================================
   // ANALYSIS OPERATIONS
   // ============================================================================
@@ -189,11 +186,11 @@ abstract class PlantAnalysisRepository {
 
 /// Bitki analizi repository concrete implementation
 ///
-/// PlantAnalysisRepository interface'ini implement eder ve
+/// PlantAnalysisRepositoryInterface'ini implement eder ve
 /// Firebase Firestore ile analiz işlemlerini gerçekleştirir.
 ///
 /// Data layer implementation'ı - Entity'leri Model'lere dönüştürür.
-class PlantAnalysisRepositoryImpl implements PlantAnalysisRepository {
+class PlantAnalysisRepository implements PlantAnalysisRepositoryInterface {
   // ============================================================================
   // DEPENDENCIES
   // ============================================================================
@@ -209,22 +206,33 @@ class PlantAnalysisRepositoryImpl implements PlantAnalysisRepository {
   // ============================================================================
 
   /// Analizler koleksiyon adı
+  /// Base collection path for plant analyses in Firestore
+  /// Structure: plant_analyses/{userId}/analyses
+  static const String _baseCollection = 'plant_analyses';
+
+  /// Legacy collection name for backward compatibility
   static const String _analysesCollection = 'plant_analyses';
 
+  /// Gets the full collection path for a user's analyses
+  String _getUserAnalysesPath(String userId) {
+    return '$_baseCollection/$userId/analyses';
+  }
+
   /// Service name for logging
-  static const String _serviceName = 'PlantAnalysisRepositoryImpl';
+  static const String _serviceName = 'PlantAnalysisRepository';
 
   // ============================================================================
   // CONSTRUCTOR
   // ============================================================================
 
   /// Constructor
-  PlantAnalysisRepositoryImpl({
+  PlantAnalysisRepository({
     required FirestoreServiceInterface firestoreService,
     required PlantAnalysisService analysisService,
   })  : _firestoreService = firestoreService,
         _analysisService = analysisService {
-    AppLogger.logWithContext(_serviceName, 'Repository başlatıldı');
+    AppLogger.logWithContext(
+        _serviceName, 'PlantAnalysisRepository başlatıldı');
   }
 
   // ============================================================================
@@ -545,8 +553,12 @@ class PlantAnalysisRepositoryImpl implements PlantAnalysisRepository {
         throw ArgumentError('Geçersiz analiz kimliği');
       }
 
+      // Get current user for path
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final userId = currentUser?.uid ?? 'anonymous';
+
       final model = await _firestoreService.getDocument<PlantAnalysisModel>(
-        collection: _analysesCollection,
+        collection: _getUserAnalysesPath(userId),
         documentId: analysisId,
         fromJson: PlantAnalysisModel.fromJson,
       );
@@ -584,8 +596,8 @@ class PlantAnalysisRepositoryImpl implements PlantAnalysisRepository {
   }) async {
     try {
       // Get current user if userId is null
-      final targetUserId =
-          userId ?? FirebaseAuth.instance.currentUser?.uid ?? 'anonymous';
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final targetUserId = userId ?? currentUser?.uid ?? 'anonymous';
 
       AppLogger.logWithContext(
         _serviceName,
@@ -593,25 +605,97 @@ class PlantAnalysisRepositoryImpl implements PlantAnalysisRepository {
         'UserId: $targetUserId, Limit: $limit',
       );
 
-      final models =
-          await _firestoreService.getDocumentsWithQuery<PlantAnalysisModel>(
-        collection: _analysesCollection,
-        fromJson: PlantAnalysisModel.fromJson,
-        queryBuilder: (collection) => collection
-            .where('userId', isEqualTo: targetUserId)
-            .orderBy('timestamp', descending: true)
-            .limit(limit),
-      );
-
-      final entities = models.map((model) => model.toEntity()).toList();
-
-      AppLogger.successWithContext(
+      // Debug bilgileri
+      AppLogger.logWithContext(
         _serviceName,
-        'Geçmiş analizler başarıyla getirildi',
-        'Count: ${entities.length}',
+        'Firebase Auth Debug',
+        'Current User: ${currentUser?.uid ?? "null"}, Anonymous: ${currentUser?.isAnonymous ?? false}, Collection: $_analysesCollection',
       );
 
-      return entities;
+      // User authentication kontrolü
+      if (currentUser == null && userId == null) {
+        AppLogger.warnWithContext(
+          _serviceName,
+          'Kullanıcı giriş yapmamış ve userId belirtilmemiş',
+          'Anonymous sign-in deneniyor...',
+        );
+
+        // Otomatik anonymous sign-in dene
+        try {
+          final userCredential =
+              await FirebaseAuth.instance.signInAnonymously();
+          final newUser = userCredential.user;
+
+          if (newUser != null) {
+            AppLogger.successWithContext(
+              _serviceName,
+              'Anonymous sign-in başarılı',
+              'UID: ${newUser.uid}',
+            );
+
+            // Yeni userId ile devam et
+            final updatedUserId = newUser.uid;
+
+            // Tekrar query dene (recursive olmayacak çünkü artık user var)
+            return await getPastAnalyses(userId: updatedUserId, limit: limit);
+          }
+        } catch (signInError) {
+          AppLogger.errorWithContext(
+            _serviceName,
+            'Anonymous sign-in başarısız',
+            signInError,
+          );
+        }
+      }
+
+      // Collection'a erişim testi yapalım
+      try {
+        // Use new user-specific collection path
+        final models =
+            await _firestoreService.getDocumentsWithQuery<PlantAnalysisModel>(
+          collection: _getUserAnalysesPath(targetUserId),
+          fromJson: PlantAnalysisModel.fromJson,
+          queryBuilder: (collection) =>
+              collection.orderBy('timestamp', descending: true).limit(limit),
+        );
+
+        final entities = models.map((model) => model.toEntity()).toList();
+
+        // Başarısız analizleri filtrele
+        final validEntities = _filterFailedAnalyses(entities);
+
+        AppLogger.successWithContext(
+          _serviceName,
+          'Geçmiş analizler başarıyla getirildi',
+          'Total: ${entities.length}, Valid: ${validEntities.length}',
+        );
+
+        return validEntities;
+      } on FirebaseException catch (e) {
+        AppLogger.warnWithContext(
+          _serviceName,
+          'Firestore query hatası',
+          'Code: ${e.code}, Message: ${e.message}',
+        );
+
+        // Permission denied veya collection not found durumunda
+        if (e.code == 'permission-denied') {
+          AppLogger.errorWithContext(
+            _serviceName,
+            'Firestore erişim izni yok',
+            'Collection: ${_getUserAnalysesPath(targetUserId)}, User: $targetUserId, Auth: ${currentUser != null}',
+          );
+        } else if (e.code == 'not-found') {
+          AppLogger.logWithContext(
+            _serviceName,
+            'Collection bulunamadı, boş liste döndürülüyor',
+            _getUserAnalysesPath(targetUserId),
+          );
+        }
+
+        // Her durumda boş liste döndür
+        return [];
+      }
     } catch (e, stackTrace) {
       AppLogger.errorWithContext(
         _serviceName,
@@ -639,12 +723,12 @@ class PlantAnalysisRepositoryImpl implements PlantAnalysisRepository {
       final targetUserId =
           userId ?? FirebaseAuth.instance.currentUser?.uid ?? 'anonymous';
 
+      // Use new user-specific collection path
       final models =
           await _firestoreService.getDocumentsWithQuery<PlantAnalysisModel>(
-        collection: _analysesCollection,
+        collection: _getUserAnalysesPath(targetUserId),
         fromJson: PlantAnalysisModel.fromJson,
         queryBuilder: (collection) => collection
-            .where('userId', isEqualTo: targetUserId)
             .where('timestamp',
                 isGreaterThanOrEqualTo: startDate.millisecondsSinceEpoch)
             .where('timestamp',
@@ -673,12 +757,12 @@ class PlantAnalysisRepositoryImpl implements PlantAnalysisRepository {
       final targetUserId =
           userId ?? FirebaseAuth.instance.currentUser?.uid ?? 'anonymous';
 
+      // Use new user-specific collection path
       final models =
           await _firestoreService.getDocumentsWithQuery<PlantAnalysisModel>(
-        collection: _analysesCollection,
+        collection: _getUserAnalysesPath(targetUserId),
         fromJson: PlantAnalysisModel.fromJson,
         queryBuilder: (collection) => collection
-            .where('userId', isEqualTo: targetUserId)
             .where('isHealthy', isEqualTo: false)
             .orderBy('timestamp', descending: true)
             .limit(limit),
@@ -706,8 +790,12 @@ class PlantAnalysisRepositoryImpl implements PlantAnalysisRepository {
     try {
       final model = PlantAnalysisModel.fromEntity(updatedEntity);
 
+      // Get current user for path
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final userId = currentUser?.uid ?? 'anonymous';
+
       await _firestoreService.updateDocument(
-        collection: _analysesCollection,
+        collection: _getUserAnalysesPath(userId),
         documentId: analysisId,
         data: model.toJson(),
       );
@@ -727,8 +815,12 @@ class PlantAnalysisRepositoryImpl implements PlantAnalysisRepository {
   @override
   Future<bool> deleteAnalysis(String analysisId) async {
     try {
+      // Get current user for path
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final userId = currentUser?.uid ?? 'anonymous';
+
       await _firestoreService.deleteDocument(
-        collection: _analysesCollection,
+        collection: _getUserAnalysesPath(userId),
         documentId: analysisId,
       );
 
@@ -753,10 +845,10 @@ class PlantAnalysisRepositoryImpl implements PlantAnalysisRepository {
   @override
   Future<bool> deleteAllUserAnalyses(String userId) async {
     try {
+      // For new structure, we need to delete the entire user sub-collection
       final deletedCount = await _firestoreService.deleteDocumentsWithQuery(
-        collection: _analysesCollection,
-        queryBuilder: (collection) =>
-            collection.where('userId', isEqualTo: userId),
+        collection: _getUserAnalysesPath(userId),
+        queryBuilder: (collection) => collection,
       );
 
       AppLogger.successWithContext(
@@ -793,12 +885,11 @@ class PlantAnalysisRepositoryImpl implements PlantAnalysisRepository {
 
       final models =
           await _firestoreService.getDocumentsWithQuery<PlantAnalysisModel>(
-        collection: _analysesCollection,
+        collection: _getUserAnalysesPath(targetUserId),
         fromJson: PlantAnalysisModel.fromJson,
         queryBuilder: (collection) => collection
-            .where('userId', isEqualTo: targetUserId)
             .where('plantName', isGreaterThanOrEqualTo: plantName)
-            .where('plantName', isLessThan: plantName + '\uf8ff')
+            .where('plantName', isLessThan: '$plantName\uf8ff')
             .limit(limit),
       );
 
@@ -824,10 +915,9 @@ class PlantAnalysisRepositoryImpl implements PlantAnalysisRepository {
       final targetUserId =
           userId ?? FirebaseAuth.instance.currentUser?.uid ?? 'anonymous';
 
-      // Hastalık adına göre arama yap - diseases array'inde bu hastalığı içeren analizler
+      // Use new user-specific collection path
       final Query query = _firestoreService.firestore
-          .collection(_analysesCollection)
-          .where('userId', isEqualTo: targetUserId)
+          .collection(_getUserAnalysesPath(targetUserId))
           .where('isHealthy', isEqualTo: false)
           .orderBy('timestamp', descending: true)
           .limit(limit);
@@ -895,9 +985,8 @@ class PlantAnalysisRepositoryImpl implements PlantAnalysisRepository {
           userId ?? FirebaseAuth.instance.currentUser?.uid ?? 'anonymous';
 
       return await _firestoreService.getDocumentCount(
-        collection: _analysesCollection,
-        queryBuilder: (collection) =>
-            collection.where('userId', isEqualTo: targetUserId),
+        collection: _getUserAnalysesPath(targetUserId),
+        queryBuilder: (collection) => collection,
       );
     } catch (e) {
       AppLogger.errorWithContext(
@@ -915,10 +1004,9 @@ class PlantAnalysisRepositoryImpl implements PlantAnalysisRepository {
       final total = await getTotalAnalysesCount(userId: targetUserId);
 
       final healthy = await _firestoreService.getDocumentCount(
-        collection: _analysesCollection,
-        queryBuilder: (collection) => collection
-            .where('userId', isEqualTo: targetUserId)
-            .where('isHealthy', isEqualTo: true),
+        collection: _getUserAnalysesPath(targetUserId),
+        queryBuilder: (collection) =>
+            collection.where('isHealthy', isEqualTo: true),
       );
 
       return {
@@ -950,11 +1038,10 @@ class PlantAnalysisRepositoryImpl implements PlantAnalysisRepository {
       // Kullanıcının tüm analizlerini al
       final models =
           await _firestoreService.getDocumentsWithQuery<PlantAnalysisModel>(
-        collection: _analysesCollection,
+        collection: _getUserAnalysesPath(targetUserId),
         fromJson: PlantAnalysisModel.fromJson,
-        queryBuilder: (collection) => collection
-            .where('userId', isEqualTo: targetUserId)
-            .orderBy('timestamp', descending: true),
+        queryBuilder: (collection) =>
+            collection.orderBy('timestamp', descending: true),
       );
 
       // Bitki adlarını say
@@ -1000,8 +1087,9 @@ class PlantAnalysisRepositoryImpl implements PlantAnalysisRepository {
   Future<bool> isConnected() async {
     try {
       // Connectivity kontrolü
-      final connectivityResult = await Connectivity().checkConnectivity();
-      final hasConnection = connectivityResult != ConnectivityResult.none;
+      final connectivityResults = await Connectivity().checkConnectivity();
+      final hasConnection =
+          !connectivityResults.contains(ConnectivityResult.none);
 
       if (!hasConnection) {
         return false;
@@ -1079,8 +1167,11 @@ class PlantAnalysisRepositoryImpl implements PlantAnalysisRepository {
           }
 
           // Firestore'da bu analiz var mı kontrol et
+          final currentUser = FirebaseAuth.instance.currentUser;
+          final userId = currentUser?.uid ?? 'anonymous';
+
           final existingDoc = await _firestoreService.firestore
-              .collection(_analysesCollection)
+              .collection(_getUserAnalysesPath(userId))
               .doc(analysis.id)
               .get();
 
@@ -1102,7 +1193,7 @@ class PlantAnalysisRepositoryImpl implements PlantAnalysisRepository {
             );
 
             await _firestoreService.setDocument(
-              collection: _analysesCollection,
+              collection: _getUserAnalysesPath(userId),
               documentId: analysis.id,
               data: model.toJson(),
             );
@@ -1138,6 +1229,39 @@ class PlantAnalysisRepositoryImpl implements PlantAnalysisRepository {
   // ============================================================================
   // PRIVATE HELPER METHODS
   // ============================================================================
+
+  /// Başarısız analizleri filtreler
+  ///
+  /// Firestore'dan çekilen analizler arasında başarısız olanları tespit eder
+  /// ve geçerli analizleri döndürür.
+  List<PlantAnalysisEntity> _filterFailedAnalyses(
+      List<PlantAnalysisEntity> entities) {
+    final validEntities = <PlantAnalysisEntity>[];
+
+    for (final entity in entities) {
+      // Başarısız analiz kriterleri:
+      // 1. plantName null veya "Analiz Edilemedi"
+      // 2. isHealthy null
+      // 3. diseases boş liste
+      // 4. description "yapılamadı" kelimesini içeriyor
+      final isFailedAnalysis = (entity.plantName == null ||
+              entity.plantName == 'Analiz Edilemedi') &&
+          entity.isHealthy == null &&
+          entity.diseases.isEmpty &&
+          (entity.description?.contains('yapılamadı') ?? false);
+
+      if (isFailedAnalysis) {
+        AppLogger.w(
+          '⚠️ Repository: Başarısız analiz filtrelendi - ID: ${entity.id}, Plant: ${entity.plantName}',
+        );
+        continue; // Bu analizi atla
+      }
+
+      validEntities.add(entity);
+    }
+
+    return validEntities;
+  }
 
   /// Gemini servisinden dönen JSON yanıtını PlantAnalysisModel'a parse eder
   Future<PlantAnalysisModel> _parseGeminiResponse(
@@ -1199,7 +1323,7 @@ class PlantAnalysisRepositoryImpl implements PlantAnalysisRepository {
       modelData['timestamp'] = DateTime.now().millisecondsSinceEpoch;
 
       final docId = await _firestoreService.setDocument(
-        collection: _analysesCollection,
+        collection: _getUserAnalysesPath(userId),
         data: modelData,
       );
 

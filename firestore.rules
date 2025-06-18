@@ -30,19 +30,10 @@ service cloud.firestore {
       allow read, write: if isOwner(userId);
     }
     
-    // Ana plant_analyses koleksiyonu - Güvenli ve açık erişim kuralları (Production için)
-    match /plant_analyses/{analysisId} {
-      // OKUMA: Analizin sahibi okuyabilir (var olan document için)
-      allow read: if isAuth() && resource.data.userId == request.auth.uid;
-      
-      // GÜNCELLEME: Analizin sahibi güncelleyebilir (var olan document için)  
-      allow update: if isAuth() && resource.data.userId == request.auth.uid;
-      
-      // SİLME: Analizin sahibi silebilir (var olan document için)
-      allow delete: if isAuth() && resource.data.userId == request.auth.uid;
-      
-      // OLUŞTURMA: Authenticated kullanıcı kendi ID'si ile oluşturabilir
-      allow create: if isAuth() && request.resource.data.userId == request.auth.uid;
+    // Yeni plant_analyses yapısı - Her kullanıcının kendi analyses koleksiyonu
+    match /plant_analyses/{userId}/analyses/{analysisId} {
+      // Sadece kendi analizlerine erişim
+      allow read, write: if isAuth() && request.auth.uid == userId;
     }
     
     // Admin kullanıcılarının listesi 
@@ -72,11 +63,10 @@ service cloud.firestore {
       allow read, write: if isAuth();
     }
     
-    // Plant analyses koleksiyonu için geçici açık erişim - DEVELOPMENT ONLY!
-    // ÖNEMLİ: Production'da kaldırılmalı ve üstteki spesifik kurallar kullanılmalı!
-    match /plant_analyses/{analysisId} {
-      // Development için geçici - authenticated kullanıcılar yazabilir
-      allow read, write: if isAuth();
+    // Plant analyses koleksiyonu için yeni yapı - DEVELOPMENT kuralları
+    match /plant_analyses/{userId}/analyses/{analysisId} {
+      // Development için geçici - authenticated kullanıcılar kendi verilerine erişebilir
+      allow read, write: if isAuth() && request.auth.uid == userId;
     }
   }
 } 

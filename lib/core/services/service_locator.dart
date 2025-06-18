@@ -13,6 +13,7 @@ import '../../core/services/ai/gemini_service_impl.dart';
 import '../../features/plant_analysis/services/location_service.dart';
 import '../../features/plant_analysis/presentation/cubits/plant_analysis_cubit_direct.dart';
 import '../../core/repositories/plant_analysis_repository.dart';
+
 import '../../features/payment/cubits/payment_cubit.dart';
 import '../../features/home/cubits/home_cubit.dart';
 import '../utils/logger.dart';
@@ -136,8 +137,13 @@ class ServiceLocator {
       },
     );
 
-    // Firestore Service
+    // Firestore Service Interface
     _getIt.registerLazySingleton<FirestoreServiceInterface>(
+      () => FirestoreService(),
+    );
+
+    // Firestore Service Concrete Class (for direct usage)
+    _getIt.registerLazySingleton<FirestoreService>(
       () => FirestoreService(),
     );
 
@@ -198,10 +204,20 @@ class ServiceLocator {
       },
     );
 
-    // Plant Analysis Repository
+    // Plant Analysis Repository (New Firestore Structure)
+    _getIt.registerLazySingleton<PlantAnalysisRepositoryInterface>(
+      () {
+        return PlantAnalysisRepository(
+          firestoreService: _getIt<FirestoreServiceInterface>(),
+          analysisService: _getIt<PlantAnalysisService>(),
+        );
+      },
+    );
+
+    // Concrete PlantAnalysisRepository da register edelim
     _getIt.registerLazySingleton<PlantAnalysisRepository>(
       () {
-        return PlantAnalysisRepositoryImpl(
+        return PlantAnalysisRepository(
           firestoreService: _getIt<FirestoreServiceInterface>(),
           analysisService: _getIt<PlantAnalysisService>(),
         );
@@ -213,7 +229,7 @@ class ServiceLocator {
       () {
         return PlantAnalysisCubitDirect(
           geminiService: _getIt<GeminiServiceInterface>(),
-          repository: _getIt<PlantAnalysisRepository>(),
+          repository: _getIt<PlantAnalysisRepositoryInterface>(),
         );
       },
     );
@@ -307,6 +323,13 @@ class ServiceLocator {
           'ServiceLocator', '✗ FirestoreServiceInterface kayıtlı DEĞİL');
     }
 
+    if (_getIt.isRegistered<FirestoreService>()) {
+      AppLogger.logWithContext('ServiceLocator', '✓ FirestoreService kayıtlı');
+    } else {
+      AppLogger.warnWithContext(
+          'ServiceLocator', '✗ FirestoreService kayıtlı DEĞİL');
+    }
+
     if (_getIt.isRegistered<AuthRepository>()) {
       AppLogger.logWithContext('ServiceLocator', '✓ AuthRepository kayıtlı');
     } else {
@@ -340,9 +363,13 @@ extension ServiceLocatorExtensions on Object {
 ///
 /// Hızlı erişim için global metodlar
 class Services {
-  /// Firestore service'ini döner
+  /// Firestore service interface'ini döner
   static FirestoreServiceInterface get firestore =>
       ServiceLocator.get<FirestoreServiceInterface>();
+
+  /// Firestore service concrete class'ını döner
+  static FirestoreService get firestoreService =>
+      ServiceLocator.get<FirestoreService>();
 
   /// Auth repository'yi döner
   static AuthRepository get authRepository =>
@@ -376,9 +403,9 @@ class Services {
   /// Home cubit'ini döner (Factory)
   static HomeCubit get homeCubit => ServiceLocator.get<HomeCubit>();
 
-  /// Plant Analysis repository'yi döner
-  static PlantAnalysisRepository get plantAnalysisRepository =>
-      ServiceLocator.get<PlantAnalysisRepository>();
+  /// Plant Analysis repository'yi döner (New Firestore Structure)
+  static PlantAnalysisRepositoryInterface get plantAnalysisRepository =>
+      ServiceLocator.get<PlantAnalysisRepositoryInterface>();
 
   /// Plant Analysis Cubit Direct'i döner (Factory)
   static PlantAnalysisCubitDirect get plantAnalysisCubitDirect =>

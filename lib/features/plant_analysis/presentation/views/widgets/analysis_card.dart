@@ -113,9 +113,11 @@ class AnalysisCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Başlık
+                    // Başlık - tarla adı varsa onu, yoksa bitki adını göster
                     Text(
-                      analysis.plantName ?? 'Bilinmeyen Bitki',
+                      (analysis.fieldName?.isNotEmpty ?? false)
+                          ? analysis.fieldName!
+                          : (analysis.plantName ?? 'Bilinmeyen Bitki'),
                       style: AppTextTheme.headline6.copyWith(
                         fontSize: context.dimensions.fontSizeM,
                         fontWeight: FontWeight.w600,
@@ -165,21 +167,23 @@ class AnalysisCard extends StatelessWidget {
                       ),
                     ),
 
-                    // Tarih ve tür bilgisi
-                    if (analysis.fieldName != null &&
-                        analysis.fieldName!.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 6),
-                        child: Text(
-                          'Tarla: ${analysis.fieldName}',
-                          style: AppTextTheme.bodyText2.copyWith(
-                            color: CupertinoColors.systemGrey,
-                            fontSize: context.dimensions.fontSizeXS,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                    // Alt bilgi - title'da tarla adı varsa bitki adını, title'da bitki adı varsa tarla adını göster
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        (analysis.fieldName?.isNotEmpty ?? false)
+                            ? 'Bitki: ${analysis.plantName ?? "Bilinmeyen"}'
+                            : (analysis.fieldName?.isNotEmpty ?? false)
+                                ? 'Tarla: ${analysis.fieldName}'
+                                : 'Bitki Analizi',
+                        style: AppTextTheme.bodyText2.copyWith(
+                          color: CupertinoColors.systemGrey,
+                          fontSize: context.dimensions.fontSizeXS,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
+                    ),
                   ],
                 ),
               ),
@@ -335,12 +339,14 @@ class AnalysisCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Ana başlık - Tarla adı veya bitki adı
+                // Ana başlık - Tarla adı varsa onu, yoksa bitki adını göster
                 Row(
                   children: [
                     Expanded(
                       child: Text(
-                        fieldName ?? analysis.plantName,
+                        (analysis.fieldName?.isNotEmpty ?? false)
+                            ? analysis.fieldName!
+                            : (analysis.plantName ?? 'Bilinmeyen Bitki'),
                         style: AppTextTheme.caption.copyWith(
                           fontWeight: FontWeight.bold,
                           letterSpacing: -0.3,
@@ -372,30 +378,31 @@ class AnalysisCard extends StatelessWidget {
                 ),
                 SizedBox(height: 4),
 
-                // Alt başlık - Bitki adı veya hastalık durumu
-                if (fieldName != null)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        CupertinoIcons.leaf_arrow_circlepath,
-                        size: 12,
-                        color: AppColors.primary,
-                      ),
-                      SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          analysis.plantName,
-                          style: AppTextTheme.bodyText2.copyWith(
-                            color: CupertinoColors.systemGrey,
-                            fontSize: context.dimensions.fontSizeXS,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                // Alt başlık - title'da tarla adı varsa bitki adını göster
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      CupertinoIcons.leaf_arrow_circlepath,
+                      size: 12,
+                      color: AppColors.primary,
+                    ),
+                    SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        (analysis.fieldName?.isNotEmpty ?? false)
+                            ? 'Bitki: ${analysis.plantName ?? "Bilinmeyen"}'
+                            : 'Bitki Analizi',
+                        style: AppTextTheme.bodyText2.copyWith(
+                          color: CupertinoColors.systemGrey,
+                          fontSize: context.dimensions.fontSizeXS,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
+                ),
 
                 SizedBox(height: 4),
 
