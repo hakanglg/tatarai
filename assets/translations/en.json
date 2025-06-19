@@ -136,6 +136,7 @@
   "select_district_desc": "Select district of the province",
   "select_neighborhood": "Select Neighborhood",
   "field_name": "Field Name",
+  "enter_field_name": "Enter field name",
   "analyzing": "Analyzing...",
   "analyze": "Analyze",
   "all_analyses": "All Analyses",
@@ -267,5 +268,13 @@
   "stats_total_analysis": "Total Analysis",
   "stats_healthy_plants": "Healthy Plants",
   "stats_this_month": "This Month",
-  "stats_success_rate": "Success Rate"
+  "stats_success_rate": "Success Rate",
+  
+  "delete_analysis": "Delete Analysis",
+  "delete_analysis_confirmation": "Are you sure you want to permanently delete this analysis? This action cannot be undone.",
+  "delete_all_analyses": "Delete All Analyses",
+  "delete_all_analyses_confirmation": "Are you sure you want to permanently delete all your analysis data? This action cannot be undone.",
+  "analysis_deleted": "Analysis deleted successfully",
+  "analyses_deleted": "Analyses deleted successfully",
+  "delete_error": "Error occurred during deletion"
 } 

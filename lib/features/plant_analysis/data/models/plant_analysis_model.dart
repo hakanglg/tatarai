@@ -188,7 +188,12 @@ class PlantAnalysisModel {
   }
 
   /// Helper method to parse boolean values from JSON (supports both string and boolean)
-  static bool _parseBoolValue(dynamic value) {
+  static bool _parseBoolValue(dynamic value, {List<Disease>? diseases}) {
+    // Eğer hastalık listesi verilmişse, önce ona göre karar ver
+    if (diseases != null && diseases.isNotEmpty) {
+      return false; // Hastalık varsa sağlıklı değil
+    }
+
     if (value == null) return true; // Default to healthy
     if (value is bool) return value;
     if (value is String) {
@@ -240,12 +245,18 @@ class PlantAnalysisModel {
             PlantTaxonomy.fromJson(json['taxonomy'] as Map<String, dynamic>);
       }
 
+      // isHealthy'yi hastalık listesine göre belirle
+      final isHealthyFromJson = _parseBoolValue(
+        json['is_healthy'] ?? json['isHealthy'],
+        diseases: diseases,
+      );
+
       return PlantAnalysisModel(
         id: json['id'] as String? ?? '',
         plantName:
             json['plant_name'] as String? ?? json['plantName'] as String? ?? '',
         probability: _parseDoubleValue(json['probability']),
-        isHealthy: _parseBoolValue(json['is_healthy'] ?? json['isHealthy']),
+        isHealthy: isHealthyFromJson,
         diseases: diseases,
         description: json['description'] as String? ?? '',
         suggestions: List<String>.from(json['suggestions'] as List? ?? []),

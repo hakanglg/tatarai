@@ -136,6 +136,7 @@
   "select_district_desc": "İlin ilçesini seçin",
   "select_neighborhood": "Mahalle Seçin",
   "field_name": "Tarla Adı",
+  "enter_field_name": "Tarla adını giriniz",
   "analyzing": "Analiz Ediliyor...",
   "analyze": "Analiz Et",
   "all_analyses": "Tüm Analizler",
@@ -266,5 +267,13 @@
   "stats_total_analysis": "Toplam Analiz",
   "stats_healthy_plants": "Sağlıklı Bitki",
   "stats_this_month": "Bu Ay",
-  "stats_success_rate": "Başarı Oranı"
+  "stats_success_rate": "Başarı Oranı",
+  
+  "delete_analysis": "Analizi Sil",
+  "delete_analysis_confirmation": "Bu analizi kalıcı olarak silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
+  "delete_all_analyses": "Tüm Analizleri Sil",
+  "delete_all_analyses_confirmation": "Tüm analiz verilerinizi kalıcı olarak silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
+  "analysis_deleted": "Analiz başarıyla silindi",
+  "analyses_deleted": "Analizler başarıyla silindi",
+  "delete_error": "Silme işlemi sırasında hata oluştu"
 } 

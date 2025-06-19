@@ -234,7 +234,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
             Navigator.of(context).pop();
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text(
+                content: SelectableText(
                     'Bu analiz başarısız olmuş. Lütfen yeni bir analiz yapın.'),
                 duration: Duration(seconds: 3),
               ),
@@ -353,11 +353,17 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                     ),
                     // Score text in center
                     Center(
-                      child: Text(
+                      child: SelectableText(
                         '$score',
                         style: AppTextTheme.headline6.copyWith(
                           fontWeight: FontWeight.bold,
                           color: color,
+                        ),
+                        toolbarOptions: const ToolbarOptions(
+                          copy: true,
+                          selectAll: true,
+                          cut: false,
+                          paste: false,
                         ),
                       ),
                     ),
@@ -369,11 +375,17 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    SelectableText(
                       'Gelişim Skoru',
                       style: AppTextTheme.headline6.copyWith(
                         fontWeight: FontWeight.bold,
                         color: AppColors.textPrimary,
+                      ),
+                      toolbarOptions: const ToolbarOptions(
+                        copy: true,
+                        selectAll: true,
+                        cut: false,
+                        paste: false,
                       ),
                     ),
                     SizedBox(height: 4),
@@ -393,11 +405,17 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                           width: 1,
                         ),
                       ),
-                      child: Text(
+                      child: SelectableText(
                         '${score}/100 Puan',
                         style: AppTextTheme.captionL.copyWith(
                           fontWeight: FontWeight.w600,
                           color: color,
+                        ),
+                        toolbarOptions: const ToolbarOptions(
+                          copy: true,
+                          selectAll: true,
+                          cut: false,
+                          paste: false,
                         ),
                       ),
                     ),
@@ -453,21 +471,33 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        SelectableText(
                           'Gelişim Aşaması',
                           style: AppTextTheme.captionL.copyWith(
                             color: color.withOpacity(0.8),
                             fontWeight: FontWeight.w600,
                             fontSize: _currentFontSize * 0.85,
                           ),
+                          toolbarOptions: const ToolbarOptions(
+                            copy: true,
+                            selectAll: true,
+                            cut: false,
+                            paste: false,
+                          ),
                         ),
                         SizedBox(height: dim.spaceXS),
-                        Text(
+                        SelectableText(
                           result.growthStage!,
                           style: AppTextTheme.bodyText1.copyWith(
                             color: color,
                             fontSize: _currentFontSize * 1.05,
                             fontWeight: FontWeight.bold,
+                          ),
+                          toolbarOptions: const ToolbarOptions(
+                            copy: true,
+                            selectAll: true,
+                            cut: false,
+                            paste: false,
                           ),
                         ),
                       ],
@@ -503,11 +533,17 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
           SizedBox(height: dim.spaceS),
 
           // Genel durum açıklaması
-          Text(
+          SelectableText(
             result.getGrowthScoreText(score),
             style: AppTextTheme.bodyText2.copyWith(
               color: AppColors.textSecondary,
               fontSize: _currentFontSize,
+            ),
+            toolbarOptions: const ToolbarOptions(
+              copy: true,
+              selectAll: true,
+              cut: false,
+              paste: false,
             ),
           ),
 
@@ -536,22 +572,34 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                         size: 16,
                       ),
                       SizedBox(width: dim.spaceXS),
-                      Text(
+                      SelectableText(
                         'Gelişim Hakkında',
                         style: AppTextTheme.captionL.copyWith(
                           color: color.withOpacity(0.8),
                           fontWeight: FontWeight.w600,
                         ),
+                        toolbarOptions: const ToolbarOptions(
+                          copy: true,
+                          selectAll: true,
+                          cut: false,
+                          paste: false,
+                        ),
                       ),
                     ],
                   ),
                   SizedBox(height: dim.spaceXS),
-                  Text(
+                  SelectableText(
                     result.growthComment!,
                     style: AppTextTheme.bodyText2.copyWith(
                       color: AppColors.textSecondary,
                       fontSize: _currentFontSize * 0.95,
                       height: 1.4,
+                    ),
+                    toolbarOptions: const ToolbarOptions(
+                      copy: true,
+                      selectAll: true,
+                      cut: false,
+                      paste: false,
                     ),
                   ),
                 ],
@@ -593,11 +641,17 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                       size: 18,
                     ),
                     SizedBox(width: dim.spaceS),
-                    Text(
+                    SelectableText(
                       'Hastalık Detayları',
                       style: AppTextTheme.bodyText1.copyWith(
                         fontWeight: FontWeight.w600,
                         color: CupertinoColors.systemBlue,
+                      ),
+                      toolbarOptions: const ToolbarOptions(
+                        copy: true,
+                        selectAll: true,
+                        cut: false,
+                        paste: false,
                       ),
                     ),
                   ],
@@ -651,12 +705,18 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                 ),
                 SizedBox(width: dim.spaceS),
                 Expanded(
-                  child: Text(
+                  child: SelectableText(
                     'Bu hastalık için detaylı tedavi bilgisi henüz mevcut değil. Genel bitki bakım kurallarına uyarak bitkinizin sağlığını koruyabilirsiniz.',
                     style: AppTextTheme.bodyText2.copyWith(
                       color: AppColors.textSecondary,
                       fontSize: _currentFontSize * 0.95,
                       height: 1.3,
+                    ),
+                    toolbarOptions: const ToolbarOptions(
+                      copy: true,
+                      selectAll: true,
+                      cut: false,
+                      paste: false,
                     ),
                   ),
                 ),
@@ -696,11 +756,17 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
               ),
             ),
             SizedBox(width: dim.spaceS),
-            Text(
+            SelectableText(
               title,
               style: AppTextTheme.captionL.copyWith(
                 fontWeight: FontWeight.w600,
                 color: AppColors.primary,
+              ),
+              toolbarOptions: const ToolbarOptions(
+                copy: true,
+                selectAll: true,
+                cut: false,
+                paste: false,
               ),
             ),
           ],
@@ -723,11 +789,17 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                       ),
                       SizedBox(width: dim.spaceS),
                       Expanded(
-                        child: Text(
+                        child: SelectableText(
                           treatment,
                           style: AppTextTheme.bodyText2.copyWith(
                             color: AppColors.textSecondary,
                             fontSize: _currentFontSize,
+                          ),
+                          toolbarOptions: const ToolbarOptions(
+                            copy: true,
+                            selectAll: true,
+                            cut: false,
+                            paste: false,
                           ),
                         ),
                       ),
@@ -798,11 +870,17 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                   ),
                   SizedBox(width: dim.spaceM),
                   Expanded(
-                    child: Text(
+                    child: SelectableText(
                       'Analiz Sonuçları',
                       style: AppTextTheme.headline5.copyWith(
                         fontWeight: FontWeight.bold,
                         color: AppColors.textPrimary,
+                      ),
+                      toolbarOptions: const ToolbarOptions(
+                        copy: true,
+                        selectAll: true,
+                        cut: false,
+                        paste: false,
                       ),
                     ),
                   ),
@@ -1122,21 +1200,33 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Text(
+                                SelectableText(
                                   '$probability%',
                                   style: AppTextTheme.bodyText1.copyWith(
                                     color: CupertinoColors.white,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 14,
                                   ),
+                                  toolbarOptions: const ToolbarOptions(
+                                    copy: true,
+                                    selectAll: true,
+                                    cut: false,
+                                    paste: false,
+                                  ),
                                 ),
-                                Text(
+                                SelectableText(
                                   'risk',
                                   style: AppTextTheme.captionL.copyWith(
                                     color:
                                         CupertinoColors.white.withOpacity(0.9),
                                     fontSize: 10,
                                     fontWeight: FontWeight.w500,
+                                  ),
+                                  toolbarOptions: const ToolbarOptions(
+                                    copy: true,
+                                    selectAll: true,
+                                    cut: false,
+                                    paste: false,
                                   ),
                                 ),
                               ],
@@ -1148,11 +1238,17 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
+                              SelectableText(
                                 disease.name,
                                 style: AppTextTheme.headline6.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: AppColors.textPrimary,
+                                ),
+                                toolbarOptions: const ToolbarOptions(
+                                  copy: true,
+                                  selectAll: true,
+                                  cut: false,
+                                  paste: false,
                                 ),
                               ),
                               SizedBox(height: dim.spaceXS),
@@ -1174,11 +1270,17 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                                     width: 1,
                                   ),
                                 ),
-                                child: Text(
+                                child: SelectableText(
                                   '${severityText} Şiddet',
                                   style: AppTextTheme.captionL.copyWith(
                                     color: severityColor,
                                     fontWeight: FontWeight.w600,
+                                  ),
+                                  toolbarOptions: const ToolbarOptions(
+                                    copy: true,
+                                    selectAll: true,
+                                    cut: false,
+                                    paste: false,
                                   ),
                                 ),
                               ),
@@ -1243,10 +1345,16 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
               children: [
                 const CupertinoActivityIndicator(radius: 16),
                 const SizedBox(height: 16),
-                Text(
+                SelectableText(
                   'Analiz sonucu yükleniyor...',
                   style: AppTextTheme.bodyText2.copyWith(
                     color: CupertinoColors.systemGrey,
+                  ),
+                  toolbarOptions: const ToolbarOptions(
+                    copy: true,
+                    selectAll: true,
+                    cut: false,
+                    paste: false,
                   ),
                 ),
               ],
@@ -1259,7 +1367,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
     if (_errorMessage != null) {
       return CupertinoPageScaffold(
         navigationBar: CupertinoNavigationBar(
-          middle: const Text('Analiz Sonucu Yüklenemedi'),
+          middle: const SelectableText('Analiz Sonucu Yüklenemedi'),
           leading: GestureDetector(
             onTap: () => Navigator.of(context).maybePop(),
             child: const Icon(
@@ -1286,15 +1394,22 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                 ),
               ),
               const SizedBox(height: 16),
-              const Text('Hata oluştu', style: AppTextTheme.headline5),
+              const SelectableText('Hata oluştu',
+                  style: AppTextTheme.headline5),
               const SizedBox(height: 8),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Text(
+                child: SelectableText(
                   _errorMessage!,
                   textAlign: TextAlign.center,
                   style: AppTextTheme.bodyText2.copyWith(
                     color: CupertinoColors.systemGrey,
+                  ),
+                  toolbarOptions: const ToolbarOptions(
+                    copy: true,
+                    selectAll: true,
+                    cut: false,
+                    paste: false,
                   ),
                 ),
               ),
@@ -1322,7 +1437,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
           '🔍 BUILD: _isLoading: $_isLoading, _errorMessage: $_errorMessage');
       return CupertinoPageScaffold(
         navigationBar: CupertinoNavigationBar(
-          middle: const Text('Analiz Sonucu Bulunamadı'),
+          middle: const SelectableText('Analiz Sonucu Bulunamadı'),
           leading: GestureDetector(
             onTap: () => Navigator.of(context).maybePop(),
             child: const Icon(
@@ -1331,7 +1446,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
             ),
           ),
         ),
-        child: const Center(child: Text('Analiz sonucu bulunamadı')),
+        child: const Center(child: SelectableText('Analiz sonucu bulunamadı')),
       );
     }
 
@@ -1346,13 +1461,19 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
       navigationBar: CupertinoNavigationBar(
         backgroundColor: CupertinoColors.systemBackground.withOpacity(0.8),
         border: const Border(),
-        middle: Text(
+        middle: SelectableText(
           result.fieldName != null && result.fieldName!.isNotEmpty
               ? result.fieldName!
               : result.plantName,
           style: AppTextTheme.headline6.copyWith(
             fontWeight: FontWeight.w600,
             color: AppColors.textPrimary,
+          ),
+          toolbarOptions: const ToolbarOptions(
+            copy: true,
+            selectAll: true,
+            cut: false,
+            paste: false,
           ),
         ),
         automaticallyImplyLeading: false,
@@ -1566,7 +1687,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
+                  SelectableText(
                     result.plantName,
                     style: AppTextTheme.headline4.copyWith(
                       color: CupertinoColors.white,
@@ -1578,6 +1699,12 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                           offset: const Offset(0, 2),
                         ),
                       ],
+                    ),
+                    toolbarOptions: const ToolbarOptions(
+                      copy: true,
+                      selectAll: true,
+                      cut: false,
+                      paste: false,
                     ),
                   ),
                   if (result.location != null &&
@@ -1592,13 +1719,18 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                         ),
                         const SizedBox(width: 4),
                         Expanded(
-                          child: Text(
+                          child: SelectableText(
                             result.location!,
                             style: AppTextTheme.bodyText2.copyWith(
                               color: CupertinoColors.white.withOpacity(0.9),
                               fontWeight: FontWeight.w500,
                             ),
-                            overflow: TextOverflow.ellipsis,
+                            toolbarOptions: const ToolbarOptions(
+                              copy: true,
+                              selectAll: true,
+                              cut: false,
+                              paste: false,
+                            ),
                           ),
                         ),
                       ],
@@ -1643,11 +1775,17 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
             color: CupertinoColors.white,
           ),
           const SizedBox(width: 4),
-          Text(
+          SelectableText(
             result.isHealthy ? 'Sağlıklı' : 'Dikkat',
             style: AppTextTheme.captionL.copyWith(
               color: CupertinoColors.white,
               fontWeight: FontWeight.w600,
+            ),
+            toolbarOptions: const ToolbarOptions(
+              copy: true,
+              selectAll: true,
+              cut: false,
+              paste: false,
             ),
           ),
         ],
@@ -1702,11 +1840,17 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
+                  child: SelectableText(
                     result.fieldName!,
                     style: AppTextTheme.headline6.copyWith(
                       fontWeight: FontWeight.w600,
                       color: AppColors.textPrimary,
+                    ),
+                    toolbarOptions: const ToolbarOptions(
+                      copy: true,
+                      selectAll: true,
+                      cut: false,
+                      paste: false,
                     ),
                   ),
                 ),
@@ -1850,18 +1994,30 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                SelectableText(
                   result.getHealthStatusTitle(),
                   style: AppTextTheme.caption.copyWith(
                     color: result.getHealthStatusColor(),
                     fontWeight: FontWeight.w600,
                   ),
+                  toolbarOptions: const ToolbarOptions(
+                    copy: true,
+                    selectAll: true,
+                    cut: false,
+                    paste: false,
+                  ),
                 ),
                 SizedBox(height: dim.spaceXXS),
-                Text(
+                SelectableText(
                   result.getHealthStatusDescription(),
                   style: AppTextTheme.caption.copyWith(
                     color: result.getHealthStatusColor().withOpacity(0.8),
+                  ),
+                  toolbarOptions: const ToolbarOptions(
+                    copy: true,
+                    selectAll: true,
+                    cut: false,
+                    paste: false,
                   ),
                 ),
               ],
@@ -1992,11 +2148,17 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                     ),
                     SizedBox(width: dim.spaceS),
                     Expanded(
-                      child: Text(
+                      child: SelectableText(
                         'Bu analiz için detaylı bakım bilgisi henüz mevcut değil. Genel bitki bakım kurallarını uygulayabilirsiniz.',
                         style: AppTextTheme.bodyText2.copyWith(
                           color: AppColors.textSecondary,
                           fontSize: _currentFontSize * 0.95,
+                        ),
+                        toolbarOptions: const ToolbarOptions(
+                          copy: true,
+                          selectAll: true,
+                          cut: false,
+                          paste: false,
                         ),
                       ),
                     ),
@@ -2095,19 +2257,31 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                SelectableText(
                   title,
                   style: AppTextTheme.headline6.copyWith(
                     fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary,
                   ),
+                  toolbarOptions: const ToolbarOptions(
+                    copy: true,
+                    selectAll: true,
+                    cut: false,
+                    paste: false,
+                  ),
                 ),
                 SizedBox(height: dim.spaceXS),
-                Text(
+                SelectableText(
                   content,
                   style: AppTextTheme.bodyText2.copyWith(
                     color: AppColors.textSecondary,
                     height: 1.4,
+                  ),
+                  toolbarOptions: const ToolbarOptions(
+                    copy: true,
+                    selectAll: true,
+                    cut: false,
+                    paste: false,
                   ),
                 ),
               ],
@@ -2172,11 +2346,17 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
               ),
             ),
             const SizedBox(width: 8),
-            Text(
+            SelectableText(
               "Hakkında",
               style: AppTextTheme.caption.copyWith(
                 fontWeight: FontWeight.w600,
                 color: AppColors.primary,
+              ),
+              toolbarOptions: const ToolbarOptions(
+                copy: true,
+                selectAll: true,
+                cut: false,
+                paste: false,
               ),
             ),
           ],
@@ -2221,7 +2401,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
             SizedBox(width: dim.spaceS),
             FittedBox(
               fit: BoxFit.scaleDown,
-              child: Text(
+              child: SelectableText(
                 title,
                 style: AppTextTheme.bodyText1.copyWith(
                   // Stil güncellendi
@@ -2229,6 +2409,12 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                   color: AppColors.textPrimary
                       .withOpacity(0.85), // Renk opaklığı ayarlandı
                   fontSize: _currentFontSize * 1.05, // Boyut ayarlandı
+                ),
+                toolbarOptions: const ToolbarOptions(
+                  copy: true,
+                  selectAll: true,
+                  cut: false,
+                  paste: false,
                 ),
               ),
             ),
@@ -2279,12 +2465,18 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
             SizedBox(width: dim.spaceS),
             FittedBox(
               fit: BoxFit.scaleDown,
-              child: Text(
+              child: SelectableText(
                 title,
                 style: AppTextTheme.bodyText1.copyWith(
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary.withOpacity(0.85),
                   fontSize: _currentFontSize * 1.05,
+                ),
+                toolbarOptions: const ToolbarOptions(
+                  copy: true,
+                  selectAll: true,
+                  cut: false,
+                  paste: false,
                 ),
               ),
             ),
@@ -2413,11 +2605,17 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                   ),
                 ),
                 SizedBox(width: dim.spaceM),
-                Text(
+                SelectableText(
                   'Tespit Edilen Hastalıklar',
                   style: AppTextTheme.headline5.copyWith(
                     fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary,
+                  ),
+                  toolbarOptions: const ToolbarOptions(
+                    copy: true,
+                    selectAll: true,
+                    cut: false,
+                    paste: false,
                   ),
                 ),
               ],
@@ -2546,11 +2744,17 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
               ),
             ),
             SizedBox(width: dim.spaceS),
-            Text(
+            SelectableText(
               title,
               style: AppTextTheme.bodyText1.copyWith(
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
+              ),
+              toolbarOptions: const ToolbarOptions(
+                copy: true,
+                selectAll: true,
+                cut: false,
+                paste: false,
               ),
             ),
           ],
@@ -2581,8 +2785,8 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
           ),
           SizedBox(width: dim.spaceS),
           Expanded(
-            child: RichText(
-              text: TextSpan(
+            child: SelectableText.rich(
+              TextSpan(
                 style: AppTextTheme.bodyText2.copyWith(
                   color: AppColors.textSecondary,
                   fontSize: _currentFontSize,
@@ -2597,6 +2801,12 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                   ),
                   TextSpan(text: value),
                 ],
+              ),
+              toolbarOptions: const ToolbarOptions(
+                copy: true,
+                selectAll: true,
+                cut: false,
+                paste: false,
               ),
             ),
           ),

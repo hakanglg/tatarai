@@ -616,4 +616,178 @@ class PlantAnalysisCubitDirect extends Cubit<PlantAnalysisState> {
       emit(PlantAnalysisInitial());
     }
   }
+
+  // ============================================================================
+  // 🗑️ DELETE OPERATIONS
+  // ============================================================================
+
+  /// Deletes a specific analysis by ID
+  Future<void> deleteAnalysis(String analysisId) async {
+    try {
+      AppLogger.logWithContext(
+        _serviceName,
+        '🗑️ Deleting analysis',
+        'ID: $analysisId',
+      );
+
+      // Emit loading state
+      emit(PlantAnalysisLoading());
+
+      // Delete from repository (Firestore)
+      await _repository.deleteAnalysis(analysisId);
+
+      // Update current state by removing the deleted analysis
+      if (state is PlantAnalysisSuccess) {
+        final currentState = state as PlantAnalysisSuccess;
+
+        // Remove from past analyses if present
+        final updatedPastAnalyses = currentState.pastAnalyses
+            .where((analysis) => analysis.id != analysisId)
+            .toList();
+
+        // Clear current analysis if it's the one being deleted
+        final updatedCurrentAnalysis =
+            currentState.currentAnalysis?.id == analysisId
+                ? null
+                : currentState.currentAnalysis;
+
+        emit(PlantAnalysisSuccess(
+          currentAnalysis: updatedCurrentAnalysis,
+          pastAnalyses: updatedPastAnalyses,
+          message: 'Analiz başarıyla silindi',
+        ));
+
+        AppLogger.successWithContext(
+          _serviceName,
+          '✅ Analysis deleted successfully',
+          'ID: $analysisId',
+        );
+      } else {
+        // If no current state, just reload past analyses
+        await loadPastAnalyses();
+      }
+    } catch (e, stackTrace) {
+      AppLogger.errorWithContext(
+        _serviceName,
+        'Delete analysis error',
+        e,
+        stackTrace,
+      );
+
+      emit(PlantAnalysisError(
+        message:
+            'Analiz silinirken hata oluştu: ${_getUserFriendlyErrorMessage(e)}',
+        errorType: _categorizeError(e),
+      ));
+    }
+  }
+
+  /// Deletes multiple analyses by their IDs
+  Future<void> deleteMultipleAnalyses(List<String> analysisIds) async {
+    try {
+      AppLogger.logWithContext(
+        _serviceName,
+        '🗑️ Deleting multiple analyses',
+        'Count: ${analysisIds.length}',
+      );
+
+      emit(PlantAnalysisLoading());
+
+      // Delete each analysis from repository
+      for (final analysisId in analysisIds) {
+        await _repository.deleteAnalysis(analysisId);
+      }
+
+      // Update current state by removing all deleted analyses
+      if (state is PlantAnalysisSuccess) {
+        final currentState = state as PlantAnalysisSuccess;
+
+        // Remove from past analyses
+        final updatedPastAnalyses = currentState.pastAnalyses
+            .where((analysis) => !analysisIds.contains(analysis.id))
+            .toList();
+
+        // Clear current analysis if it's among the deleted ones
+        final updatedCurrentAnalysis =
+            analysisIds.contains(currentState.currentAnalysis?.id)
+                ? null
+                : currentState.currentAnalysis;
+
+        emit(PlantAnalysisSuccess(
+          currentAnalysis: updatedCurrentAnalysis,
+          pastAnalyses: updatedPastAnalyses,
+          message: '${analysisIds.length} analiz başarıyla silindi',
+        ));
+
+        AppLogger.successWithContext(
+          _serviceName,
+          '✅ Multiple analyses deleted successfully',
+          'Count: ${analysisIds.length}',
+        );
+      } else {
+        // If no current state, just reload past analyses
+        await loadPastAnalyses();
+      }
+    } catch (e, stackTrace) {
+      AppLogger.errorWithContext(
+        _serviceName,
+        'Delete multiple analyses error',
+        e,
+        stackTrace,
+      );
+
+      emit(PlantAnalysisError(
+        message:
+            'Analizler silinirken hata oluştu: ${_getUserFriendlyErrorMessage(e)}',
+        errorType: _categorizeError(e),
+      ));
+    }
+  }
+
+  /// Deletes all analyses for the current user
+  Future<void> deleteAllAnalyses() async {
+    try {
+      AppLogger.logWithContext(
+        _serviceName,
+        '🗑️ Deleting all analyses for user',
+        'User: ${FirebaseAuth.instance.currentUser?.uid}',
+      );
+
+      emit(PlantAnalysisLoading());
+
+      // Get all analyses first
+      final allAnalyses = await _repository.getPastAnalyses(limit: 1000);
+
+      // Delete each analysis
+      for (final analysis in allAnalyses) {
+        await _repository.deleteAnalysis(analysis.id);
+      }
+
+      // Reset state to initial
+      emit(PlantAnalysisSuccess(
+        currentAnalysis: null,
+        pastAnalyses: [],
+        message: 'Tüm analizler başarıyla silindi',
+      ));
+
+      AppLogger.successWithContext(
+        _serviceName,
+        '✅ All analyses deleted successfully',
+        'Count: ${allAnalyses.length}',
+      );
+    } catch (e, stackTrace) {
+      AppLogger.errorWithContext(
+        _serviceName,
+        'Delete all analyses error',
+        e,
+        stackTrace,
+      );
+
+      emit(PlantAnalysisError(
+        message:
+            'Analizler silinirken hata oluştu: ${_getUserFriendlyErrorMessage(e)}',
+        errorType: _categorizeError(e),
+      ));
+    }
+  }
 }

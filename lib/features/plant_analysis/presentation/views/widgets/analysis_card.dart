@@ -27,6 +27,12 @@ class AnalysisCard extends StatelessWidget {
   /// Karta tıklandığında çalışacak fonksiyon
   final VoidCallback? onTap;
 
+  /// Analiz silindiğinde çalışacak fonksiyon
+  final VoidCallback? onDelete;
+
+  /// Silme butonunu göster/gizle
+  final bool showDeleteButton;
+
   /// Varsayılan yapıcı metod
   const AnalysisCard({
     super.key,
@@ -34,10 +40,92 @@ class AnalysisCard extends StatelessWidget {
     this.cardSize = AnalysisCardSize.compact,
     this.dateLabel,
     this.onTap,
+    this.onDelete,
+    this.showDeleteButton = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final cardContent = Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(cardSize == AnalysisCardSize.compact
+            ? context.dimensions.radiusM
+            : context.dimensions.radiusL),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+            spreadRadius: 0,
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(cardSize == AnalysisCardSize.compact
+            ? context.dimensions.radiusM
+            : context.dimensions.radiusL),
+        child: _buildCardContent(context),
+      ),
+    );
+
+    // Swipe-to-delete özelliği varsa Dismissible ile sar
+    if (showDeleteButton && onDelete != null) {
+      return Dismissible(
+        key: Key('analysis_${analysis.id}'),
+        direction: DismissDirection.endToStart,
+        confirmDismiss: (direction) async {
+          return await _showDeleteConfirmation(context);
+        },
+        onDismissed: (direction) {
+          onDelete?.call();
+        },
+        background: Container(
+          alignment: Alignment.centerRight,
+          padding: EdgeInsets.symmetric(horizontal: 20),
+          decoration: BoxDecoration(
+            color: CupertinoColors.systemRed,
+            borderRadius: BorderRadius.circular(
+                cardSize == AnalysisCardSize.compact
+                    ? context.dimensions.radiusM
+                    : context.dimensions.radiusL),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Icon(
+                CupertinoIcons.delete,
+                color: CupertinoColors.white,
+                size: 24,
+              ),
+              SizedBox(width: 8),
+              Text(
+                'Sil',
+                style: AppTextTheme.bodyText1.copyWith(
+                  color: CupertinoColors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        child: GestureDetector(
+          onTap: onTap ??
+              () {
+                Navigator.of(context).push(
+                  CupertinoPageRoute(
+                    builder: (context) => AnalysisResultScreen(
+                      analysisId: analysis.id,
+                    ),
+                  ),
+                );
+              },
+          child: cardContent,
+        ),
+      );
+    }
+
+    // Normal kart
     return GestureDetector(
       onTap: onTap ??
           () {
@@ -49,30 +137,62 @@ class AnalysisCard extends StatelessWidget {
               ),
             );
           },
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.circular(
-              cardSize == AnalysisCardSize.compact
-                  ? context.dimensions.radiusM
-                  : context.dimensions.radiusL),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-              spreadRadius: 0,
+      child: cardContent,
+    );
+  }
+
+  /// Silme onayı dialog'unu gösterir
+  Future<bool?> _showDeleteConfirmation(BuildContext context) async {
+    return await showCupertinoDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return CupertinoAlertDialog(
+          title: Text(
+            'Analizi Sil',
+            style: AppTextTheme.headline6.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          content: Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: Text(
+              'Bu analizi kalıcı olarak silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.',
+              style: AppTextTheme.bodyText2.copyWith(
+                color: CupertinoColors.systemGrey,
+              ),
+            ),
+          ),
+          actions: [
+            CupertinoDialogAction(
+              isDefaultAction: true,
+              onPressed: () {
+                Navigator.of(context).pop(false);
+              },
+              child: Text(
+                'İptal',
+                style: AppTextTheme.bodyText1.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            CupertinoDialogAction(
+              isDestructiveAction: true,
+              onPressed: () {
+                Navigator.of(context).pop(true);
+              },
+              child: Text(
+                'Sil',
+                style: AppTextTheme.bodyText1.copyWith(
+                  color: CupertinoColors.systemRed,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(
-              cardSize == AnalysisCardSize.compact
-                  ? context.dimensions.radiusM
-                  : context.dimensions.radiusL),
-          child: _buildCardContent(context),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -88,14 +208,16 @@ class AnalysisCard extends StatelessWidget {
 
   /// Kompakt kart (ana ekran için)
   Widget _buildCompactCard(BuildContext context) {
-    // Sağlık durumu renklerini belirle
-    final Color statusColor = analysis.diseases.isEmpty
-        ? AppColors.primary
-        : CupertinoColors.systemRed;
+    // Sağlık durumu renklerini belirle - isHealthy alanına göre
+    final Color statusColor =
+        analysis.isHealthy ? AppColors.primary : CupertinoColors.systemRed;
 
-    // Sağlık durumu metni
-    final String statusText =
-        analysis.diseases.isEmpty ? 'Sağlıklı' : analysis.diseases.first.name;
+    // Sağlık durumu metni - isHealthy alanına göre
+    final String statusText = analysis.isHealthy
+        ? 'Sağlıklı'
+        : (analysis.diseases.isNotEmpty
+            ? analysis.diseases.first.name
+            : 'Sağlık Sorunu');
 
     return Stack(
       children: [
@@ -144,7 +266,7 @@ class AnalysisCard extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            analysis.diseases.isEmpty
+                            analysis.isHealthy
                                 ? CupertinoIcons.checkmark_circle_fill
                                 : CupertinoIcons.exclamationmark_circle_fill,
                             size: 12,
@@ -248,14 +370,16 @@ class AnalysisCard extends StatelessWidget {
             ? analysis.fieldName!
             : null;
 
-    // Sağlık durumu renklerini belirle
-    final Color statusColor = analysis.diseases.isEmpty
-        ? AppColors.primary
-        : CupertinoColors.systemRed;
+    // Sağlık durumu renklerini belirle - isHealthy alanına göre
+    final Color statusColor =
+        analysis.isHealthy ? AppColors.primary : CupertinoColors.systemRed;
 
-    // Sağlık durumu metni
-    final String statusText =
-        analysis.diseases.isEmpty ? 'Sağlıklı' : analysis.diseases.first.name;
+    // Sağlık durumu metni - isHealthy alanına göre
+    final String statusText = analysis.isHealthy
+        ? 'Sağlıklı'
+        : (analysis.diseases.isNotEmpty
+            ? analysis.diseases.first.name
+            : 'Sağlık Sorunu');
 
     return Padding(
       padding: EdgeInsets.all(context.dimensions.paddingM),
@@ -318,7 +442,7 @@ class AnalysisCard extends StatelessWidget {
                       ),
                       child: Center(
                         child: Icon(
-                          analysis.diseases.isEmpty
+                          analysis.isHealthy
                               ? CupertinoIcons.checkmark
                               : CupertinoIcons.exclamationmark,
                           color: CupertinoColors.white,
@@ -427,7 +551,7 @@ class AnalysisCard extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        analysis.diseases.isEmpty
+                        analysis.isHealthy
                             ? CupertinoIcons.checkmark_circle_fill
                             : CupertinoIcons.exclamationmark_circle_fill,
                         size: 10,
