@@ -62,13 +62,6 @@ class _AnalysisScreenState extends State<AnalysisScreen>
     AppLogger.i('AnalysisScreen - build başladı');
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
-      navigationBar: CupertinoNavigationBar(
-        backgroundColor: AppColors.background,
-        middle: Text('plant_analysis'.locale(context)),
-        border: const Border(
-          bottom: BorderSide(color: CupertinoColors.separator, width: 0.5),
-        ),
-      ),
       child: SafeArea(
         child: BlocConsumer<PlantAnalysisCubitDirect, PlantAnalysisState>(
           listener: (context, state) async {
