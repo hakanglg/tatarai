@@ -1,4 +1,7 @@
 import 'package:equatable/equatable.dart';
+import 'package:flutter/material.dart';
+import 'package:tatarai/core/extensions/string_extension.dart';
+import 'package:tatarai/features/plant_analysis/data/models/plant_analysis_model.dart';
 
 import '../../domain/entities/plant_analysis_entity.dart';
 
@@ -412,8 +415,44 @@ enum ErrorType {
     }
   }
 
-  /// Kullanıcı dostu açıklama
-  String get description {
+  /// Hata türünün açıklamasını döner (lokalize edilmiş)
+  String description(BuildContext context) {
+    switch (this) {
+      case ErrorType.general:
+        return 'error_general'.locale(context);
+      case ErrorType.networkError:
+        return 'error_network'.locale(context);
+      case ErrorType.serverError:
+        return 'error_server'.locale(context);
+      case ErrorType.fileError:
+        return 'error_file'.locale(context);
+      case ErrorType.validation:
+        return 'error_validation'.locale(context);
+      case ErrorType.subscription:
+        return 'error_subscription'.locale(context);
+      case ErrorType.analysisFailure:
+        return 'error_analysis_failure'.locale(context);
+      case ErrorType.storageError:
+        return 'error_storage'.locale(context);
+      case ErrorType.timeout:
+        return 'error_timeout'.locale(context);
+      case ErrorType.unauthorized:
+        return 'error_unauthorized'.locale(context);
+      case ErrorType.notFound:
+        return 'error_not_found'.locale(context);
+      case ErrorType.unknown:
+        return 'error_unknown'.locale(context);
+      case ErrorType.apiError:
+        return 'error_api'.locale(context);
+      case ErrorType.creditError:
+        return 'error_credit'.locale(context);
+      case ErrorType.premiumRequired:
+        return 'error_premium_required'.locale(context);
+    }
+  }
+
+  /// Fallback hata açıklamasını döner (context olmadığında)
+  String get fallbackDescription {
     switch (this) {
       case ErrorType.general:
         return 'Beklenmeyen bir hata oluştu';

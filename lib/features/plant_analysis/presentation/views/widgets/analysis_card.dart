@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:tatarai/core/extensions/string_extension.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
 import 'package:tatarai/core/theme/dimensions.dart';
 import 'package:tatarai/core/theme/text_theme.dart';
@@ -100,7 +101,7 @@ class AnalysisCard extends StatelessWidget {
               ),
               SizedBox(width: 8),
               Text(
-                'Sil',
+                'delete'.locale(context),
                 style: AppTextTheme.bodyText1.copyWith(
                   color: CupertinoColors.white,
                   fontWeight: FontWeight.w600,
@@ -149,7 +150,7 @@ class AnalysisCard extends StatelessWidget {
       builder: (BuildContext context) {
         return CupertinoAlertDialog(
           title: Text(
-            'Analizi Sil',
+            'delete_analysis'.locale(context),
             style: AppTextTheme.headline6.copyWith(
               fontWeight: FontWeight.w600,
             ),
@@ -157,7 +158,7 @@ class AnalysisCard extends StatelessWidget {
           content: Padding(
             padding: const EdgeInsets.only(top: 8.0),
             child: Text(
-              'Bu analizi kalıcı olarak silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.',
+              'delete_analysis_confirmation'.locale(context),
               style: AppTextTheme.bodyText2.copyWith(
                 color: CupertinoColors.systemGrey,
               ),
@@ -170,7 +171,7 @@ class AnalysisCard extends StatelessWidget {
                 Navigator.of(context).pop(false);
               },
               child: Text(
-                'İptal',
+                'cancel'.locale(context),
                 style: AppTextTheme.bodyText1.copyWith(
                   color: AppColors.primary,
                   fontWeight: FontWeight.w500,
@@ -183,7 +184,7 @@ class AnalysisCard extends StatelessWidget {
                 Navigator.of(context).pop(true);
               },
               child: Text(
-                'Sil',
+                'delete'.locale(context),
                 style: AppTextTheme.bodyText1.copyWith(
                   color: CupertinoColors.systemRed,
                   fontWeight: FontWeight.w600,
@@ -294,10 +295,10 @@ class AnalysisCard extends StatelessWidget {
                       padding: const EdgeInsets.only(top: 6),
                       child: Text(
                         (analysis.fieldName?.isNotEmpty ?? false)
-                            ? 'Bitki: ${analysis.plantName ?? "Bilinmeyen"}'
+                            ? '${'plant_info'.locale(context)}: ${analysis.plantName ?? 'unknown'.locale(context)}'
                             : (analysis.fieldName?.isNotEmpty ?? false)
-                                ? 'Tarla: ${analysis.fieldName}'
-                                : 'Bitki Analizi',
+                                ? '${'field_name'.locale(context)}: ${analysis.fieldName}'
+                                : 'plant_analysis_generic'.locale(context),
                         style: AppTextTheme.bodyText2.copyWith(
                           color: CupertinoColors.systemGrey,
                           fontSize: context.dimensions.fontSizeXS,
@@ -376,10 +377,10 @@ class AnalysisCard extends StatelessWidget {
 
     // Sağlık durumu metni - isHealthy alanına göre
     final String statusText = analysis.isHealthy
-        ? 'Sağlıklı'
+        ? 'healthy'.locale(context)
         : (analysis.diseases.isNotEmpty
             ? analysis.diseases.first.name
-            : 'Sağlık Sorunu');
+            : 'health_issue'.locale(context));
 
     return Padding(
       padding: EdgeInsets.all(context.dimensions.paddingM),
@@ -470,7 +471,8 @@ class AnalysisCard extends StatelessWidget {
                       child: Text(
                         (analysis.fieldName?.isNotEmpty ?? false)
                             ? analysis.fieldName!
-                            : (analysis.plantName ?? 'Bilinmeyen Bitki'),
+                            : (analysis.plantName ??
+                                'unknown_plant'.locale(context)),
                         style: AppTextTheme.caption.copyWith(
                           fontWeight: FontWeight.bold,
                           letterSpacing: -0.3,
@@ -515,8 +517,8 @@ class AnalysisCard extends StatelessWidget {
                     Flexible(
                       child: Text(
                         (analysis.fieldName?.isNotEmpty ?? false)
-                            ? 'Bitki: ${analysis.plantName ?? "Bilinmeyen"}'
-                            : 'Bitki Analizi',
+                            ? '${'plant_info'.locale(context)}: ${analysis.plantName ?? 'unknown'.locale(context)}'
+                            : 'plant_analysis_generic'.locale(context),
                         style: AppTextTheme.bodyText2.copyWith(
                           color: CupertinoColors.systemGrey,
                           fontSize: context.dimensions.fontSizeXS,

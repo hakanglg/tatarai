@@ -15,6 +15,8 @@ import '../../features/navbar/navigation_manager.dart';
 import '../../features/onboarding/views/onboarding_screen.dart';
 import '../../features/plant_analysis/presentation/views/analyses_result/analysis_result_screen.dart';
 import '../../features/plant_analysis/presentation/views/analysis/analysis_screen.dart';
+import '../../features/settings/views/settings_screen.dart';
+import '../../features/settings/views/language_selection_screen.dart';
 import '../../features/splash/views/splash_screen.dart';
 import '../../features/update/views/force_update_screen.dart';
 
@@ -80,11 +82,16 @@ class AppRouter {
               return AnalysisResultScreen(analysisId: analysisId);
             },
           ),
-          // GoRoute(
-          //   path: RoutePaths.profile,
-          //   name: RouteNames.profile,
-          //   builder: (context, state) => const ProfileScreen(),
-          // ),
+          GoRoute(
+            path: RoutePaths.languageSelection,
+            name: RouteNames.languageSelection,
+            builder: (context, state) => const LanguageSelectionScreen(),
+          ),
+          GoRoute(
+            path: RoutePaths.settings,
+            name: RouteNames.settings,
+            builder: (context, state) => const SettingsScreen(),
+          ),
           // Premium sayfası şu an mevcut değil
           // GoRoute(
           //   path: RoutePaths.premium,

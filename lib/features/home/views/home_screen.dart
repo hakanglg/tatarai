@@ -9,7 +9,7 @@ import 'package:tatarai/features/home/views/home_tab_content.dart';
 import 'package:tatarai/features/navbar/navigation_manager.dart';
 import 'package:tatarai/features/navbar/widgets/app_bottom_navigation_bar.dart';
 import 'package:tatarai/features/plant_analysis/presentation/views/analysis/analysis_screen.dart';
-import 'package:tatarai/features/profile/views/profile_screen.dart';
+import 'package:tatarai/features/settings/views/settings_screen.dart';
 
 /// Ana ekran widget'ı - TabBar içeren ana sayfa
 class HomeScreen extends StatefulWidget {
@@ -55,7 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
       // NavigationManager olmadan basit bir home ekranı göster
       return Scaffold(
         appBar: AppBar(
-          title: Text('TatarAI'),
+          title: Text('app_title'.locale(context)),
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
         ),
@@ -82,7 +82,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   NavigationManager.initialize(initialIndex: 0);
                   setState(() {});
                 },
-                child: Text('Yenile'),
+                child: Text('refresh'.locale(context)),
               ),
             ],
           ),
@@ -143,8 +143,8 @@ class _HomeScreenState extends State<HomeScreen> {
         return const HomeTabContent();
       case 1:
         return const AnalysisScreen();
-      // case 2:
-      // return const ProfileScreen();
+      case 2:
+        return const SettingsScreen();
       default:
         return Center(child: Text('page_not_found'.locale(context)));
     }

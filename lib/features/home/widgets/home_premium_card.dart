@@ -6,6 +6,7 @@ import '../../../core/theme/color_scheme.dart';
 import '../../../core/theme/dimensions.dart';
 import '../../../core/theme/text_theme.dart';
 import '../../../core/utils/logger.dart';
+import '../../../core/extensions/string_extension.dart';
 import '../../payment/cubits/payment_cubit.dart';
 
 /// Sade Premium Card Widget'ı
@@ -52,7 +53,7 @@ class HomePremiumCard extends StatelessWidget {
   Widget _buildPremiumCard(BuildContext context, PaymentState paymentState) {
     return Container(
       width: double.infinity,
-      height: 100,
+      height: 110, // Yüksekliği 100'den 110'a çıkardık
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
@@ -123,21 +124,28 @@ class HomePremiumCard extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                'Premium\'a Geç',
+                                'switch_to_premium'.locale(context),
                                 style: AppTextTheme.bodyText1.copyWith(
                                   fontWeight: FontWeight.w700,
                                   color: Colors.white,
-                                ),
-                              ),
-                              SizedBox(height: 2),
-                              Text(
-                                'Sınırsız analiz ve gelişmiş özellikler',
-                                style: AppTextTheme.bodyText2.copyWith(
-                                  color: Colors.white.withOpacity(0.9),
-                                  fontSize: 13,
+                                  fontSize: 15, // Font boyutunu biraz küçülttük
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
+                              ),
+                              SizedBox(height: 4), // Boşluğu artırdık
+                              Flexible(
+                                // Flexible ekledik ki subtitle'a daha fazla alan verelim
+                                child: Text(
+                                  'unlimited_analysis_premium'.locale(context),
+                                  style: AppTextTheme.bodyText2.copyWith(
+                                    color: Colors.white.withOpacity(0.9),
+                                    fontSize: 12, // Font boyutunu küçülttük
+                                    height: 1.3, // Satır yüksekliğini ayarladık
+                                  ),
+                                  maxLines: 2, // 2 satıra çıkardık
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ],
                           ),
@@ -195,7 +203,7 @@ class HomePremiumCard extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Keşfet',
+                    'explore'.locale(context),
                     style: AppTextTheme.bodyText2.copyWith(
                       color: AppColors.primary,
                       fontWeight: FontWeight.w600,

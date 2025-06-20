@@ -3,7 +3,7 @@ import 'package:tatarai/core/extensions/string_extension.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/features/home/views/home_tab_content.dart';
 import 'package:tatarai/features/plant_analysis/presentation/views/analysis/analysis_screen.dart';
-import 'package:tatarai/features/profile/views/profile_screen.dart';
+import 'package:tatarai/features/settings/views/settings_screen.dart';
 
 /// Navigasyon öğeleri için varsayılan ikonlar ve başlıklar
 class NavigationItems {
@@ -23,19 +23,19 @@ class NavigationItems {
         label: 'nav_analysis'.locale(context),
       );
 
-  /// Profile tab itemları oluştur
-  static BottomNavigationBarItem profileTab(BuildContext context) =>
+  /// Settings tab itemları oluştur
+  static BottomNavigationBarItem settingsTab(BuildContext context) =>
       BottomNavigationBarItem(
-        icon: const Icon(CupertinoIcons.person),
-        activeIcon: const Icon(CupertinoIcons.person_fill),
-        label: 'nav_profile'.locale(context),
+        icon: const Icon(CupertinoIcons.gear_alt),
+        activeIcon: const Icon(CupertinoIcons.gear_alt_fill),
+        label: 'nav_settings'.locale(context),
       );
 
   /// Tüm tab itemlarını içeren liste oluştur (localize)
   static List<BottomNavigationBarItem> getAllTabs(BuildContext context) => [
         homeTab(context),
         analysisTab(context),
-        // profileTab(context),
+        settingsTab(context),
       ];
 }
 
@@ -96,11 +96,12 @@ class NavigationManager with ChangeNotifier {
       _screens = [
         const HomeTabContent(),
         const AnalysisScreen(),
-        // const ProfileScreen(),
+        const SettingsScreen(),
       ];
     } catch (e, stack) {
       AppLogger.e('Ekranları yüklerken hata', e, stack);
       _screens = [
+        const SizedBox.shrink(),
         const SizedBox.shrink(),
         const SizedBox.shrink(),
       ];

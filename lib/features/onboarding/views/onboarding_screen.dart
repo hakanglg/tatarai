@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sprung/sprung.dart';
+import 'package:tatarai/core/extensions/string_extension.dart';
 import 'package:tatarai/core/routing/route_names.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
 import 'package:tatarai/core/theme/dimensions.dart';
@@ -34,9 +35,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   final List<OnboardingItem> _onboardingItems = [
     OnboardingItem(
-      title: 'Bitki Sağlığı Analizi',
-      description:
-          'Yapay zeka ile bitkilerinizin sağlığını analiz edin ve sorunları erken aşamada tespit edin.',
+      title: 'onboarding_title_1',
+      description: 'onboarding_desc_1',
       icon: CupertinoIcons.leaf_arrow_circlepath,
       backgroundOpacity: 0.2,
       mainColor: AppColors.primary,
@@ -66,9 +66,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       ],
     ),
     OnboardingItem(
-      title: 'Tarım Tavsiyeleri',
-      description:
-          'Bitki türüne ve yetişme koşullarına göre özelleştirilmiş tarım tavsiyeleri alın.',
+      title: 'onboarding_title_2',
+      description: 'onboarding_desc_2',
       icon: CupertinoIcons.light_max,
       backgroundOpacity: 0.25,
       mainColor: AppColors.primary,
@@ -98,9 +97,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       ],
     ),
     OnboardingItem(
-      title: 'Hastalık Teşhisi',
-      description:
-          'Bitkilerinizdeki hastalıkları yapay zeka ile teşhis edin ve çözüm önerileri alın.',
+      title: 'onboarding_title_3',
+      description: 'onboarding_desc_3',
       icon: CupertinoIcons.doc_text_search,
       backgroundOpacity: 0.3,
       mainColor: AppColors.primary,
@@ -130,15 +128,14 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       ],
     ),
     OnboardingItem(
-      title: 'TatarAI\'ye Hoş Geldiniz!',
-      description:
-          'Bitki sağlığı analizi için yapay zeka destekli uygulamanız hazır. Hemen başlayın ve bitkilerinizin sağlığını profesyonel düzeyde analiz edin.',
+      title: 'onboarding_title_4',
+      description: 'onboarding_desc_4',
       icon: CupertinoIcons.check_mark_circled_solid,
       backgroundOpacity: 0.35,
       mainColor: AppColors.primary,
       illustrationPath: 'assets/images/onboarding_4.png',
       pricingInfo: '',
-      specialOffer: 'Ücretsiz 5 analiz hakkı ile başlayın',
+      specialOffer: 'onboarding_special_offer',
       bgElements: const [
         DecorationItem(
           icon: Icons.check_circle,
@@ -620,7 +617,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 ),
                 SizedBox(width: context.dimensions.spaceXXS),
                 Text(
-                  'HOŞ GELDİNİZ',
+                  'welcome'.locale(context).toUpperCase(),
                   style: AppTextTheme.captionL.copyWith(
                     color: Colors.white,
                     letterSpacing: 1.2,
@@ -642,7 +639,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 child: Transform.translate(
                   offset: Offset(0, 20 * (1 - value)),
                   child: Text(
-                    item.title,
+                    item.title.locale(context),
                     textAlign: TextAlign.center,
                     style: AppTextTheme.headline2.copyWith(
                       color: AppColors.primary,
@@ -666,7 +663,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 child: Transform.translate(
                   offset: Offset(0, 30 * (1 - value)),
                   child: Text(
-                    item.description,
+                    item.description.locale(context),
                     textAlign: TextAlign.center,
                     style: AppTextTheme.body.copyWith(
                       color: AppColors.textSecondary,
@@ -757,7 +754,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                       ),
                       SizedBox(width: context.dimensions.spaceXXS),
                       Text(
-                        'BAŞLANGIC HEDİYESİ',
+                        'welcome_gift'.locale(context).toUpperCase(),
                         style: AppTextTheme.captionL.copyWith(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w600,
@@ -767,7 +764,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   ),
                   SizedBox(height: context.dimensions.spaceXXS),
                   Text(
-                    item.specialOffer,
+                    item.specialOffer.locale(context),
                     textAlign: TextAlign.center,
                     style: AppTextTheme.headline4.copyWith(
                       color: AppColors.primary,
@@ -793,7 +790,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 ),
                 SizedBox(width: context.dimensions.spaceXS),
                 Text(
-                  'Güvenli • Hızlı • Kolay Kullanım',
+                  'app_features'.locale(context),
                   style: AppTextTheme.captionL.copyWith(
                     color: Colors.grey[600],
                   ),

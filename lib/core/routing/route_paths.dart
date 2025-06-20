@@ -23,8 +23,11 @@ class RoutePaths {
   /// Analiz sonuçları ekranı yolu
   static const String analysisResult = '/analysis/result';
 
-  /// Profil ekranı yolu
-  static const String profile = '/profile';
+  /// Ayarlar ekranı yolu
+  static const String settings = '/settings';
+
+  /// Dil seçimi ekranı yolu
+  static const String languageSelection = '/language-selection';
 
   /// Premium ekranı yolu
   static const String premium = '/premium';

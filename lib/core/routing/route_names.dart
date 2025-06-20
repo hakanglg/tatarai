@@ -23,8 +23,11 @@ class RouteNames {
   /// Analiz sonuçları ekranının adı
   static const String analysisResult = 'analysisResult';
 
-  /// Profil ekranının adı
-  static const String profile = 'profile';
+  /// Ayarlar ekranının adı
+  static const String settings = 'settings';
+
+  /// Dil seçimi ekranının adı
+  static const String languageSelection = 'languageSelection';
 
   /// Premium ekranının adı
   static const String premium = 'premium';

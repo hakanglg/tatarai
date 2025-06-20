@@ -10,6 +10,7 @@ import 'package:tatarai/core/constants/app_constants.dart';
 import 'package:tatarai/core/utils/validation_util.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/core/models/user_model.dart';
+import 'package:tatarai/core/init/localization/localization_manager.dart';
 import 'package:tatarai/features/plant_analysis/services/gemini_service.dart';
 import 'package:tatarai/features/plant_analysis/data/models/plant_analysis_model.dart';
 
@@ -177,6 +178,11 @@ class PlantAnalysisService {
           'Calling Gemini AI service',
           'Image size: ${imageBytes.length} bytes',
         );
+
+        // Güncel dil ayarını al ve Gemini servisine uygula
+        final currentLocale = LocalizationManager.instance.currentLocale;
+        final languageCode = currentLocale.languageCode == 'tr' ? 'tr' : 'en';
+        _geminiService.setLanguage(languageCode);
 
         final analysisResult = await _geminiService.analyzeImage(
           imageBytes,

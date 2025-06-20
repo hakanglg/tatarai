@@ -42,7 +42,7 @@ class HomeStatsWidget extends StatelessWidget {
               bottom: context.dimensions.paddingM,
             ),
             child: Text(
-              'Genel Bakış',
+              'stats_overview'.locale(context),
               style: AppTextTheme.headline6.copyWith(
                 fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
@@ -267,25 +267,25 @@ class HomeStatsWidget extends StatelessWidget {
 
     return [
       StatData(
-        title: 'Toplam Analiz',
+        title: 'stats_total_analysis'.locale(context),
         value: totalAnalyses.toString(),
         icon: CupertinoIcons.chart_bar_alt_fill,
         color: AppColors.primary,
       ),
       StatData(
-        title: 'Sağlıklı Bitki',
+        title: 'stats_healthy_plants'.locale(context),
         value: healthyPlants.toString(),
         icon: CupertinoIcons.leaf_arrow_circlepath,
         color: AppColors.success,
       ),
       StatData(
-        title: 'Bu Ay',
+        title: 'stats_this_month'.locale(context),
         value: thisMonthAnalyses.toString(),
         icon: CupertinoIcons.calendar_today,
         color: AppColors.info,
       ),
       StatData(
-        title: 'Başarı Oranı',
+        title: 'stats_success_rate'.locale(context),
         value: totalAnalyses > 0
             ? '${((healthyPlants / totalAnalyses) * 100).round()}%'
             : '0%',

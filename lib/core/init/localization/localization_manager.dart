@@ -50,15 +50,23 @@ class LocalizationManager {
       if (savedLanguageCode != null && savedLanguageCode.isNotEmpty) {
         // Kaydedilmiş dili al ve kullan
         final List<String> codeParts = savedLanguageCode.split('_');
+        Locale newLocale;
+
         if (codeParts.length >= 2) {
-          final newLocale = Locale(codeParts[0], codeParts[1]);
+          newLocale = Locale(codeParts[0], codeParts[1]);
+        } else {
+          // Sadece dil kodu varsa (ülke kodu yoksa)
+          newLocale = Locale(codeParts[0]);
+        }
+
+        // Desteklenen dil mi kontrol et
+        if (_isSupportedLocale(newLocale)) {
           _updateLocale(newLocale);
           AppLogger.i('Kaydedilmiş dil yüklendi: $newLocale');
         } else {
-          // Sadece dil kodu varsa (ülke kodu yoksa)
-          final newLocale = Locale(codeParts[0]);
-          _updateLocale(newLocale);
-          AppLogger.i('Kaydedilmiş dil yüklendi: $newLocale');
+          AppLogger.w(
+              'Desteklenmeyen kaydedilmiş dil: $newLocale, varsayılan dil kullanılıyor');
+          _useDeviceLocale();
         }
       } else {
         // Kaydedilmiş dil yoksa cihaz dilini kullan
@@ -92,31 +100,51 @@ class LocalizationManager {
 
   /// Dil değiştir
   Future<void> changeLocale(Locale locale) async {
+    AppLogger.i('changeLocale çağrıldı - istek edilen dil: $locale');
+    AppLogger.i('Mevcut dil: ${_currentLocale.value}');
+
     if (!_isSupportedLocale(locale)) {
       AppLogger.w('Desteklenmeyen dil: $locale, varsayılan dil kullanılıyor');
       locale = LocaleConstants.fallbackLocale;
     }
 
     try {
+      AppLogger.i('Dil kaydediliyor: $locale');
       await _saveLocale(locale);
+
+      AppLogger.i('Locale güncelleniyor: $locale');
       _updateLocale(locale);
 
-      // Uygulamanın doğru delegate'leri bilmesi için dil değişikliğini bildiriyoruz
-      AppLogger.i('Dil değiştirildi: $locale');
+      AppLogger.i('Yeni locale değeri: ${_currentLocale.value}');
+      AppLogger.i('Dil değişikliği tamamlandı: $locale');
     } catch (e) {
       AppLogger.e('Dil değiştirme hatası: $e');
+      throw e; // Hatayı yukarı fırlat
     }
   }
 
   /// Dil ayarını kaydet
   Future<void> _saveLocale(Locale locale) async {
-    final localeCode = '${locale.languageCode}_${locale.countryCode}';
-    await _preferences.setString(LocaleConstants.prefsKeyLanguage, localeCode);
+    try {
+      final localeCode = locale.countryCode != null
+          ? '${locale.languageCode}_${locale.countryCode}'
+          : locale.languageCode;
+
+      await _preferences.setString(
+          LocaleConstants.prefsKeyLanguage, localeCode);
+      AppLogger.i('Dil ayarı kaydedildi: $localeCode');
+    } catch (e) {
+      AppLogger.e('Dil ayarı kaydetme hatası: $e');
+    }
   }
 
   /// Locale değerini güncelle
   void _updateLocale(Locale locale) {
+    AppLogger.d(
+        '_updateLocale çağrıldı - eski: ${_currentLocale.value}, yeni: $locale');
     _currentLocale.value = locale;
+    AppLogger.d(
+        'ValueNotifier güncellendi - şu anki değer: ${_currentLocale.value}');
   }
 
   /// Desteklenen bir dil mi?

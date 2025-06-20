@@ -15,6 +15,9 @@ class GeminiService extends BaseService {
   bool _isInitialized = false;
   final Dio _dio = Dio();
 
+  /// Güncel dil ayarı ('tr' veya 'en')
+  String _currentLanguage = 'tr';
+
   /// Servis oluşturulurken Gemini modelini başlatır
   GeminiService() {
     _initializeModel();
@@ -65,6 +68,18 @@ class GeminiService extends BaseService {
     }
   }
 
+  /// Dil ayarını günceller
+  ///
+  /// [language] - Yanıt dili ('tr' veya 'en')
+  void setLanguage(String language) {
+    if (language == 'tr' || language == 'en') {
+      _currentLanguage = language;
+      logInfo('Gemini dil ayarı güncellendi', 'Yeni dil: $language');
+    } else {
+      logWarning('Geçersiz dil kodu', 'Desteklenen diller: tr, en');
+    }
+  }
+
   /// Görsel analizi yapar
   ///
   /// [imageBytes] analiz edilecek görselin bayt dizisi
@@ -100,7 +115,8 @@ class GeminiService extends BaseService {
           fieldName: fieldName);
 
       // 3. Analiz promptunu hazırla
-      final finalPrompt = _prepareAnalysisPrompt(prompt, locationInfo);
+      final finalPrompt = _prepareAnalysisPrompt(prompt, locationInfo,
+          language: _currentLanguage);
 
       // DEBUG: Prompt'u logla
       logInfo(
@@ -420,7 +436,24 @@ göz önünde bulundurularak önerilerini vermelisin.''';
 
   /// Analiz talimatlarını oluşturur
   String _buildAnalysisInstructions(String analysisType, String language) {
-    final baseInstructions = '''[ANALİZ TALİMATLARI]
+    final baseInstructions = language == 'en'
+        ? '''[ANALYSIS INSTRUCTIONS]
+1. 🔍 PLANT IDENTIFICATION: Accurately identify the plant (Common and Latin name)
+2. 🩺 HEALTH ASSESSMENT: Detailed health analysis
+   - Leaf color and texture
+   - Stem condition
+   - Root system appearance
+   - Fruit/flower condition
+3. 🦠 DISEASE DETECTION: Identify disease symptoms
+   - Fungal diseases
+   - Bacterial diseases
+   - Viral diseases
+   - Pest damage
+   - Nutrient deficiencies
+4. 📊 GROWTH EVALUATION: Score plant development (0-100)
+5. 💊 TREATMENT RECOMMENDATIONS: Specific treatment methods
+6. 🌱 CARE ADVICE: Comprehensive care plan'''
+        : '''[ANALİZ TALİMATLARI]
 1. 🔍 BİTKİ TEŞHİSİ: Bitkiyi kesin olarak teşhis et (Türkçe ve Latince adı)
 2. 🩺 SAĞLIK DURUMU: Detaylı sağlık analizi yap
    - Yaprak rengi ve dokusu
@@ -437,15 +470,23 @@ göz önünde bulundurularak önerilerini vermelisin.''';
 5. 💊 TEDAVİ ÖNERİLERİ: Spesifik tedavi yöntemleri öner
 6. 🌱 BAKIM TAVSİYELERİ: Comprehensive bakım planı hazırla''';
 
+    final focusMessage = language == 'en' ? '[SPECIAL FOCUS]' : '[ÖZEL FOKUS]';
+
     switch (analysisType) {
       case 'disease':
+        final diseaseText = language == 'en'
+            ? 'Focus on disease diagnosis and treatment recommendations.'
+            : 'Hastalık teşhisi ve tedavi önerilerine odaklan.';
         return '''$baseInstructions
         
-[ÖZEL FOKUS] Hastalık teşhisi ve tedavi önerilerine odaklan.''';
+$focusMessage $diseaseText''';
       case 'care':
+        final careText = language == 'en'
+            ? 'Focus on care recommendations and growing conditions.'
+            : 'Bakım tavsiyeleri ve yetiştirme koşullarına odaklan.';
         return '''$baseInstructions
         
-[ÖZEL FOKUS] Bakım tavsiyeleri ve yetiştirme koşullarına odaklan.''';
+$focusMessage $careText''';
       default:
         return baseInstructions;
     }
@@ -486,7 +527,23 @@ göz önünde bulundurularak önerilerini vermelisin.''';
 
   /// Kritik uyarıları oluşturur
   String _buildCriticalWarnings(String language) {
-    return '''[🚨 KRİTİK UYARILAR - MUTLAKA UYULACAK] 
+    if (language == 'en') {
+      return '''[🚨 CRITICAL WARNINGS - MUST FOLLOW] 
+🔴 ONLY respond in JSON format - nothing else
+🔴 FIRST CHARACTER must be {, LAST CHARACTER must be }
+🔴 NO preface, explanation, notes or conclusion
+🔴 Do NOT write a SINGLE CHARACTER outside JSON (no period, explanation, emoji)
+🔴 Do NOT use markdown formatting (```json, ``` etc.)
+🔴 Use proper English characters and grammar
+🔴 All string values in double quotes
+🔴 Boolean values: only true/false (no quotes)
+🔴 Numeric values: without quotes (e.g. 0.85)
+🔴 Arrays in square brackets: ["item1", "item2"]
+🔴 Do NOT use null values - use empty string "" or empty array []
+🔴 Do NOT use trailing comma (no comma after last item)
+🔴 Do NOT use Unicode escape characters (\\u0000 etc.)''';
+    } else {
+      return '''[🚨 KRİTİK UYARILAR - MUTLAKA UYULACAK] 
 🔴 SADECE VE YALNIZCA JSON formatında yanıt ver - başka hiçbir şey yok
 🔴 CEVABININ İLK KARAKTERI { OLMALI, SON KARAKTERI } OLMALI
 🔴 HİÇBİR ön söz, açıklama, not veya son söz EKLEME
@@ -500,6 +557,7 @@ göz önünde bulundurularak önerilerini vermelisin.''';
 🔴 Null değer kullanma - boş string "" veya boş array [] kullan
 🔴 Trailing comma kullanma (son öğeden sonra virgül yok)
 🔴 Unicode kaçış karakterleri kullanma (\\u0000 vb.)''';
+    }
   }
 
   /// Zorunlu kuralları oluşturur

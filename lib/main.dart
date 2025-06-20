@@ -189,7 +189,7 @@ class _TatarAIState extends State<TatarAI> {
 
                 // Ana başlık
                 Text(
-                  hasError ? 'Başlatma Sorunu' : 'TatarAI Başlatılıyor...',
+                  hasError ? 'İnit sorunu' : 'Başlatılıyor...',
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w600,
@@ -201,8 +201,8 @@ class _TatarAIState extends State<TatarAI> {
                 // Durum mesajı
                 Text(
                   hasError
-                      ? 'Uygulama başlatılırken bir sorun oluştu.\nLütfen bekleyin veya uygulamayı yeniden başlatın.'
-                      : 'Servisler yükleniyor, lütfen bekleyin...',
+                      ? 'Başlatma sorunu oluştu.\nLütfen bekleyin.'
+                      : 'Servisler yükleniyor...',
                   style: TextStyle(
                     fontSize: 14,
                     color: hasError ? Colors.red[600] : Colors.grey[600],
@@ -245,7 +245,7 @@ class _TatarAIState extends State<TatarAI> {
                     foregroundColor: Colors.white,
                   ),
                   child: Text(
-                    hasError ? 'Zorla Devam Et' : 'Debug: Ana Sayfaya Git',
+                    hasError ? 'Devam Et' : 'Ana Sayfa',
                     style: const TextStyle(fontSize: 14),
                   ),
                 ),
@@ -274,32 +274,40 @@ class _TatarAIState extends State<TatarAI> {
           AppLogger.i(
               '📱 MaterialApp build - Auth State: ${authState.runtimeType}');
 
-          return MaterialApp.router(
-            title: AppConstants.appName,
-            debugShowCheckedModeBanner: false,
+          return ValueListenableBuilder<Locale>(
+            valueListenable: LocalizationManager.instance.currentLocaleNotifier,
+            builder: (context, currentLocale, child) {
+              AppLogger.d(
+                  '🌐 Dil değişikliği algılandı: ${currentLocale.languageCode}');
 
-            // Theme configuration
-            theme: AppTheme.materialTheme,
-            darkTheme: AppTheme.materialTheme.copyWith(
-              colorScheme: AppTheme.darkColorScheme,
-              brightness: Brightness.dark,
-            ),
-            themeMode: ThemeMode.light,
+              return MaterialApp.router(
+                title: AppConstants.appName,
+                debugShowCheckedModeBanner: false,
 
-            // Router configuration
-            routerConfig: AppRouter(
-              authCubit: BlocProvider.of<AuthCubit>(context),
-            ).router,
+                // Theme configuration
+                theme: AppTheme.materialTheme,
+                darkTheme: AppTheme.materialTheme.copyWith(
+                  colorScheme: AppTheme.darkColorScheme,
+                  brightness: Brightness.dark,
+                ),
+                themeMode: ThemeMode.light,
 
-            // Localization configuration
-            locale: LocalizationManager.instance.currentLocaleNotifier.value,
-            supportedLocales: LocaleConstants.supportedLocales,
-            localizationsDelegates: const [
-              AppLocalizations.delegate,
-              GlobalMaterialLocalizations.delegate,
-              GlobalWidgetsLocalizations.delegate,
-              GlobalCupertinoLocalizations.delegate,
-            ],
+                // Router configuration
+                routerConfig: AppRouter(
+                  authCubit: BlocProvider.of<AuthCubit>(context),
+                ).router,
+
+                // Localization configuration - ValueListenable ile dinamik
+                locale: currentLocale,
+                supportedLocales: LocaleConstants.supportedLocales,
+                localizationsDelegates: const [
+                  AppLocalizations.delegate,
+                  GlobalMaterialLocalizations.delegate,
+                  GlobalWidgetsLocalizations.delegate,
+                  GlobalCupertinoLocalizations.delegate,
+                ],
+              );
+            },
           );
         },
       ),

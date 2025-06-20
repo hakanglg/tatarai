@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import '../../../core/theme/color_scheme.dart';
 import '../../../core/theme/dimensions.dart';
 import '../../../core/theme/text_theme.dart';
+import '../../../core/extensions/string_extension.dart';
 
 /// Modern Ana Ekran İpuçları Widget'ı
 ///
@@ -22,7 +23,7 @@ class HomeTipsWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final todaysTip = _getTodaysTip();
+    final todaysTip = _getTodaysTip(context);
 
     return Container(
       margin: EdgeInsets.symmetric(
@@ -41,7 +42,7 @@ class HomeTipsWidget extends StatelessWidget {
             child: Row(
               children: [
                 Text(
-                  'Günün İpucu',
+                  'daily_tip'.locale(context),
                   style: AppTextTheme.headline6.copyWith(
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
@@ -218,84 +219,77 @@ class HomeTipsWidget extends StatelessWidget {
   }
 
   /// Günün ipucunu getirir
-  TipData _getTodaysTip() {
+  TipData _getTodaysTip(BuildContext context) {
     final tips = [
       // Pazartesi - Sulama
       TipData(
-        category: 'Sulama',
-        title: 'Doğru Sulama Zamanı',
-        description:
-            'Bitkilerinizi sabah erken saatlerde sulayın. Bu sayede gün boyunca suyu emebilir ve gece nemli kalmaktan kaynaklı hastalıklardan korunabilirler.',
+        category: 'watering_category'.locale(context),
+        title: 'watering_tip_title'.locale(context),
+        description: 'watering_tip_desc'.locale(context),
         icon: CupertinoIcons.drop_fill,
         color: AppColors.info, // Proje info rengi
-        actionText: 'Sulama Rehberi',
+        actionText: 'watering_guide'.locale(context),
       ),
 
       // Salı - Işık
       TipData(
-        category: 'Işık',
-        title: 'Işık İhtiyacını Anlayın',
-        description:
-            'Her bitkinin farklı ışık ihtiyacı vardır. Yaprakların solması veya uzaması, yanlış ışık koşullarının işareti olabilir.',
+        category: 'lighting_category'.locale(context),
+        title: 'lighting_tip_title'.locale(context),
+        description: 'lighting_tip_desc'.locale(context),
         icon: CupertinoIcons.sun_max_fill,
         color: AppColors.warning, // Proje warning rengi
-        actionText: 'Işık Rehberi',
+        actionText: 'lighting_guide'.locale(context),
       ),
 
       // Çarşamba - Toprak
       TipData(
-        category: 'Toprak',
-        title: 'Toprak Sağlığı Kontrolü',
-        description:
-            'Toprağınızın pH seviyesini kontrol edin. Çoğu bitki 6.0-7.0 pH aralığında en iyi gelişir.',
+        category: 'soil_category'.locale(context),
+        title: 'soil_tip_title'.locale(context),
+        description: 'soil_tip_desc'.locale(context),
         icon: CupertinoIcons.globe,
         color: AppColors.primary, // Proje ana rengi
-        actionText: 'Toprak Testi',
+        actionText: 'soil_test'.locale(context),
       ),
 
       // Perşembe - Budama
       TipData(
-        category: 'Budama',
-        title: 'Düzenli Budama Yapın',
-        description:
-            'Ölü, hastalıklı veya zarar görmüş yaprakları düzenli olarak temizleyin. Bu, bitkinin enerjisini sağlıklı büyümeye odaklamasını sağlar.',
+        category: 'pruning_category'.locale(context),
+        title: 'pruning_tip_title'.locale(context),
+        description: 'pruning_tip_desc'.locale(context),
         icon: CupertinoIcons.scissors,
         color: AppColors.textSecondary, // Proje secondary rengi
-        actionText: 'Budama Teknikleri',
+        actionText: 'pruning_techniques'.locale(context),
       ),
 
       // Cuma - Gübre
       TipData(
-        category: 'Beslenme',
-        title: 'Mevsimsel Gübreleme',
-        description:
-            'İlkbahar ve yaz aylarında bitkilerinizi düzenli gübrelemeyi unutmayın. Organik gübreler uzun vadeli sağlık için idealdir.',
+        category: 'nutrition_category'.locale(context),
+        title: 'nutrition_tip_title'.locale(context),
+        description: 'nutrition_tip_desc'.locale(context),
         icon: CupertinoIcons.leaf_arrow_circlepath,
         color: AppColors.success, // Proje success rengi
-        actionText: 'Gübre Rehberi',
+        actionText: 'fertilizer_guide'.locale(context),
       ),
 
       // Cumartesi - Hastalık
       TipData(
-        category: 'Hastalık Önleme',
-        title: 'Erken Teşhis Önemli',
-        description:
-            'Bitkilerinizi düzenli kontrol edin. Yapraklardaki lekeler, renk değişiklikleri veya şekil bozuklukları hastalık belirtisi olabilir.',
+        category: 'disease_prevention_category'.locale(context),
+        title: 'disease_prevention_tip_title'.locale(context),
+        description: 'disease_prevention_tip_desc'.locale(context),
         icon: CupertinoIcons.shield_fill,
         color:
             AppColors.textSecondary, // error yerine textSecondary kullanıyoruz
-        actionText: 'Hastalık Rehberi',
+        actionText: 'disease_guide'.locale(context),
       ),
 
       // Pazar - Genel Bakım
       TipData(
-        category: 'Genel Bakım',
-        title: 'Sabırlı Olun',
-        description:
-            'Bitki bakımı sabır işidir. Ani değişiklikler yapmak yerine, bitkilerinizin doğal ritmine uyum sağlayın.',
+        category: 'general_care_category'.locale(context),
+        title: 'general_care_tip_title'.locale(context),
+        description: 'general_care_tip_desc'.locale(context),
         icon: CupertinoIcons.heart_fill,
         color: AppColors.textTertiary, // Proje tertiary rengi
-        actionText: 'Bakım Takvimi',
+        actionText: 'care_calendar'.locale(context),
       ),
     ];
 
@@ -319,7 +313,7 @@ class HomeTipsWidget extends StatelessWidget {
         actions: [
           CupertinoDialogAction(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Tamam'),
+            child: Text('ok'.locale(context)),
           ),
         ],
       ),

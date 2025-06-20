@@ -5,11 +5,14 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../../core/services/ai/gemini_service_interface.dart';
+import '../../../../core/services/ai/gemini_service_impl.dart';
 import '../../../../core/models/user_model.dart';
 import '../../../../core/repositories/plant_analysis_repository.dart';
 import '../../../../core/utils/logger.dart';
 import '../../../../core/services/service_locator.dart';
 import '../../../../core/services/firestore/firestore_service.dart';
+import '../../../../core/init/localization/localization_manager.dart';
+import '../../../../core/services/ai/gemini_model_config.dart';
 import '../../services/plant_analysis_service.dart';
 
 import 'plant_analysis_state.dart';
@@ -128,6 +131,22 @@ class PlantAnalysisCubitDirect extends Cubit<PlantAnalysisState> {
         progressMessage: 'AI analysis in progress...',
         progress: 0.6,
       ));
+
+      // Güncel dil ayarını al ve Gemini servisine uygula
+      final currentLocale = LocalizationManager.instance.currentLocale;
+      final geminiLanguage = currentLocale.languageCode == 'tr'
+          ? GeminiResponseLanguage.turkish
+          : GeminiResponseLanguage.english;
+
+      // GeminiServiceImpl cast ederek dil ayarını güncelle
+      if (_geminiService is GeminiServiceImpl) {
+        (_geminiService as GeminiServiceImpl).setLanguage(geminiLanguage);
+        AppLogger.logWithContext(
+          _serviceName,
+          '🌐 Gemini dil ayarı güncellendi',
+          'Dil: ${geminiLanguage.code}',
+        );
+      }
 
       final analysisModel = await _geminiService.analyzeImage(
         imageBytes,

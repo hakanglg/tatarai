@@ -128,7 +128,8 @@ class _HomeHeaderWidgetState extends State<HomeHeaderWidget>
 
   @override
   Widget build(BuildContext context) {
-    final headerMessage = _getTodaysMessage(context);
+    // Dil değişikliklerini dinlemek için Localizations.localeOf(context) kullanıyoruz
+    final currentLocale = Localizations.localeOf(context);
 
     return AnimatedBuilder(
       animation: Listenable.merge([
@@ -136,6 +137,9 @@ class _HomeHeaderWidgetState extends State<HomeHeaderWidget>
         _breatheAnimation,
       ]),
       builder: (context, child) {
+        // Her build'de header message'ı yeniden al (dil değişikliği için)
+        final headerMessage = _getTodaysMessage(context);
+
         return FadeTransition(
           opacity: _entryAnimation,
           child: SlideTransition(
@@ -502,24 +506,32 @@ class _HomeHeaderWidgetState extends State<HomeHeaderWidget>
   HeaderMessage _getTodaysMessage(BuildContext context) {
     final messages = [
       HeaderMessage(
-        title: 'Bitkilerinizin\nSağlığını Keşfedin',
-        subtitle:
-            'AI destekli gelişmiş analiz teknolojisi ile bitkilerinizin durumunu anında öğrenin.',
+        title: 'header_message_1_title'.locale(context),
+        subtitle: 'header_message_1_subtitle'.locale(context),
       ),
       HeaderMessage(
-        title: 'Bitki Bakımında\nUzman Rehberliği',
-        subtitle:
-            'Profesyonel tavsiyeleri alın ve bitkilerinizi en iyi şekilde büyütün.',
+        title: 'header_message_2_title'.locale(context),
+        subtitle: 'header_message_2_subtitle'.locale(context),
       ),
       HeaderMessage(
-        title: 'Hastalıkları Erkenden\nTespit Edin',
-        subtitle:
-            'Gelişmiş AI teknolojisi ile bitki hastalıklarını zamanında fark edin.',
+        title: 'header_message_3_title'.locale(context),
+        subtitle: 'header_message_3_subtitle'.locale(context),
       ),
       HeaderMessage(
-        title: 'Bitkilerinizin\nGeleceğini Planlayın',
-        subtitle:
-            'Uzun vadeli bakım stratejileri oluşturun ve bitkilerinizi koruyun.',
+        title: 'header_message_4_title'.locale(context),
+        subtitle: 'header_message_4_subtitle'.locale(context),
+      ),
+      HeaderMessage(
+        title: 'header_message_5_title'.locale(context),
+        subtitle: 'header_message_5_subtitle'.locale(context),
+      ),
+      HeaderMessage(
+        title: 'header_message_6_title'.locale(context),
+        subtitle: 'header_message_6_subtitle'.locale(context),
+      ),
+      HeaderMessage(
+        title: 'header_message_7_title'.locale(context),
+        subtitle: 'header_message_7_subtitle'.locale(context),
       ),
     ];
 

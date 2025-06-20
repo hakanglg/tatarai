@@ -1406,8 +1406,9 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.primary
-                                .withOpacity(0.2 * _pulseAnimation.value),
+                            color: AppColors.primary.withOpacity(
+                                (0.2 * (_pulseAnimation.value ?? 0.0))
+                                    .clamp(0.0, 1.0)),
                             blurRadius: 30,
                             spreadRadius: 10,
                           ),
@@ -1416,8 +1417,9 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                       child: Icon(
                         CupertinoIcons.leaf_arrow_circlepath,
                         size: 64,
-                        color: AppColors.primary
-                            .withOpacity(0.8 + (0.2 * _pulseAnimation.value)),
+                        color: AppColors.primary.withOpacity(
+                            (0.8 + (0.2 * (_pulseAnimation.value ?? 0.0)))
+                                .clamp(0.0, 1.0)),
                       ),
                     ),
                   ),
@@ -1478,8 +1480,9 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                           offset: const Offset(0, 6),
                         ),
                         BoxShadow(
-                          color: AppColors.primary
-                              .withOpacity(0.1 * _pulseAnimation.value),
+                          color: AppColors.primary.withOpacity(
+                              (0.1 * (_pulseAnimation.value ?? 0.0))
+                                  .clamp(0.0, 1.0)),
                           blurRadius: 30,
                           offset: const Offset(0, 15),
                           spreadRadius: 5,
@@ -1601,8 +1604,9 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.primary
-                                .withOpacity(0.2 * _pulseAnimation.value),
+                            color: AppColors.primary.withOpacity(
+                                (0.2 * (_pulseAnimation.value ?? 0.0))
+                                    .clamp(0.0, 1.0)),
                             blurRadius: 30,
                             spreadRadius: 10,
                           ),
@@ -1611,8 +1615,9 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                       child: Icon(
                         CupertinoIcons.search_circle,
                         size: 56,
-                        color: AppColors.primary
-                            .withOpacity(0.8 + (0.2 * _pulseAnimation.value)),
+                        color: AppColors.primary.withOpacity(
+                            (0.8 + (0.2 * (_pulseAnimation.value ?? 0.0)))
+                                .clamp(0.0, 1.0)),
                       ),
                     ),
                   ),

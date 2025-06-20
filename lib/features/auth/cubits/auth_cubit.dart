@@ -6,6 +6,10 @@ import '../../../core/services/service_locator.dart';
 import '../../../core/repositories/auth_repository.dart';
 import '../../../core/models/user_model.dart';
 import 'auth_state.dart';
+import 'package:bloc/bloc.dart';
+import 'package:flutter/material.dart';
+import 'package:tatarai/core/extensions/string_extension.dart';
+import 'package:tatarai/core/utils/cache_manager.dart';
 
 /// Authentication işlemlerini yöneten Cubit
 ///
@@ -160,7 +164,7 @@ class AuthCubit extends BaseCubit<AuthState> {
           handleError('Kalıcı Firestore hatası', firestoreError, stackTrace);
           emit(AuthError(
             message:
-                'Kullanıcı verilerine erişilemiyor: ${_getFirestoreErrorMessage(firestoreError.code)}',
+                'Kullanıcı verilerine erişilemiyor: ${_getFirestoreErrorMessage(firestoreError.code, null)}',
             errorCode: firestoreError.code,
             isCritical: false,
           ));
@@ -304,7 +308,7 @@ class AuthCubit extends BaseCubit<AuthState> {
     } on FirebaseAuthException catch (error, stackTrace) {
       handleError('Anonim giriş Firebase hatası', error, stackTrace);
       emit(AuthError(
-        message: _getFirebaseErrorMessage(error),
+        message: _getFirebaseErrorMessage(error, null),
         errorCode: error.code,
         isCritical: true,
       ));
@@ -470,58 +474,115 @@ class AuthCubit extends BaseCubit<AuthState> {
   }
 
   /// Firestore hata mesajlarını Türkçe'ye çevirir
-  String _getFirestoreErrorMessage(String errorCode) {
+  String _getFirestoreErrorMessage(String errorCode, BuildContext? context) {
+    if (context == null) {
+      // Fallback to default messages if context is not available
+      switch (errorCode) {
+        case 'unavailable':
+          return 'Veritabanı servisi geçici olarak kullanılamıyor';
+        case 'deadline-exceeded':
+          return 'İşlem zaman aşımına uğradı';
+        case 'resource-exhausted':
+          return 'Sistem kaynaklarına erişim sınırı aşıldı';
+        case 'permission-denied':
+          return 'Bu işlem için yetkiniz bulunmuyor';
+        case 'not-found':
+          return 'İstenen veri bulunamadı';
+        case 'already-exists':
+          return 'Bu veri zaten mevcut';
+        case 'invalid-argument':
+          return 'Geçersiz veri gönderildi';
+        case 'unauthenticated':
+          return 'Kimlik doğrulaması gerekli';
+        case 'aborted':
+          return 'İşlem iptal edildi';
+        case 'internal':
+          return 'Sistem iç hatası';
+        default:
+          return 'Veritabanı hatası oluştu';
+      }
+    }
+
     switch (errorCode) {
       case 'unavailable':
-        return 'Veritabanı servisi geçici olarak kullanılamıyor';
+        return 'firestore_unavailable'.locale(context);
       case 'deadline-exceeded':
-        return 'İşlem zaman aşımına uğradı';
+        return 'firestore_deadline_exceeded'.locale(context);
       case 'resource-exhausted':
-        return 'Sistem kaynaklarına erişim sınırı aşıldı';
+        return 'firestore_resource_exhausted'.locale(context);
       case 'permission-denied':
-        return 'Bu işlem için yetkiniz bulunmuyor';
+        return 'firestore_permission_denied'.locale(context);
       case 'not-found':
-        return 'İstenen veri bulunamadı';
+        return 'firestore_not_found'.locale(context);
       case 'already-exists':
-        return 'Bu veri zaten mevcut';
+        return 'firestore_already_exists'.locale(context);
       case 'invalid-argument':
-        return 'Geçersiz veri gönderildi';
+        return 'firestore_invalid_argument'.locale(context);
       case 'unauthenticated':
-        return 'Kimlik doğrulaması gerekli';
+        return 'firestore_unauthenticated'.locale(context);
       case 'aborted':
-        return 'İşlem iptal edildi';
+        return 'firestore_aborted'.locale(context);
       case 'internal':
-        return 'Sistem iç hatası';
+        return 'firestore_internal'.locale(context);
       default:
-        return 'Veritabanı hatası oluştu';
+        return 'firestore_default'.locale(context);
     }
   }
 
   /// Firebase Auth hata kodlarını Türkçe mesajlara çevirir
-  String _getFirebaseErrorMessage(FirebaseAuthException error) {
+  String _getFirebaseErrorMessage(
+      FirebaseAuthException error, BuildContext? context) {
+    if (context == null) {
+      // Fallback to default messages if context is not available
+      switch (error.code) {
+        case 'user-not-found':
+          return 'Bu email adresine kayıtlı kullanıcı bulunamadı';
+        case 'wrong-password':
+          return 'Hatalı şifre girdiniz';
+        case 'email-already-in-use':
+          return 'Bu email adresi zaten kullanımda';
+        case 'weak-password':
+          return 'Şifre çok zayıf. En az 6 karakter olmalı';
+        case 'invalid-email':
+          return 'Geçersiz email adresi';
+        case 'too-many-requests':
+          return 'Çok fazla deneme yapıldı. Lütfen daha sonra tekrar deneyin';
+        case 'network-request-failed':
+          return 'İnternet bağlantısı hatası';
+        case 'user-disabled':
+          return 'Bu hesap devre dışı bırakılmış';
+        case 'operation-not-allowed':
+          return 'Bu işlem şu anda izinli değil';
+        case 'invalid-credential':
+          return 'Geçersiz kimlik bilgileri';
+        default:
+          return error.message ?? 'Bilinmeyen bir hata oluştu';
+      }
+    }
+
     switch (error.code) {
       case 'user-not-found':
-        return 'Bu email adresine kayıtlı kullanıcı bulunamadı';
+        return 'auth_user_not_found'.locale(context);
       case 'wrong-password':
-        return 'Hatalı şifre girdiniz';
+        return 'auth_wrong_password'.locale(context);
       case 'email-already-in-use':
-        return 'Bu email adresi zaten kullanımda';
+        return 'auth_email_already_in_use'.locale(context);
       case 'weak-password':
-        return 'Şifre çok zayıf. En az 6 karakter olmalı';
+        return 'auth_weak_password'.locale(context);
       case 'invalid-email':
-        return 'Geçersiz email adresi';
+        return 'auth_invalid_email'.locale(context);
       case 'too-many-requests':
-        return 'Çok fazla deneme yapıldı. Lütfen daha sonra tekrar deneyin';
+        return 'auth_too_many_requests'.locale(context);
       case 'network-request-failed':
-        return 'İnternet bağlantısı hatası';
+        return 'auth_network_request_failed'.locale(context);
       case 'user-disabled':
-        return 'Bu hesap devre dışı bırakılmış';
+        return 'auth_user_disabled'.locale(context);
       case 'operation-not-allowed':
-        return 'Bu işlem şu anda izinli değil';
+        return 'auth_operation_not_allowed'.locale(context);
       case 'invalid-credential':
-        return 'Geçersiz kimlik bilgileri';
+        return 'auth_invalid_credential'.locale(context);
       default:
-        return error.message ?? 'Bilinmeyen bir hata oluştu';
+        return error.message ?? 'auth_unknown_error'.locale(context);
     }
   }
 

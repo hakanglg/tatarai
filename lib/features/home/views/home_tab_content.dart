@@ -436,7 +436,7 @@ class _HomeTabContentState extends State<HomeTabContent>
                           children: [
                             // Main brand name - ultra premium typography
                             Text(
-                              'TatarAI',
+                              'app_title'.locale(context),
                               style: AppTextTheme.headline4.copyWith(
                                 fontWeight: FontWeight.w700,
                                 color: AppColors.textPrimary,
@@ -448,7 +448,7 @@ class _HomeTabContentState extends State<HomeTabContent>
                             SizedBox(height: 2),
                             // Sophisticated tagline
                             Text(
-                              'Bitki Analiz Asistanı',
+                              'app_subtitle'.locale(context),
                               style: AppTextTheme.caption.copyWith(
                                 color: AppColors.textSecondary,
                                 fontWeight: FontWeight.w600,
@@ -609,7 +609,7 @@ class _HomeTabContentState extends State<HomeTabContent>
                       ),
                       SizedBox(height: context.dimensions.spaceL),
                       Text(
-                        'Uygulama Başlatılırken Bir Sorun Oluştu',
+                        'app_initialization_error'.locale(context),
                         style: AppTextTheme.headline5.copyWith(
                           fontWeight: FontWeight.w700,
                           color: AppColors.textPrimary,
@@ -631,7 +631,7 @@ class _HomeTabContentState extends State<HomeTabContent>
                           borderRadius: BorderRadius.circular(16),
                           onPressed: _attemptPremiumRestart,
                           child: Text(
-                            'Yeniden Dene',
+                            'try_again_button'.locale(context),
                             style: AppTextTheme.bodyText1.copyWith(
                               color: CupertinoColors.white,
                               fontWeight: FontWeight.w600,
@@ -776,25 +776,36 @@ class _HomeTabContentState extends State<HomeTabContent>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'Bitkilerinizin\nSağlığını Keşfedin',
-                              style: AppTextTheme.headline2.copyWith(
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
-                                height: 1.1,
-                                letterSpacing: -1.0,
-                                fontSize: 32,
-                              ),
-                            ),
-                            SizedBox(height: context.dimensions.spaceM),
-                            Text(
-                              'AI destekli gelişmiş analiz teknolojisi ile bitkilerinizin durumunu anında öğrenin ve uzman tavsiyeleri alın.',
-                              style: AppTextTheme.bodyText1.copyWith(
-                                color: Colors.white.withOpacity(0.95),
-                                height: 1.5,
-                                fontWeight: FontWeight.w500,
-                                fontSize: 16,
-                              ),
+                            Builder(
+                              builder: (context) {
+                                final headerMessage =
+                                    _getTodaysHeaderMessage(context);
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      headerMessage['title']!,
+                                      style: AppTextTheme.headline2.copyWith(
+                                        fontWeight: FontWeight.w900,
+                                        color: Colors.white,
+                                        height: 1.1,
+                                        letterSpacing: -1.0,
+                                        fontSize: 32,
+                                      ),
+                                    ),
+                                    SizedBox(height: context.dimensions.spaceM),
+                                    Text(
+                                      headerMessage['subtitle']!,
+                                      style: AppTextTheme.bodyText1.copyWith(
+                                        color: Colors.white.withOpacity(0.95),
+                                        height: 1.5,
+                                        fontWeight: FontWeight.w500,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
                             ),
                           ],
                         ),
@@ -888,7 +899,7 @@ class _HomeTabContentState extends State<HomeTabContent>
                         ),
                         const SizedBox(width: 12),
                         Text(
-                          'Analiz Başlat',
+                          'start_analysis'.locale(context),
                           style: AppTextTheme.bodyText1.copyWith(
                             color: AppColors.primary,
                             fontWeight: FontWeight.w700,
@@ -939,7 +950,7 @@ class _HomeTabContentState extends State<HomeTabContent>
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        'Geçmiş',
+                        'history'.locale(context),
                         style: AppTextTheme.bodyText2.copyWith(
                           color: Colors.white.withOpacity(0.9),
                           fontWeight: FontWeight.w600,
@@ -1164,8 +1175,9 @@ class _HomeTabContentState extends State<HomeTabContent>
                     borderRadius: BorderRadius.circular(40),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary
-                            .withOpacity(0.2 * _pulseAnimation.value),
+                        color: AppColors.primary.withOpacity(
+                            (0.2 * (_pulseAnimation.value ?? 0.0))
+                                .clamp(0.0, 1.0)),
                         blurRadius: 30,
                         spreadRadius: 10,
                       ),
@@ -1174,8 +1186,9 @@ class _HomeTabContentState extends State<HomeTabContent>
                   child: Center(
                     child: CupertinoActivityIndicator(
                       radius: 16,
-                      color: AppColors.primary
-                          .withOpacity(0.8 + (0.2 * _pulseAnimation.value)),
+                      color: AppColors.primary.withOpacity(
+                          (0.8 + (0.2 * (_pulseAnimation.value ?? 0.0)))
+                              .clamp(0.0, 1.0)),
                     ),
                   ),
                 ),
@@ -1189,7 +1202,7 @@ class _HomeTabContentState extends State<HomeTabContent>
                 ),
                 SizedBox(height: context.dimensions.spaceS),
                 Text(
-                  'En son analizlerinizi getiriyoruz',
+                  'loading_latest_analyses'.locale(context),
                   style: AppTextTheme.bodyText2.copyWith(
                     color: AppColors.textSecondary,
                     fontWeight: FontWeight.w500,
@@ -1287,7 +1300,7 @@ class _HomeTabContentState extends State<HomeTabContent>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSectionTitle('Son Analizler'),
+          _buildSectionTitle('recent_analyses'.locale(context)),
           SizedBox(height: context.dimensions.spaceM),
           _buildEmptyAnalysisCard(),
         ],
@@ -1331,7 +1344,7 @@ class _HomeTabContentState extends State<HomeTabContent>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Son Analizleriniz',
+                  'latest_analyses'.locale(context),
                   style: AppTextTheme.headline5.copyWith(
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
@@ -1340,7 +1353,7 @@ class _HomeTabContentState extends State<HomeTabContent>
                 ),
                 SizedBox(height: 4),
                 Text(
-                  'En son yaptığınız bitki analizleri',
+                  'latest_analyses_desc'.locale(context),
                   style: AppTextTheme.caption.copyWith(
                     color: AppColors.textSecondary,
                     fontWeight: FontWeight.w500,
@@ -1386,7 +1399,7 @@ class _HomeTabContentState extends State<HomeTabContent>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'Tümünü Gör',
+                        'see_all'.locale(context),
                         style: AppTextTheme.bodyText2.copyWith(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w600,
@@ -1541,12 +1554,12 @@ class _HomeTabContentState extends State<HomeTabContent>
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        _buildSectionTitle('Son Analizler'),
+        _buildSectionTitle('recent_analyses'.locale(context)),
         CupertinoButton(
           padding: EdgeInsets.zero,
           onPressed: _navigateToAllAnalyses,
           child: Text(
-            'Tümünü Gör',
+            'see_all'.locale(context),
             style: AppTextTheme.bodyText1.copyWith(
               color: AppColors.primary,
               fontWeight: FontWeight.w600,
@@ -1704,8 +1717,9 @@ class _HomeTabContentState extends State<HomeTabContent>
                   borderRadius: BorderRadius.circular(70),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary
-                          .withOpacity(0.15 * _pulseAnimation.value),
+                      color: AppColors.primary.withOpacity(
+                          (0.15 * (_pulseAnimation.value ?? 0.0))
+                              .clamp(0.0, 1.0)),
                       blurRadius: 60,
                       spreadRadius: 10,
                     ),
@@ -1772,8 +1786,9 @@ class _HomeTabContentState extends State<HomeTabContent>
                 child: Icon(
                   CupertinoIcons.leaf_arrow_circlepath,
                   size: 40,
-                  color: AppColors.primary
-                      .withOpacity(0.85 + (0.15 * _pulseAnimation.value)),
+                  color: AppColors.primary.withOpacity(
+                      (0.85 + (0.15 * (_pulseAnimation.value ?? 0.0)))
+                          .clamp(0.0, 1.0)),
                 ),
               ),
             ],
@@ -1786,7 +1801,7 @@ class _HomeTabContentState extends State<HomeTabContent>
   /// 🎯 Revolutionary Empty State Title - Premium Typography
   Widget _buildRevolutionaryEmptyStateTitle() {
     return Text(
-      'Bitkilerinizin Yolculuğu\nBurada Başlıyor',
+      'first_analysis_title'.locale(context),
       textAlign: TextAlign.center,
       style: AppTextTheme.headline3.copyWith(
         fontWeight: FontWeight.w800,
@@ -1801,7 +1816,7 @@ class _HomeTabContentState extends State<HomeTabContent>
   /// 🎨 Revolutionary Empty State Description - Engaging Copy
   Widget _buildRevolutionaryEmptyStateDescription() {
     return Text(
-      'AI destekli gelişmiş analiz teknolojisi ile bitkilerinizin sağlık durumunu anında öğrenin, hastalıkları tespit edin ve uzman tavsiyeleri alın.',
+      'first_analysis_desc'.locale(context),
       textAlign: TextAlign.center,
       style: AppTextTheme.bodyText1.copyWith(
         color: AppColors.textSecondary,
@@ -1844,8 +1859,8 @@ class _HomeTabContentState extends State<HomeTabContent>
                 ),
                 // Dynamic pulse glow
                 BoxShadow(
-                  color: AppColors.primary
-                      .withOpacity(0.15 * _pulseAnimation.value),
+                  color: AppColors.primary.withOpacity(
+                      (0.15 * (_pulseAnimation.value ?? 0.0)).clamp(0.0, 1.0)),
                   blurRadius: 40,
                   offset: const Offset(0, 8),
                   spreadRadius: 8,
@@ -1897,7 +1912,7 @@ class _HomeTabContentState extends State<HomeTabContent>
                     const SizedBox(width: 16),
                     // Premium button text
                     Text(
-                      'İlk Analizini Başlat',
+                      'start_first_analysis'.locale(context),
                       style: AppTextTheme.bodyText1.copyWith(
                         color: CupertinoColors.white,
                         fontWeight: FontWeight.w800,
@@ -1960,7 +1975,7 @@ class _HomeTabContentState extends State<HomeTabContent>
       context: context,
       builder: (BuildContext context) => CupertinoActionSheet(
         title: Text(
-          'Bildirimler',
+          'notifications'.locale(context),
           style: AppTextTheme.headline6.copyWith(
             fontWeight: FontWeight.w600,
           ),
@@ -1971,7 +1986,7 @@ class _HomeTabContentState extends State<HomeTabContent>
             onPressed: () {
               Navigator.pop(context);
             },
-            child: const Text('Tamam'),
+            child: Text('ok'.locale(context)),
           ),
         ],
       ),
@@ -1988,5 +2003,42 @@ class _HomeTabContentState extends State<HomeTabContent>
     } catch (e, stackTrace) {
       AppLogger.e('❌ Emergency restart başarısız', e, stackTrace);
     }
+  }
+
+  /// Günün header mesajını getirir
+  Map<String, String> _getTodaysHeaderMessage(BuildContext context) {
+    final messages = [
+      {
+        'title': 'header_message_1_title'.locale(context),
+        'subtitle': 'header_message_1_subtitle'.locale(context),
+      },
+      {
+        'title': 'header_message_2_title'.locale(context),
+        'subtitle': 'header_message_2_subtitle'.locale(context),
+      },
+      {
+        'title': 'header_message_3_title'.locale(context),
+        'subtitle': 'header_message_3_subtitle'.locale(context),
+      },
+      {
+        'title': 'header_message_4_title'.locale(context),
+        'subtitle': 'header_message_4_subtitle'.locale(context),
+      },
+      {
+        'title': 'header_message_5_title'.locale(context),
+        'subtitle': 'header_message_5_subtitle'.locale(context),
+      },
+      {
+        'title': 'header_message_6_title'.locale(context),
+        'subtitle': 'header_message_6_subtitle'.locale(context),
+      },
+      {
+        'title': 'header_message_7_title'.locale(context),
+        'subtitle': 'header_message_7_subtitle'.locale(context),
+      },
+    ];
+
+    final dayOfYear = DateTime.now().dayOfYear;
+    return messages[dayOfYear % messages.length];
   }
 }
