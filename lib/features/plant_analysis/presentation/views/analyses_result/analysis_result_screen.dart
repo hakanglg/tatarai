@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:tatarai/core/extensions/string_extension.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
 import 'package:tatarai/core/theme/dimensions.dart'; // AppDimensions için import eklendi
 import 'package:tatarai/core/theme/text_theme.dart';
@@ -33,15 +34,17 @@ extension PlantAnalysisModelUIExtension on PlantAnalysisModel {
   }
 
   /// Sağlık durumu başlığını döndürür
-  String getHealthStatusTitle() {
-    return isHealthy ? 'Bitkiniz Sağlıklı' : 'Sağlık Sorunu Tespit Edildi';
+  String getHealthStatusTitle(BuildContext context) {
+    return isHealthy
+        ? 'plant_healthy'.locale(context)
+        : 'health_issue_detected'.locale(context);
   }
 
   /// Sağlık durumu açıklamasını döndürür
-  String getHealthStatusDescription() {
+  String getHealthStatusDescription(BuildContext context) {
     return isHealthy
-        ? 'Bitkiniz iyi durumda görünüyor'
-        : 'Bitkinizde bazı sorunlar tespit edildi';
+        ? 'plant_looks_good'.locale(context)
+        : 'plant_has_issues'.locale(context);
   }
 
   /// Gelişim skoruna göre renk döndürür
@@ -53,72 +56,13 @@ extension PlantAnalysisModelUIExtension on PlantAnalysisModel {
     return CupertinoColors.systemRed;
   }
 
-  /// Gelişim skoruna göre açıklama metni döndürür
-  String getGrowthScoreText(int score) {
-    if (score >= 80) {
-      return 'Bitkinin gelişimi mükemmel, ideal koşullarda büyüyor.';
-    }
-    if (score >= 60) {
-      return 'Bitkinin gelişimi iyi durumda, büyüme devam ediyor.';
-    }
-    if (score >= 40) {
-      return 'Ortalama bir gelişim gösteriyor, bakım koşulları iyileştirilebilir.';
-    }
-    if (score >= 20) {
-      return 'Gelişim yavaş, acil bakım ve müdahale gerekebilir.';
-    }
-    return 'Kritik gelişim seviyesi, acil müdahale gerekiyor.';
-  }
-
-  /// Gelişim durumuna göre tavsiye metni döndürür
-  String getGrowthAdvice(int score, String? stage) {
-    final String stageText = stage?.toLowerCase() ?? '';
-
-    if (score >= 80) {
-      if (stageText.contains('çiçek') || stageText.contains('cicek')) {
-        return 'Çiçeklenme döneminde gübre desteğini sürdürün, düzenli sulama çok önemli.';
-      } else if (stageText.contains('fide') || stageText.contains('fidan')) {
-        return 'Fide aşamasında iyi gelişiyor, düzenli sulamaya devam edin.';
-      } else if (stageText.contains('meyve')) {
-        return 'Meyvelenme döneminde potasyum açısından zengin gübreler tercih edin.';
-      } else if (stageText.contains('olgun')) {
-        return 'Olgunlaşma sürecinde ideal koşullar sağlanmış, aynı şekilde devam edin.';
-      }
-      return 'Şu anki bakım koşullarını koruyun, bitkiniz çok iyi gelişiyor.';
-    } else if (score >= 60) {
-      if (stageText.contains('çiçek') || stageText.contains('cicek')) {
-        return 'Çiçeklenme döneminde daha fazla fosfor içerikli gübre kullanın.';
-      } else if (stageText.contains('fide') || stageText.contains('fidan')) {
-        return 'Fide aşamasında daha dengeli bir sulama programı uygulayın.';
-      } else if (stageText.contains('meyve')) {
-        return 'Meyvelenme için ek mikro element takviyesi yapmanız faydalı olabilir.';
-      } else if (stageText.contains('olgun')) {
-        return 'Olgunlaşma sürecinde ışık koşullarını optimize edin.';
-      }
-      return 'Biraz daha gübreleme ve optimize edilmiş sulama ile gelişimi artırabilirsiniz.';
-    } else if (score >= 40) {
-      if (stageText.contains('çiçek') || stageText.contains('cicek')) {
-        return 'Çiçeklenme için acilen fosfor/potasyum dengesini sağlayın.';
-      } else if (stageText.contains('fide') || stageText.contains('fidan')) {
-        return 'Fide gelişimi yavaş, daha fazla ışık ve dengeli gübreleme gerekli.';
-      } else if (stageText.contains('meyve')) {
-        return 'Meyvelenme durdurmak üzere, acilen toprak analizi yaptırın.';
-      } else if (stageText.contains('olgun')) {
-        return 'Olgunlaşma gecikiyor, su ve besin eksikliği olabilir.';
-      }
-      return 'Bakım koşullarında önemli iyileştirmeler gerekiyor. Toprak, ışık ve sulama programını gözden geçirin.';
-    } else {
-      return 'Acil müdahale gerektiren bir gelişim durumu görülüyor. Toprak değişimi, gübre takviyesi ve sulama düzeninde değişiklik düşünülmeli.';
-    }
-  }
-
   /// Hastalık şiddet seviyesini döndürür (Yüksek, Orta, Düşük)
-  String getDiseaseServerityText(Disease disease) {
+  String getDiseaseServerityText(Disease disease, BuildContext context) {
     return (disease.probability ?? 0.0) >= 0.7
-        ? 'Yüksek'
+        ? 'high'.locale(context)
         : (disease.probability ?? 0.0) >= 0.4
-            ? 'Orta'
-            : 'Düşük';
+            ? 'medium'.locale(context)
+            : 'low'.locale(context);
   }
 
   /// Hastalık şiddet seviyesine göre renk döndürür
@@ -233,9 +177,9 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
           if (mounted) {
             Navigator.of(context).pop();
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: SelectableText(
-                    'Bu analiz başarısız olmuş. Lütfen yeni bir analiz yapın.'),
+              SnackBar(
+                content:
+                    SelectableText('analysis_failed_try_new'.locale(context)),
                 duration: Duration(seconds: 3),
               ),
             );
@@ -376,7 +320,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     SelectableText(
-                      'Gelişim Skoru',
+                      'growth_score'.locale(context),
                       style: AppTextTheme.headline6.copyWith(
                         fontWeight: FontWeight.bold,
                         color: AppColors.textPrimary,
@@ -472,7 +416,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         SelectableText(
-                          'Gelişim Aşaması',
+                          'growth_stage'.locale(context),
                           style: AppTextTheme.captionL.copyWith(
                             color: color.withOpacity(0.8),
                             fontWeight: FontWeight.w600,
@@ -532,80 +476,21 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
           ),
           SizedBox(height: dim.spaceS),
 
-          // Genel durum açıklaması
-          SelectableText(
-            result.getGrowthScoreText(score),
-            style: AppTextTheme.bodyText2.copyWith(
-              color: AppColors.textSecondary,
-              fontSize: _currentFontSize,
-            ),
-            toolbarOptions: const ToolbarOptions(
-              copy: true,
-              selectAll: true,
-              cut: false,
-              paste: false,
-            ),
-          ),
-
-          // Detaylı gelişim yorumu (varsa)
-          if (result.growthComment != null &&
-              result.growthComment!.isNotEmpty) ...[
-            SizedBox(height: dim.spaceM),
-            Container(
-              padding: EdgeInsets.all(dim.paddingS),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(dim.radiusS),
-                border: Border.all(
-                  color: color.withOpacity(0.2),
-                  width: 1,
-                ),
+          // Genel durum açıklaması - Gemini'den gelen growthComment kullanılıyor
+          if (result.growthComment != null && result.growthComment!.isNotEmpty)
+            SelectableText(
+              result.growthComment!,
+              style: AppTextTheme.bodyText2.copyWith(
+                color: AppColors.textSecondary,
+                fontSize: _currentFontSize,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        CupertinoIcons.text_bubble_fill,
-                        color: color.withOpacity(0.7),
-                        size: 16,
-                      ),
-                      SizedBox(width: dim.spaceXS),
-                      SelectableText(
-                        'Gelişim Hakkında',
-                        style: AppTextTheme.captionL.copyWith(
-                          color: color.withOpacity(0.8),
-                          fontWeight: FontWeight.w600,
-                        ),
-                        toolbarOptions: const ToolbarOptions(
-                          copy: true,
-                          selectAll: true,
-                          cut: false,
-                          paste: false,
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: dim.spaceXS),
-                  SelectableText(
-                    result.growthComment!,
-                    style: AppTextTheme.bodyText2.copyWith(
-                      color: AppColors.textSecondary,
-                      fontSize: _currentFontSize * 0.95,
-                      height: 1.4,
-                    ),
-                    toolbarOptions: const ToolbarOptions(
-                      copy: true,
-                      selectAll: true,
-                      cut: false,
-                      paste: false,
-                    ),
-                  ),
-                ],
+              toolbarOptions: const ToolbarOptions(
+                copy: true,
+                selectAll: true,
+                cut: false,
+                paste: false,
               ),
             ),
-          ],
         ],
       ),
     );
@@ -642,7 +527,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                     ),
                     SizedBox(width: dim.spaceS),
                     SelectableText(
-                      'Hastalık Detayları',
+                      'disease_details'.locale(context),
                       style: AppTextTheme.bodyText1.copyWith(
                         fontWeight: FontWeight.w600,
                         color: CupertinoColors.systemBlue,
@@ -679,11 +564,13 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
 
         // Tedavi önerileri
         if (disease.treatments.isNotEmpty) ...[
-          _buildTreatmentSection('Tedavi Önerileri', disease.treatments),
+          _buildTreatmentSection(
+              'treatment_recommendations'.locale(context), disease.treatments),
           SizedBox(height: dim.spaceM),
 
           // İlaç önerileri (aynı treatments listesini farklı başlıkla göster)
-          _buildTreatmentSection('İlaç Önerileri', disease.treatments),
+          _buildTreatmentSection(
+              'medicine_recommendations'.locale(context), disease.treatments),
         ] else ...[
           // Tedavi bilgisi yoksa bilgilendirme mesajı
           Container(
@@ -706,7 +593,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                 SizedBox(width: dim.spaceS),
                 Expanded(
                   child: SelectableText(
-                    'Bu hastalık için detaylı tedavi bilgisi henüz mevcut değil. Genel bitki bakım kurallarına uyarak bitkinizin sağlığını koruyabilirsiniz.',
+                    'no_treatment_info_available'.locale(context),
                     style: AppTextTheme.bodyText2.copyWith(
                       color: AppColors.textSecondary,
                       fontSize: _currentFontSize * 0.95,
@@ -746,7 +633,8 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Icon(
-                title.contains('İlaç')
+                title.contains('medicine_recommendations'.locale(context)) ||
+                        title.contains('İlaç')
                     ? CupertinoIcons.capsule_fill
                     : title.contains('Biyolojik')
                         ? CupertinoIcons.leaf_arrow_circlepath
@@ -871,7 +759,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                   SizedBox(width: dim.spaceM),
                   Expanded(
                     child: SelectableText(
-                      'Analiz Sonuçları',
+                      'analysis_results'.locale(context),
                       style: AppTextTheme.headline5.copyWith(
                         fontWeight: FontWeight.bold,
                         color: AppColors.textPrimary,
@@ -991,7 +879,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                             fit: BoxFit.scaleDown,
                             alignment: Alignment.centerLeft,
                             child: SelectableText(
-                              'Sağlık Durumu',
+                              'health_status'.locale(context),
                               style: AppTextTheme.captionL.copyWith(
                                 color: AppColors.textSecondary,
                                 fontWeight: FontWeight.w500,
@@ -1011,7 +899,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                             fit: BoxFit.scaleDown,
                             alignment: Alignment.centerLeft,
                             child: SelectableText(
-                              result.getHealthStatusTitle(),
+                              result.getHealthStatusTitle(context),
                               style: AppTextTheme.bodyText1.copyWith(
                                 fontWeight: FontWeight.w600,
                                 color: result.getHealthStatusColor(),
@@ -1030,7 +918,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                             fit: BoxFit.scaleDown,
                             alignment: Alignment.centerLeft,
                             child: SelectableText(
-                              result.getHealthStatusDescription(),
+                              result.getHealthStatusDescription(context),
                               style: AppTextTheme.bodyText2.copyWith(
                                 color: AppColors.textSecondary,
                                 fontSize: _currentFontSize,
@@ -1059,14 +947,14 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                   children: [
                     InfoCardItem(
                       icon: CupertinoIcons.calendar,
-                      title: 'Son Analiz',
-                      value: 'Bugün',
+                      title: 'last_analysis'.locale(context),
+                      value: 'today'.locale(context),
                       iconColor: CupertinoColors.systemTeal,
                     ),
                     SizedBox(height: dim.spaceM),
                     InfoCardItem(
                       icon: CupertinoIcons.leaf_arrow_circlepath,
-                      title: 'Bitki Türü',
+                      title: 'plant_type'.locale(context),
                       value: result.plantName,
                       iconColor: AppColors.primary,
                     ),
@@ -1105,7 +993,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
                   child: SelectableText(
-                    'Tespit Edilen Hastalıklar',
+                    'detected_diseases'.locale(context),
                     style: AppTextTheme.headline5.copyWith(
                       fontWeight: FontWeight.bold,
                       color: AppColors.textPrimary,
@@ -1126,7 +1014,8 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
             final probability =
                 (disease.probability != null ? disease.probability! * 100 : 0)
                     .toStringAsFixed(0);
-            final severityText = result.getDiseaseServerityText(disease);
+            final severityText =
+                result.getDiseaseServerityText(disease, context);
 
             return Container(
               margin: EdgeInsets.only(bottom: dim.spaceL),
@@ -1215,7 +1104,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                                   ),
                                 ),
                                 SelectableText(
-                                  'risk',
+                                  'risk'.locale(context),
                                   style: AppTextTheme.captionL.copyWith(
                                     color:
                                         CupertinoColors.white.withOpacity(0.9),
@@ -1271,7 +1160,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                                   ),
                                 ),
                                 child: SelectableText(
-                                  '${severityText} Şiddet',
+                                  '$severityText ${'severity'.locale(context)}',
                                   style: AppTextTheme.captionL.copyWith(
                                     color: severityColor,
                                     fontWeight: FontWeight.w600,
@@ -1346,7 +1235,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                 const CupertinoActivityIndicator(radius: 16),
                 const SizedBox(height: 16),
                 SelectableText(
-                  'Analiz sonucu yükleniyor...',
+                  'loading_analysis_result'.locale(context),
                   style: AppTextTheme.bodyText2.copyWith(
                     color: CupertinoColors.systemGrey,
                   ),
@@ -1367,7 +1256,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
     if (_errorMessage != null) {
       return CupertinoPageScaffold(
         navigationBar: CupertinoNavigationBar(
-          middle: const SelectableText('Analiz Sonucu Yüklenemedi'),
+          middle: SelectableText('analysis_result_load_error'.locale(context)),
           leading: GestureDetector(
             onTap: () => Navigator.of(context).maybePop(),
             child: const Icon(
@@ -1394,7 +1283,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                 ),
               ),
               const SizedBox(height: 16),
-              const SelectableText('Hata oluştu',
+              SelectableText('error_occurred'.locale(context),
                   style: AppTextTheme.headline5),
               const SizedBox(height: 8),
               Padding(
@@ -1417,7 +1306,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
               SizedBox(
                 width: 160,
                 child: AppButton(
-                  text: 'Tekrar Dene',
+                  text: 'try_again'.locale(context),
                   onPressed: _loadAnalysisResult,
                   icon: CupertinoIcons.refresh,
                   type: AppButtonType.secondary,
@@ -1437,7 +1326,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
           '🔍 BUILD: _isLoading: $_isLoading, _errorMessage: $_errorMessage');
       return CupertinoPageScaffold(
         navigationBar: CupertinoNavigationBar(
-          middle: const SelectableText('Analiz Sonucu Bulunamadı'),
+          middle: SelectableText('analysis_result_not_found'.locale(context)),
           leading: GestureDetector(
             onTap: () => Navigator.of(context).maybePop(),
             child: const Icon(
@@ -1446,7 +1335,9 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
             ),
           ),
         ),
-        child: const Center(child: SelectableText('Analiz sonucu bulunamadı')),
+        child: Center(
+            child: SelectableText(
+                'analysis_result_not_found_desc'.locale(context))),
       );
     }
 
@@ -1776,7 +1667,9 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
           ),
           const SizedBox(width: 4),
           SelectableText(
-            result.isHealthy ? 'Sağlıklı' : 'Dikkat',
+            result.isHealthy
+                ? 'healthy'.locale(context)
+                : 'attention'.locale(context),
             style: AppTextTheme.captionL.copyWith(
               color: CupertinoColors.white,
               fontWeight: FontWeight.w600,
@@ -1995,7 +1888,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SelectableText(
-                  result.getHealthStatusTitle(),
+                  result.getHealthStatusTitle(context),
                   style: AppTextTheme.caption.copyWith(
                     color: result.getHealthStatusColor(),
                     fontWeight: FontWeight.w600,
@@ -2009,7 +1902,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                 ),
                 SizedBox(height: dim.spaceXXS),
                 SelectableText(
-                  result.getHealthStatusDescription(),
+                  result.getHealthStatusDescription(context),
                   style: AppTextTheme.caption.copyWith(
                     color: result.getHealthStatusColor().withOpacity(0.8),
                   ),
@@ -2061,7 +1954,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
           if (result.watering != null && result.watering!.isNotEmpty) {
             careItems.add(_buildCareItem(
               CupertinoIcons.drop_fill,
-              'Sulama',
+              'watering'.locale(context),
               result.watering!,
               AppColors.info,
             ));
@@ -2072,7 +1965,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
               careItems.add(SizedBox(height: dim.spaceM));
             careItems.add(_buildCareItem(
               CupertinoIcons.sun_max_fill,
-              'Güneş Işığı',
+              'sunlight'.locale(context),
               result.sunlight!,
               CupertinoColors.systemYellow,
             ));
@@ -2083,7 +1976,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
               careItems.add(SizedBox(height: dim.spaceM));
             careItems.add(_buildCareItem(
               CupertinoIcons.square_stack_3d_down_right_fill,
-              'Toprak',
+              'soil'.locale(context),
               result.soil!,
               CupertinoColors.systemBrown,
             ));
@@ -2094,7 +1987,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
               careItems.add(SizedBox(height: dim.spaceM));
             careItems.add(_buildCareItem(
               CupertinoIcons.cloud_sun_fill,
-              'İklim',
+              'climate'.locale(context),
               result.climate!,
               CupertinoColors.systemTeal,
             ));
@@ -2107,7 +2000,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
               careItems.add(SizedBox(height: dim.spaceM));
             careItems.add(_buildCareItem(
               CupertinoIcons.leaf_arrow_circlepath,
-              'Tarımsal İpuçları',
+              'agricultural_tips'.locale(context),
               result.agriculturalTips!.join(' • '),
               CupertinoColors.activeGreen,
             ));
@@ -2120,7 +2013,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
               careItems.add(SizedBox(height: dim.spaceM));
             careItems.add(_buildCareItem(
               CupertinoIcons.gear_alt_fill,
-              'Müdahale Yöntemleri',
+              'intervention_methods'.locale(context),
               result.interventionMethods!.join(' • '),
               CupertinoColors.systemBlue,
             ));
@@ -2149,7 +2042,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                     SizedBox(width: dim.spaceS),
                     Expanded(
                       child: SelectableText(
-                        'Bu analiz için detaylı bakım bilgisi henüz mevcut değil. Genel bitki bakım kurallarını uygulayabilirsiniz.',
+                        'no_detailed_care_info'.locale(context),
                         style: AppTextTheme.bodyText2.copyWith(
                           color: AppColors.textSecondary,
                           fontSize: _currentFontSize * 0.95,
@@ -2347,7 +2240,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
             ),
             const SizedBox(width: 8),
             SelectableText(
-              "Hakkında",
+              "about".locale(context),
               style: AppTextTheme.caption.copyWith(
                 fontWeight: FontWeight.w600,
                 color: AppColors.primary,
@@ -2606,7 +2499,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                 ),
                 SizedBox(width: dim.spaceM),
                 SelectableText(
-                  'Tespit Edilen Hastalıklar',
+                  'detected_diseases'.locale(context),
                   style: AppTextTheme.headline5.copyWith(
                     fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary,
@@ -2632,16 +2525,16 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                 if (result.diseaseName != null ||
                     result.diseaseDescription != null) ...[
                   _buildAgriculturalSection(
-                    title: 'Hastalık Bilgileri',
+                    title: 'disease_information'.locale(context),
                     icon: CupertinoIcons.exclamationmark_triangle_fill,
                     iconColor: AppColors.error,
                     items: [
                       if (result.diseaseName != null)
-                        _buildAgriculturalItem(
-                            'Hastalık Adı', result.diseaseName!),
+                        _buildAgriculturalItem('disease_name'.locale(context),
+                            result.diseaseName!),
                       if (result.diseaseDescription != null)
-                        _buildAgriculturalItem(
-                            'Açıklama', result.diseaseDescription!),
+                        _buildAgriculturalItem('description'.locale(context),
+                            result.diseaseDescription!),
                     ],
                   ),
                   SizedBox(height: dim.spaceL),
@@ -2656,31 +2549,36 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                     result.waitingPeriod != null ||
                     result.effectiveness != null) ...[
                   _buildAgriculturalSection(
-                    title: 'Tedavi ve Uygulama',
+                    title: 'treatment_and_application'.locale(context),
                     icon: CupertinoIcons.bandage_fill,
                     iconColor: AppColors.info,
                     items: [
                       if (result.treatmentName != null)
                         _buildAgriculturalItem(
-                            'Tedavi/İlaç', result.treatmentName!),
+                            'treatment_medicine'.locale(context),
+                            result.treatmentName!),
                       if (result.dosagePerDecare != null)
                         _buildAgriculturalItem(
-                            'Dozaj (Dekar başına)', result.dosagePerDecare!),
+                            'dosage_per_decare'.locale(context),
+                            result.dosagePerDecare!),
                       if (result.applicationMethod != null)
                         _buildAgriculturalItem(
-                            'Uygulama Yöntemi', result.applicationMethod!),
+                            'application_method'.locale(context),
+                            result.applicationMethod!),
                       if (result.applicationTime != null)
                         _buildAgriculturalItem(
-                            'Uygulama Zamanı', result.applicationTime!),
+                            'application_time'.locale(context),
+                            result.applicationTime!),
                       if (result.applicationFrequency != null)
                         _buildAgriculturalItem(
-                            'Uygulama Sıklığı', result.applicationFrequency!),
+                            'application_frequency'.locale(context),
+                            result.applicationFrequency!),
                       if (result.waitingPeriod != null)
-                        _buildAgriculturalItem(
-                            'Bekleme Süresi', result.waitingPeriod!),
+                        _buildAgriculturalItem('waiting_period'.locale(context),
+                            result.waitingPeriod!),
                       if (result.effectiveness != null)
-                        _buildAgriculturalItem(
-                            'Etkinlik', result.effectiveness!),
+                        _buildAgriculturalItem('effectiveness'.locale(context),
+                            result.effectiveness!),
                     ],
                   ),
                   SizedBox(height: dim.spaceL),
@@ -2692,20 +2590,24 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                     result.intervention != null ||
                     result.agriculturalTip != null) ...[
                   _buildAgriculturalSection(
-                    title: 'Öneriler ve İpuçları',
+                    title: 'recommendations_and_tips'.locale(context),
                     icon: CupertinoIcons.lightbulb_fill,
                     iconColor: CupertinoColors.systemYellow,
                     items: [
                       if (result.suggestion != null)
-                        _buildAgriculturalItem('Ana Öneri', result.suggestion!),
-                      if (result.intervention != null)
                         _buildAgriculturalItem(
-                            'Müdahale', result.intervention!),
+                            'main_recommendation'.locale(context),
+                            result.suggestion!),
+                      if (result.intervention != null)
+                        _buildAgriculturalItem('intervention'.locale(context),
+                            result.intervention!),
                       if (result.agriculturalTip != null)
                         _buildAgriculturalItem(
-                            'Tarımsal İpucu', result.agriculturalTip!),
+                            'agricultural_tip'.locale(context),
+                            result.agriculturalTip!),
                       if (result.notes != null)
-                        _buildAgriculturalItem('Ek Notlar', result.notes!),
+                        _buildAgriculturalItem(
+                            'additional_notes'.locale(context), result.notes!),
                     ],
                   ),
                 ],

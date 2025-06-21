@@ -6,6 +6,9 @@ import '../../../core/extensions/string_extension.dart';
 import '../../../core/theme/color_scheme.dart';
 import '../../../core/theme/dimensions.dart';
 import '../../../core/theme/text_theme.dart';
+import '../../../core/utils/logger.dart';
+import '../../navbar/navigation_manager.dart';
+import '../../plant_analysis/presentation/views/all_analysis/all_analyses_screen.dart';
 
 /// 🍃 Revolutionary Modern Home Header Widget - Steve Jobs Seviyesinde Tasarım
 ///
@@ -343,114 +346,108 @@ class _HomeHeaderWidgetState extends State<HomeHeaderWidget>
     required VoidCallback onTap,
     required bool isPrimary,
   }) {
-    return AnimatedBuilder(
-      animation: _breatheAnimation,
-      builder: (context, child) {
-        return Transform.scale(
-          scale: isPrimary ? 0.98 + (0.02 * _breatheAnimation.value) : 1.0,
-          child: Container(
-            height: isPrimary ? 58 : 54,
-            decoration: BoxDecoration(
-              gradient: isPrimary
-                  ? LinearGradient(
-                      colors: [
-                        Colors.white,
-                        Colors.white.withOpacity(0.95),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    )
-                  : null,
-              color: isPrimary ? null : Colors.white.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(isPrimary ? 20 : 18),
-              border: Border.all(
-                color: Colors.white.withOpacity(isPrimary ? 0.3 : 0.25),
-                width: isPrimary ? 0.5 : 1,
-              ),
-              boxShadow: isPrimary
-                  ? [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.15),
-                        blurRadius: 25,
-                        offset: const Offset(0, 10),
-                        spreadRadius: -5,
-                      ),
-                      BoxShadow(
-                        color: Colors.white.withOpacity(0.2),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                        spreadRadius: -2,
-                      ),
-                    ]
-                  : [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 15,
-                        offset: const Offset(0, 6),
-                        spreadRadius: -3,
-                      ),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(isPrimary ? 20 : 18),
+        child: Container(
+          height: isPrimary ? 58 : 54,
+          decoration: BoxDecoration(
+            gradient: isPrimary
+                ? LinearGradient(
+                    colors: [
+                      Colors.white,
+                      Colors.white.withOpacity(0.95),
                     ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : null,
+            color: isPrimary ? null : Colors.white.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(isPrimary ? 20 : 18),
+            border: Border.all(
+              color: Colors.white.withOpacity(isPrimary ? 0.3 : 0.25),
+              width: isPrimary ? 0.5 : 1,
             ),
-            child: CupertinoButton(
-              padding: EdgeInsets.zero,
-              borderRadius: BorderRadius.circular(isPrimary ? 20 : 18),
-              onPressed: onTap,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (isPrimary) ...[
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        icon,
-                        size: 20,
-                        color: AppColors.primary,
-                      ),
+            boxShadow: isPrimary
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.15),
+                      blurRadius: 25,
+                      offset: const Offset(0, 10),
+                      spreadRadius: -5,
                     ),
-                    const SizedBox(width: 12),
-                    Flexible(
-                      child: Text(
-                        title,
-                        style: AppTextTheme.bodyText1.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 16,
-                          letterSpacing: -0.3,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
-                      ),
+                    BoxShadow(
+                      color: Colors.white.withOpacity(0.2),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                      spreadRadius: -2,
                     ),
-                  ] else ...[
-                    Icon(
-                      icon,
-                      size: 18,
-                      color: Colors.white.withOpacity(0.9),
-                    ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        title,
-                        style: AppTextTheme.bodyText2.copyWith(
-                          color: Colors.white.withOpacity(0.9),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
-                      ),
+                  ]
+                : [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 15,
+                      offset: const Offset(0, 6),
+                      spreadRadius: -3,
                     ),
                   ],
-                ],
-              ),
-            ),
           ),
-        );
-      },
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (isPrimary) ...[
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 20,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: Text(
+                    title,
+                    style: AppTextTheme.bodyText1.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                      letterSpacing: -0.3,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+              ] else ...[
+                Icon(
+                  icon,
+                  size: 18,
+                  color: Colors.white.withOpacity(0.9),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    title,
+                    style: AppTextTheme.bodyText2.copyWith(
+                      color: Colors.white.withOpacity(0.9),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -541,13 +538,34 @@ class _HomeHeaderWidgetState extends State<HomeHeaderWidget>
 
   /// Analiz sayfasına navigate eder
   void _navigateToAnalysis(BuildContext context) {
-    // NavigationManager ile analiz tab'ına geç
-    // Bu implementasyon NavigationManager'a bağlı
+    try {
+      // NavigationManager ile analiz tab'ına geç (tab index: 1)
+      final navigationManager = NavigationManager.instance;
+      if (navigationManager != null) {
+        navigationManager.switchToTab(1);
+        AppLogger.i('🚀 Analysis tab\'ına geçiş yapıldı');
+      } else {
+        AppLogger.w('NavigationManager instance bulunamadı');
+      }
+    } catch (e, stack) {
+      AppLogger.e('Analysis tab geçiş hatası', e, stack);
+    }
   }
 
   /// Geçmiş sayfasına navigate eder
   void _navigateToHistory(BuildContext context) {
-    // Navigator ile geçmiş sayfasına git
+    try {
+      // AllAnalysesScreen'i modal olarak aç
+      Navigator.of(context).push(
+        CupertinoPageRoute(
+          builder: (context) => const AllAnalysesScreen(),
+          fullscreenDialog: true,
+        ),
+      );
+      AppLogger.i('🗂️ All Analyses screen açıldı');
+    } catch (e, stack) {
+      AppLogger.e('All Analyses screen açma hatası', e, stack);
+    }
   }
 }
 

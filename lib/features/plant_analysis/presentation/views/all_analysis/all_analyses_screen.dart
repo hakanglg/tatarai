@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sprung/sprung.dart';
+import 'package:tatarai/core/extensions/string_extension.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
 import 'package:tatarai/core/theme/dimensions.dart';
 import 'package:tatarai/core/theme/text_theme.dart';
@@ -307,14 +308,14 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                       padding: EdgeInsets.zero,
                       onPressed: () => Navigator.of(context).pop(),
                       child: Text(
-                        'İptal',
+                        'cancel'.locale(context),
                         style: AppTextTheme.bodyText1.copyWith(
                           color: AppColors.textSecondary,
                         ),
                       ),
                     ),
                     Text(
-                      'Filtrele',
+                      'filter'.locale(context),
                       style: AppTextTheme.headline6.copyWith(
                         fontWeight: FontWeight.w700,
                         color: AppColors.textPrimary,
@@ -327,7 +328,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                         Navigator.of(context).pop();
                       },
                       child: Text(
-                        'Uygula',
+                        'apply'.locale(context),
                         style: AppTextTheme.bodyText1.copyWith(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w600,
@@ -347,14 +348,14 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                     children: [
                       // Durum filtresi
                       _buildFilterSection(
-                        'Analiz Durumu',
+                        'analysis_status'.locale(context),
                         CupertinoIcons.heart_fill,
                         [
-                          FilterOption(
-                              'all', 'Tümü', _selectedStatusFilter == 'all'),
-                          FilterOption('healthy', 'Sağlıklı',
+                          FilterOption('all', 'all_filter'.locale(context),
+                              _selectedStatusFilter == 'all'),
+                          FilterOption('healthy', 'healthy'.locale(context),
                               _selectedStatusFilter == 'healthy'),
-                          FilterOption('diseased', 'Hastalıklı',
+                          FilterOption('diseased', 'diseased'.locale(context),
                               _selectedStatusFilter == 'diseased'),
                         ],
                         (value) =>
@@ -365,17 +366,17 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
 
                       // Tarih filtresi
                       _buildFilterSection(
-                        'Tarih Aralığı',
+                        'date_range'.locale(context),
                         CupertinoIcons.calendar,
                         [
-                          FilterOption(
-                              'all', 'Tümü', _selectedDateFilter == 'all'),
-                          FilterOption(
-                              'today', 'Bugün', _selectedDateFilter == 'today'),
-                          FilterOption('week', 'Bu Hafta',
+                          FilterOption('all', 'all_filter'.locale(context),
+                              _selectedDateFilter == 'all'),
+                          FilterOption('today', 'today'.locale(context),
+                              _selectedDateFilter == 'today'),
+                          FilterOption('week', 'this_week'.locale(context),
                               _selectedDateFilter == 'week'),
-                          FilterOption(
-                              'month', 'Bu Ay', _selectedDateFilter == 'month'),
+                          FilterOption('month', 'this_month'.locale(context),
+                              _selectedDateFilter == 'month'),
                         ],
                         (value) =>
                             setModalState(() => _selectedDateFilter = value),
@@ -408,7 +409,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                                 ),
                                 SizedBox(width: context.dimensions.spaceS),
                                 Text(
-                                  'Filtreleri Temizle',
+                                  'clear_filters'.locale(context),
                                   style: AppTextTheme.bodyText1.copyWith(
                                     color: AppColors.textSecondary,
                                     fontWeight: FontWeight.w600,
@@ -735,7 +736,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                'Tüm Analizlerim',
+                                'all_my_analyses'.locale(context),
                                 style: AppTextTheme.headline5.copyWith(
                                   fontWeight: FontWeight.w800,
                                   color: AppColors.textPrimary,
@@ -744,7 +745,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                               ),
                               if (_isHeaderCollapsed)
                                 Text(
-                                  'Geçmiş Analiz Sonuçları',
+                                  'past_analysis_results'.locale(context),
                                   style: AppTextTheme.caption.copyWith(
                                     color: AppColors.textSecondary,
                                     fontSize: 11,
@@ -758,66 +759,66 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                   ),
                 ),
 
-                // Premium filter button
-                AnimatedBuilder(
-                  animation: _pulseAnimation,
-                  builder: (context, child) {
-                    return Transform.scale(
-                      scale: _pulseAnimation.value,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: _hasActiveFilters()
-                              ? AppColors.primary.withOpacity(0.15)
-                              : AppColors.primary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: _hasActiveFilters()
-                                ? AppColors.primary.withOpacity(0.4)
-                                : AppColors.primary.withOpacity(0.2),
-                            width: 0.5,
-                          ),
-                          boxShadow: _hasActiveFilters()
-                              ? [
-                                  BoxShadow(
-                                    color: AppColors.primary.withOpacity(0.2),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ]
-                              : null,
-                        ),
-                        child: CupertinoButton(
-                          padding: EdgeInsets.all(context.dimensions.paddingS),
-                          onPressed: _showPremiumFilterModal,
-                          child: Stack(
-                            children: [
-                              Icon(
-                                CupertinoIcons.line_horizontal_3_decrease,
-                                color: AppColors.primary,
-                                size: 18,
-                              ),
-                              if (_hasActiveFilters())
-                                Positioned(
-                                  top: -2,
-                                  right: -2,
-                                  child: Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
+                // // Premium filter button
+                // AnimatedBuilder(
+                //   animation: _pulseAnimation,
+                //   builder: (context, child) {
+                //     return Transform.scale(
+                //       scale: _pulseAnimation.value,
+                //       child: Container(
+                //         decoration: BoxDecoration(
+                //           color: _hasActiveFilters()
+                //               ? AppColors.primary.withOpacity(0.15)
+                //               : AppColors.primary.withOpacity(0.1),
+                //           borderRadius: BorderRadius.circular(12),
+                //           border: Border.all(
+                //             color: _hasActiveFilters()
+                //                 ? AppColors.primary.withOpacity(0.4)
+                //                 : AppColors.primary.withOpacity(0.2),
+                //             width: 0.5,
+                //           ),
+                //           boxShadow: _hasActiveFilters()
+                //               ? [
+                //                   BoxShadow(
+                //                     color: AppColors.primary.withOpacity(0.2),
+                //                     blurRadius: 8,
+                //                     offset: const Offset(0, 2),
+                //                   ),
+                //                 ]
+                //               : null,
+                //         ),
+                //         child: CupertinoButton(
+                //           padding: EdgeInsets.all(context.dimensions.paddingS),
+                //           onPressed: _showPremiumFilterModal,
+                //           child: Stack(
+                //             children: [
+                //               Icon(
+                //                 CupertinoIcons.line_horizontal_3_decrease,
+                //                 color: AppColors.primary,
+                //                 size: 18,
+                //               ),
+                //               if (_hasActiveFilters())
+                //                 Positioned(
+                //                   top: -2,
+                //                   right: -2,
+                //                   child: Container(
+                //                     width: 8,
+                //                     height: 8,
+                //                     decoration: BoxDecoration(
+                //                       color: AppColors.primary,
+                //                       shape: BoxShape.circle,
+                //                     ),
+                //                   ),
+                //                 ),
+                //             ],
+                //           ),
+                //         ),
+                //       ),
+                //     );
+                //   },
+                // ),
 
-                SizedBox(width: context.dimensions.spaceS),
+                // SizedBox(width: context.dimensions.spaceS),
 
                 // Premium delete all button - Only show if there are analyses
                 BlocBuilder<PlantAnalysisCubitDirect, PlantAnalysisState>(
@@ -901,7 +902,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
 
     if (state.isError) {
       return _buildPremiumErrorView(
-          context, state.errorMessage ?? 'Bir hata oluştu');
+          context, state.errorMessage ?? 'error_occurred'.locale(context));
     }
 
     if (state.isSuccess && state.pastAnalyses.isNotEmpty) {
@@ -969,7 +970,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                   ),
                   SizedBox(height: context.dimensions.spaceL),
                   Text(
-                    'Analizleriniz Yükleniyor',
+                    'loading_analyses'.locale(context),
                     style: AppTextTheme.headline5.copyWith(
                       fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary,
@@ -977,7 +978,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                   ),
                   SizedBox(height: context.dimensions.spaceS),
                   Text(
-                    'Geçmiş analiz sonuçlarınız hazırlanıyor...',
+                    'preparing_past_analyses'.locale(context),
                     style: AppTextTheme.bodyText2.copyWith(
                       color: AppColors.textSecondary,
                     ),
@@ -1087,7 +1088,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                       ),
                       SizedBox(width: context.dimensions.spaceS),
                       Text(
-                        '${analysesToShow.length} Analiz Sonucu',
+                        '${analysesToShow.length} ${'analysis_results'.locale(context)}',
                         style: AppTextTheme.bodyText1.copyWith(
                           fontWeight: FontWeight.w600,
                           color: AppColors.primary,
@@ -1170,6 +1171,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
     final PlantAnalysisState currentState =
         context.read<PlantAnalysisCubitDirect>().state;
     final ErrorInfo errorInfo = _getErrorInfo(
+      context,
       currentState is PlantAnalysisError ? currentState.errorType : null,
     );
 
@@ -1315,7 +1317,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                           ),
                           SizedBox(width: context.dimensions.spaceS),
                           Text(
-                            'Tekrar Dene',
+                            'try_again'.locale(context),
                             style: AppTextTheme.bodyText1.copyWith(
                               color: CupertinoColors.white,
                               fontWeight: FontWeight.w600,
@@ -1427,7 +1429,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
 
                   // Premium empty state title
                   Text(
-                    'Henüz Hiç Analiz Yok',
+                    'no_analyses_yet'.locale(context),
                     style: AppTextTheme.headline4.copyWith(
                       fontWeight: FontWeight.w800,
                       color: AppColors.textPrimary,
@@ -1448,7 +1450,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Text(
-                      'Bitki fotoğrafı yükleyerek ilk analizinizi yapın.\nTüm analiz sonuçlarınız burada güvenle saklanır.',
+                      'empty_state_description'.locale(context),
                       style: AppTextTheme.bodyText1.copyWith(
                         color: AppColors.textSecondary,
                         height: 1.5,
@@ -1511,7 +1513,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                           ),
                           SizedBox(width: context.dimensions.spaceM),
                           Text(
-                            'Ana Sayfaya Dön',
+                            'back_to_home'.locale(context),
                             style: AppTextTheme.bodyText1.copyWith(
                               color: CupertinoColors.white,
                               fontWeight: FontWeight.w700,
@@ -1625,7 +1627,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
 
                   // No results title
                   Text(
-                    'Filtre Sonucu Bulunamadı',
+                    'no_filter_results'.locale(context),
                     style: AppTextTheme.headline4.copyWith(
                       fontWeight: FontWeight.w800,
                       color: AppColors.textPrimary,
@@ -1646,7 +1648,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Text(
-                      'Seçilen filtrelere uygun analiz sonucu bulunamadı.\nFiltreleri temizleyerek tekrar deneyin.',
+                      'filter_no_results_description'.locale(context),
                       style: AppTextTheme.bodyText1.copyWith(
                         color: AppColors.textSecondary,
                         height: 1.5,
@@ -1706,7 +1708,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                           ),
                           SizedBox(width: context.dimensions.spaceM),
                           Text(
-                            'Filtreleri Temizle',
+                            'clear_filters'.locale(context),
                             style: AppTextTheme.bodyText1.copyWith(
                               color: CupertinoColors.white,
                               fontWeight: FontWeight.w700,
@@ -1732,9 +1734,10 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
   /// Maps ErrorType enum values to user-friendly error information
   /// with appropriate icons, colors, and messages.
   ///
+  /// @param context - BuildContext for localization
   /// @param errorType - The type of error that occurred
   /// @return ErrorInfo object with display properties
-  ErrorInfo _getErrorInfo(ErrorType? errorType) {
+  ErrorInfo _getErrorInfo(BuildContext context, ErrorType? errorType) {
     switch (errorType) {
       // Network-related errors
       case ErrorType.networkError:
@@ -1881,7 +1884,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
       builder: (BuildContext context) {
         return CupertinoAlertDialog(
           title: Text(
-            'Tüm Analizleri Sil',
+            'delete_all_analyses'.locale(context),
             style: AppTextTheme.headline6.copyWith(
               fontWeight: FontWeight.w600,
             ),
@@ -1889,7 +1892,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
           content: Padding(
             padding: const EdgeInsets.only(top: 8.0),
             child: Text(
-              'Tüm analiz verilerinizi kalıcı olarak silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.',
+              'delete_all_confirmation'.locale(context),
               style: AppTextTheme.bodyText2.copyWith(
                 color: CupertinoColors.systemGrey,
               ),
@@ -1902,7 +1905,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                 Navigator.of(context).pop(false);
               },
               child: Text(
-                'İptal',
+                'cancel'.locale(context),
                 style: AppTextTheme.bodyText1.copyWith(
                   color: AppColors.primary,
                   fontWeight: FontWeight.w500,
@@ -1915,7 +1918,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                 Navigator.of(context).pop(true);
               },
               child: Text(
-                'Tümünü Sil',
+                'delete_all'.locale(context),
                 style: AppTextTheme.bodyText1.copyWith(
                   color: CupertinoColors.systemRed,
                   fontWeight: FontWeight.w600,

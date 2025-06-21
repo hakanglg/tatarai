@@ -26,6 +26,7 @@ import '../widgets/home_tips_widget.dart';
 import '../../../core/init/app_initializer.dart';
 import '../../auth/cubits/auth_cubit.dart';
 import '../../auth/cubits/auth_state.dart';
+import '../../navbar/navigation_manager.dart';
 
 /// 🍃 Modern Ana Ekran Tab İçeriği
 ///
@@ -1886,18 +1887,22 @@ class _HomeTabContentState extends State<HomeTabContent>
                 ),
               ),
               child: CupertinoButton(
-                padding: EdgeInsets.zero,
+                padding: EdgeInsets.symmetric(
+                  horizontal: context.dimensions.paddingM,
+                  vertical: context.dimensions.paddingS,
+                ),
                 borderRadius: BorderRadius.circular(22),
                 onPressed: _navigateToAnalysis,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     // Sophisticated icon container
                     Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.25),
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: Colors.white.withOpacity(0.3),
                           width: 0.5,
@@ -1905,26 +1910,32 @@ class _HomeTabContentState extends State<HomeTabContent>
                       ),
                       child: const Icon(
                         CupertinoIcons.camera_fill,
-                        size: 22,
+                        size: 20,
                         color: CupertinoColors.white,
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    // Premium button text
-                    Text(
-                      'start_first_analysis'.locale(context),
-                      style: AppTextTheme.bodyText1.copyWith(
-                        color: CupertinoColors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 18,
-                        letterSpacing: -0.4,
+                    SizedBox(width: context.dimensions.spaceM),
+                    // Premium button text - responsive ve flexible
+                    Flexible(
+                      child: Text(
+                        'start_first_analysis'.locale(context),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextTheme.bodyText1.copyWith(
+                          color: CupertinoColors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                          letterSpacing: -0.3,
+                          height: 1.2,
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: context.dimensions.spaceM),
                     // Elegant arrow indicator
                     Icon(
                       CupertinoIcons.arrow_right_circle_fill,
-                      size: 18,
+                      size: 16,
                       color: CupertinoColors.white.withOpacity(0.9),
                     ),
                   ],
@@ -1965,8 +1976,19 @@ class _HomeTabContentState extends State<HomeTabContent>
   /// Analiz sayfasına yönlendirir
   void _navigateToAnalysis() {
     AppLogger.i('📷 Analiz sayfasına yönlendiriliyor');
-    // NavigationManager ile analiz tab'ına geç
-    // Bu implementasyon NavigationManager'a bağlı
+
+    try {
+      // NavigationManager ile analiz tab'ına geç (tab index: 1)
+      final navigationManager = NavigationManager.instance;
+      if (navigationManager != null) {
+        navigationManager.switchToTab(1);
+        AppLogger.i('🚀 Analysis tab\'ına geçiş yapıldı');
+      } else {
+        AppLogger.w('NavigationManager instance bulunamadı');
+      }
+    } catch (e, stack) {
+      AppLogger.e('Analysis tab geçiş hatası', e, stack);
+    }
   }
 
   /// Bildirimler gösterir

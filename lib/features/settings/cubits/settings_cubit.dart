@@ -78,7 +78,11 @@ class SettingsCubit extends Cubit<SettingsState> {
 
       await _authRepository.deleteAccount();
 
-      emit(const SettingsState());
+      // Başarılı sonucu emit et
+      emit(state.copyWith(
+        isLoading: false,
+        successMessage: 'Hesap başarıyla silindi',
+      ));
 
       AppLogger.i('Hesap başarıyla silindi');
     } catch (e) {

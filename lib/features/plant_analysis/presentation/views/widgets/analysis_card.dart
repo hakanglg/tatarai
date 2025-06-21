@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:tatarai/core/extensions/string_extension.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
 import 'package:tatarai/core/theme/dimensions.dart';
@@ -290,15 +291,11 @@ class AnalysisCard extends StatelessWidget {
                       ),
                     ),
 
-                    // Alt bilgi - title'da tarla adı varsa bitki adını, title'da bitki adı varsa tarla adını göster
+                    // Alt bilgi - analiz tarihi
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
                       child: Text(
-                        (analysis.fieldName?.isNotEmpty ?? false)
-                            ? '${'plant_info'.locale(context)}: ${analysis.plantName ?? 'unknown'.locale(context)}'
-                            : (analysis.fieldName?.isNotEmpty ?? false)
-                                ? '${'field_name'.locale(context)}: ${analysis.fieldName}'
-                                : 'plant_analysis_generic'.locale(context),
+                        _formatAnalysisDate(context),
                         style: AppTextTheme.bodyText2.copyWith(
                           color: CupertinoColors.systemGrey,
                           fontSize: context.dimensions.fontSizeXS,
@@ -516,9 +513,7 @@ class AnalysisCard extends StatelessWidget {
                     SizedBox(width: 4),
                     Flexible(
                       child: Text(
-                        (analysis.fieldName?.isNotEmpty ?? false)
-                            ? '${'plant_info'.locale(context)}: ${analysis.plantName ?? 'unknown'.locale(context)}'
-                            : 'plant_analysis_generic'.locale(context),
+                        _formatAnalysisDate(context),
                         style: AppTextTheme.bodyText2.copyWith(
                           color: CupertinoColors.systemGrey,
                           fontSize: context.dimensions.fontSizeXS,
@@ -811,6 +806,42 @@ class AnalysisCard extends StatelessWidget {
           );
         },
       );
+    }
+  }
+
+  /// Analiz tarihini formatlar
+  String _formatAnalysisDate(BuildContext context) {
+    if (analysis.timestamp == null) {
+      return 'analysis_date_unknown'.locale(context);
+    }
+
+    try {
+      final date = DateTime.fromMillisecondsSinceEpoch(analysis.timestamp!);
+      final now = DateTime.now();
+      final difference = now.difference(date);
+
+      // Bugün yapıldıysa
+      if (difference.inDays == 0) {
+        final formatter = DateFormat('HH:mm');
+        return '${'today'.locale(context)} ${formatter.format(date)}';
+      }
+      // Dün yapıldıysa
+      else if (difference.inDays == 1) {
+        final formatter = DateFormat('HH:mm');
+        return '${'yesterday'.locale(context)} ${formatter.format(date)}';
+      }
+      // Bu hafta yapıldıysa
+      else if (difference.inDays < 7) {
+        return '${difference.inDays} ${'days_ago'.locale(context)}';
+      }
+      // Daha eskiyse
+      else {
+        final formatter = DateFormat('dd.MM.yyyy');
+        return formatter.format(date);
+      }
+    } catch (e) {
+      AppLogger.e('Tarih formatlama hatası', e);
+      return 'analysis_date_unknown'.locale(context);
     }
   }
 }

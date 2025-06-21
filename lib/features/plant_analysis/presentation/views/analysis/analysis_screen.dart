@@ -403,7 +403,8 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                                                     height: context
                                                         .dimensions.spaceXS),
                                                 Text(
-                                                  'Analizin doğru yapılabilmesi için bitkinizin net bir fotoğrafını ekleyin',
+                                                  'add_clear_photo_instruction'
+                                                      .locale(context),
                                                   style: AppTextTheme.bodyText2
                                                       .copyWith(
                                                     color: CupertinoColors

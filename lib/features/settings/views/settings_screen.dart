@@ -44,88 +44,97 @@ class _SettingsScreenState extends State<SettingsScreen> {
           transitionBetweenRoutes: false,
         ),
         child: SafeArea(
-          child: BlocBuilder<SettingsCubit, SettingsState>(
-            builder: (context, state) {
-              if (state.isLoading) {
-                return const Center(
-                  child: CupertinoActivityIndicator(radius: 14),
-                );
+          child: BlocListener<SettingsCubit, SettingsState>(
+            listener: (context, state) {
+              // Hesap silme işlemi başarılı ise AuthCubit'den logout et
+              if (state.hasSuccess) {
+                // Başarı mesajını göster
+                _showAccountDeletedDialog(context);
               }
+            },
+            child: BlocBuilder<SettingsCubit, SettingsState>(
+              builder: (context, state) {
+                if (state.isLoading) {
+                  return const Center(
+                    child: CupertinoActivityIndicator(radius: 14),
+                  );
+                }
 
-              if (state.hasError) {
-                return Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(context.dimensions.paddingL),
+                if (state.hasError) {
+                  return Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(context.dimensions.paddingL),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            CupertinoIcons.exclamationmark_circle,
+                            color: CupertinoColors.systemRed,
+                            size: 50,
+                          ),
+                          SizedBox(height: context.dimensions.spaceM),
+                          Text(
+                            'error_occurred'.locale(context),
+                            style: AppTextTheme.headline5.copyWith(
+                              color: CupertinoColors.systemRed,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          SizedBox(height: context.dimensions.spaceS),
+                          Text(
+                            state.errorMessage!,
+                            style: AppTextTheme.bodyText1.copyWith(
+                              color: CupertinoColors.systemGrey,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                final user = state.user;
+                if (user == null) {
+                  return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const Icon(
-                          CupertinoIcons.exclamationmark_circle,
-                          color: CupertinoColors.systemRed,
-                          size: 50,
+                          CupertinoIcons.gear_alt,
+                          size: 48,
+                          color: CupertinoColors.systemGrey,
                         ),
                         SizedBox(height: context.dimensions.spaceM),
                         Text(
-                          'error_occurred'.locale(context),
-                          style: AppTextTheme.headline5.copyWith(
-                            color: CupertinoColors.systemRed,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        SizedBox(height: context.dimensions.spaceS),
-                        Text(
-                          state.errorMessage!,
-                          style: AppTextTheme.bodyText1.copyWith(
-                            color: CupertinoColors.systemGrey,
-                          ),
-                          textAlign: TextAlign.center,
+                          'not_logged_in'.locale(context),
+                          style: AppTextTheme.headline6
+                              .copyWith(color: CupertinoColors.systemGrey),
                         ),
                       ],
                     ),
-                  ),
+                  );
+                }
+
+                return ListView(
+                  padding: EdgeInsets.all(context.dimensions.paddingL),
+                  children: [
+                    // Üyelik Bilgileri Kartı
+                    _buildMembershipCard(user),
+
+                    SizedBox(height: context.dimensions.spaceL),
+
+                    // Ayarlar
+                    _buildSettingsSection(context),
+
+                    SizedBox(height: context.dimensions.spaceL),
+
+                    // Hesap İşlemleri
+                    _buildAccountSection(context),
+                  ],
                 );
-              }
-
-              final user = state.user;
-              if (user == null) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        CupertinoIcons.gear_alt,
-                        size: 48,
-                        color: CupertinoColors.systemGrey,
-                      ),
-                      SizedBox(height: context.dimensions.spaceM),
-                      Text(
-                        'not_logged_in'.locale(context),
-                        style: AppTextTheme.headline6
-                            .copyWith(color: CupertinoColors.systemGrey),
-                      ),
-                    ],
-                  ),
-                );
-              }
-
-              return ListView(
-                padding: EdgeInsets.all(context.dimensions.paddingL),
-                children: [
-                  // Üyelik Bilgileri Kartı
-                  _buildMembershipCard(user),
-
-                  SizedBox(height: context.dimensions.spaceL),
-
-                  // Ayarlar
-                  _buildSettingsSection(context),
-
-                  SizedBox(height: context.dimensions.spaceL),
-
-                  // Hesap İşlemleri
-                  _buildAccountSection(context),
-                ],
-              );
-            },
+              },
+            ),
           ),
         ),
       ),
@@ -649,23 +658,68 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// Hesap silme dialog'unu göster
   void _showDeleteAccountDialog(BuildContext context) {
     HapticFeedback.heavyImpact();
+
+    // SettingsCubit'i dialog açılmadan önce yakala
+    final settingsCubit = context.read<SettingsCubit>();
+
     showCupertinoDialog(
       context: context,
-      builder: (context) => CupertinoAlertDialog(
+      builder: (dialogContext) => CupertinoAlertDialog(
         title: Text('delete_account_title'.locale(context)),
         content: Text('delete_account_warning'.locale(context)),
         actions: [
           CupertinoDialogAction(
             child: Text('cancel'.locale(context)),
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(dialogContext).pop(),
           ),
           CupertinoDialogAction(
             isDestructiveAction: true,
             child: Text('delete_account_title'.locale(context)),
             onPressed: () {
-              Navigator.of(context).pop();
-              context.read<SettingsCubit>().deleteAccount();
+              Navigator.of(dialogContext).pop();
+              // Yakaladığımız cubit'i kullan
+              settingsCubit.deleteAccount();
             },
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Hesap silindi dialog'unu gösterir
+  void _showAccountDeletedDialog(BuildContext context) {
+    showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              CupertinoIcons.checkmark_circle,
+              color: CupertinoColors.activeGreen,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'account_deleted'.locale(context),
+              style: AppTextTheme.body.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 8.0),
+          child: Text(
+            'account_deleted_message'.locale(context),
+            style: AppTextTheme.caption,
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            child: Text('ok'.locale(context)),
+            onPressed: () => Navigator.of(context).pop(),
           ),
         ],
       ),

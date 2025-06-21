@@ -116,27 +116,30 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
       context: context,
       builder: (BuildContext context) => CupertinoActionSheet(
         title: Text(
-          'Fotoğraf Seç',
-          style: AppTextTheme.bodyLarge,
+          'photo_source_description'.locale(context),
+          style: AppTextTheme.bodyLarge.copyWith(
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w600,
+          ),
         ),
-        message: Text(
-          'Lütfen fotoğraf kaynağını seçin',
-          style: AppTextTheme.bodyMedium,
-        ),
+        // message: Text(
+        //   'photo_source_description'.locale(context),
+        //   style: AppTextTheme.bodyMedium,
+        // ),
         actions: <CupertinoActionSheetAction>[
           CupertinoActionSheetAction(
             onPressed: () {
               Navigator.pop(context);
               _pickImage(ImageSource.camera);
             },
-            child: Text('Kamera'),
+            child: Text('camera'.locale(context)),
           ),
           CupertinoActionSheetAction(
             onPressed: () {
               Navigator.pop(context);
               _pickImage(ImageSource.gallery);
             },
-            child: Text('Galeri'),
+            child: Text('gallery'.locale(context)),
           ),
         ],
         cancelButton: CupertinoActionSheetAction(
@@ -144,7 +147,7 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
           onPressed: () {
             Navigator.pop(context);
           },
-          child: Text('İptal'),
+          child: Text('cancel'.locale(context)),
         ),
       ),
     );
@@ -197,12 +200,11 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
       await showCupertinoDialog(
         context: context,
         builder: (context) => CupertinoAlertDialog(
-          title: Text('Hata'),
-          content: Text(
-              'Fotoğraf seçilirken bir hata oluştu. Lütfen tekrar deneyin.'),
+          title: Text('error'.locale(context)),
+          content: Text('photo_selection_error'.locale(context)),
           actions: [
             CupertinoDialogAction(
-              child: Text('Tamam'),
+              child: Text('ok'.locale(context)),
               onPressed: () => Navigator.pop(context),
             ),
           ],
@@ -219,7 +221,7 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
       context: context,
       builder: (BuildContext context) => CupertinoActionSheet(
         title: Text(
-          'Fotoğraf Seçenekleri',
+          'photo_ops'.locale(context),
           style: AppTextTheme.bodyLarge,
         ),
         actions: <CupertinoActionSheetAction>[
@@ -228,7 +230,7 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
               Navigator.pop(context);
               _showPhotoSourceDialog();
             },
-            child: Text('Yeni Fotoğraf Seç'),
+            child: Text('change_photo'.locale(context)),
           ),
           CupertinoActionSheetAction(
             isDestructiveAction: true,
@@ -239,14 +241,14 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
               });
               AppLogger.i('Fotoğraf kaldırıldı');
             },
-            child: Text('Fotoğrafı Kaldır'),
+            child: Text('delete_photo'.locale(context)),
           ),
         ],
         cancelButton: CupertinoActionSheetAction(
           onPressed: () {
             Navigator.pop(context);
           },
-          child: Text('İptal'),
+          child: Text('cancel'.locale(context)),
         ),
       ),
     );
@@ -535,12 +537,12 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
         // Giriş sonrası tekrar kontrol et
         final newAuthState = context.read<AuthCubit>().state;
         if (newAuthState is! AuthAuthenticated) {
-          _showErrorDialog('Analiz yapmak için giriş yapmanız gerekiyor');
+          _showErrorDialog('auth_required_for_analysis'.locale(context));
           return;
         }
       } catch (e) {
         AppLogger.e('Anonim giriş hatası: $e');
-        _showErrorDialog('Giriş yapılırken hata oluştu: $e');
+        _showErrorDialog('auth_login_error'.locale(context));
         return;
       }
     }
@@ -558,7 +560,7 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
       AppLogger.w(
           'Kullanıcının analiz kredisi yok, premium popup gösteriliyor');
       await _showErrorDialog(
-        'Ücretsiz analiz hakkınızı kullandınız. Premium üyelik satın alarak sınırsız analiz yapabilirsiniz.',
+        'free_analysis_limit_reached'.locale(context),
         needsPremium: true,
       );
       return;
@@ -576,8 +578,7 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
       final retryFirebaseUser = FirebaseAuth.instance.currentUser;
 
       if (retryFirebaseUser == null) {
-        _showErrorDialog(
-            'Firebase Authentication hatası. Lütfen uygulamayı yeniden başlatın.');
+        _showErrorDialog('firebase_auth_error'.locale(context));
         return;
       }
 
