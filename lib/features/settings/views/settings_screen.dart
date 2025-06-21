@@ -613,42 +613,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
             topRight: Radius.circular(16),
           ),
         ),
-        child: SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Handle çubuğu
-              Container(
-                width: 36,
-                height: 4,
-                margin: const EdgeInsets.only(top: 12, bottom: 16),
-                decoration: BoxDecoration(
-                  color: CupertinoColors.systemGrey4,
-                  borderRadius: BorderRadius.circular(2),
+        child: Scaffold(
+          body: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Handle çubuğu
+                Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(top: 12, bottom: 16),
+                  decoration: BoxDecoration(
+                    color: CupertinoColors.systemGrey4,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
-              ),
 
-              // Başlık
-              Text(
-                'language'.locale(context),
-                style: AppTextTheme.headline6.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: CupertinoColors.label,
+                // Başlık
+                Text(
+                  'language'.locale(context),
+                  style: AppTextTheme.headline6.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: CupertinoColors.label,
+                  ),
                 ),
-              ),
 
-              const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-              // Dil seçenekleri
-              Padding(
-                padding: EdgeInsets.symmetric(
-                    horizontal: context.dimensions.paddingL),
-                child: _buildLanguageOptions(context),
-              ),
+                // Dil seçenekleri
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                      horizontal: context.dimensions.paddingL),
+                  child: _buildLanguageOptions(context),
+                ),
 
-              // Alt boşluk
-              SizedBox(height: context.dimensions.paddingL),
-            ],
+                // Alt boşluk
+                SizedBox(height: context.dimensions.paddingL),
+              ],
+            ),
           ),
         ),
       ),
