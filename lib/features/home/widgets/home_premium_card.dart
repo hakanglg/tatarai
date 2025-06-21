@@ -7,6 +7,7 @@ import '../../../core/theme/dimensions.dart';
 import '../../../core/theme/text_theme.dart';
 import '../../../core/utils/logger.dart';
 import '../../../core/extensions/string_extension.dart';
+import '../../../core/extensions/context_extensions.dart';
 import '../../payment/cubits/payment_cubit.dart';
 
 /// Sade Premium Card Widget'ı
@@ -35,6 +36,15 @@ class HomePremiumCard extends StatelessWidget {
       builder: (context, paymentState) {
         // Premium kullanıcı ise card'ı gizle
         if (paymentState.isPremium) {
+          return const SizedBox.shrink();
+        }
+
+        // API anahtarı yoksa veya offerings alınamadıysa card'ı gizle
+        if (paymentState.hasError &&
+            paymentState.errorMessage
+                    ?.contains('Premium özellikler şu anda kullanılamıyor') ==
+                true) {
+          AppLogger.i('Premium card gizleniyor: API anahtarı bulunamadı');
           return const SizedBox.shrink();
         }
 
@@ -226,24 +236,20 @@ class HomePremiumCard extends StatelessWidget {
     try {
       AppLogger.i('Premium card tıklandı');
 
-      // PaymentCubit üzerinden offerings getir
-      final paymentCubit = context.read<PaymentCubit>();
-      final offerings = await paymentCubit.fetchOfferings();
+      // Context extension kullanarak paywall aç
+      final result = await context.showPaywall(
+        displayCloseButton: true,
+        onComplete: (result) {
+          AppLogger.i('Paywall tamamlandı: $result');
 
-      if (offerings?.current?.availablePackages.isNotEmpty == true) {
-        // İlk paketi satın al
-        final package = offerings!.current!.availablePackages.first;
-        await paymentCubit.purchasePackage(package);
+          // Başarılı satın alma durumunda callback çağır
+          if (result != null && onPremiumPurchased != null) {
+            onPremiumPurchased!();
+          }
+        },
+      );
 
-        // Başarılı satın alma durumunda callback çağır
-        if (onPremiumPurchased != null) {
-          onPremiumPurchased!();
-        }
-      } else {
-        AppLogger.w('Premium paketleri bulunamadı');
-      }
-
-      AppLogger.i('Premium satın alma işlemi tamamlandı');
+      AppLogger.i('Premium satın alma işlemi tamamlandı: $result');
     } catch (e, stackTrace) {
       AppLogger.e('Premium satın alma hatası', e, stackTrace);
     }

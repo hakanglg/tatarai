@@ -24,6 +24,8 @@ import 'package:tatarai/core/extensions/context_extensions.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
 import 'package:tatarai/features/auth/cubits/auth_state.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:tatarai/core/services/service_locator.dart';
+import 'package:tatarai/core/services/firestore/firestore_service.dart';
 
 part 'analysis_screen_mixin.dart';
 

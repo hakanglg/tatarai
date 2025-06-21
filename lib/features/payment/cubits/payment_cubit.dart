@@ -25,6 +25,24 @@ class PaymentCubit extends Cubit<PaymentState> {
       CustomerInfo? customerInfo;
 
       try {
+        // API anahtarı kontrolü
+        String apiKey = Platform.isIOS
+            ? AppConstants.revenueiOSApiKey
+            : AppConstants
+                .revenueiOSApiKey; // Şimdilik iOS anahtarını kullanıyoruz
+
+        if (apiKey.isEmpty) {
+          AppLogger.w(
+              'RevenueCat API anahtarı bulunamadı. Premium özellikler devre dışı.');
+          emit(state.copyWith(
+            isLoading: false,
+            hasError: false,
+            offerings: null,
+            errorMessage: 'Premium özellikler şu anda kullanılamıyor',
+          ));
+          return null;
+        }
+
         // RevenueCat'in başlatılıp başlatılmadığını kontrol et
         bool isConfigured = await Purchases.isConfigured;
         if (!isConfigured) {
@@ -162,13 +180,19 @@ class PaymentCubit extends Cubit<PaymentState> {
       if (Platform.isIOS) {
         apiKey = AppConstants.revenueiOSApiKey;
         if (apiKey.isEmpty) {
-          throw Exception('iOS RevenueCat API anahtarı bulunamadı!');
+          AppLogger.w(
+              'iOS RevenueCat API anahtarı bulunamadı! .env dosyasını kontrol edin.');
+          // Geçici test API anahtarı (sandbox için)
+          apiKey = 'appl_test_key_placeholder';
         }
       } else if (Platform.isAndroid) {
         apiKey = AppConstants
             .revenueiOSApiKey; // Şimdilik iOS anahtarını kullanıyoruz
         if (apiKey.isEmpty) {
-          throw Exception('Android RevenueCat API anahtarı bulunamadı!');
+          AppLogger.w(
+              'Android RevenueCat API anahtarı bulunamadı! .env dosyasını kontrol edin.');
+          // Geçici test API anahtarı (sandbox için)
+          apiKey = 'goog_test_key_placeholder';
         }
       } else {
         throw Exception('Desteklenmeyen platform!');

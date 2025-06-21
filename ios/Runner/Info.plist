@@ -35,20 +35,16 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
-	<key>LSRequiresIPhoneOS</key>
-	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
-	<key>com.apple.developer.applesignin</key>
-	<array>
-		<string>Default</string>
-	</array>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>TatarAI, profil fotoğrafı çekmek ve bitki analizi yapmak için kamera erişimi gerektirir. Bu izin yalnızca açıkça fotoğraf çekmeyi seçtiğinizde kullanılır ve başka hiçbir amaçla kullanılmaz. Kamera erişimine izin vermezseniz, fotoğraf çekemezsiniz ancak galeriden seçme seçeneğini hala kullanabilirsiniz.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>TatarAI, profil fotoğrafınızı güncellemek ve bitki analizi yapmak için fotoğraf galerisi erişimi gerektirir. Bu izin yalnızca açıkça bir fotoğraf seçtiğinizde kullanılır ve fotoğraflarınız izniniz olmadan paylaşılmaz veya depolanmaz. Galeri erişimine izin vermezseniz, fotoğraf seçemezsiniz ancak kamera seçeneğini hala kullanabilirsiniz.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>TatarAI, analiz sonuçlarını ve diğer fotoğrafları galerinize kaydetmek için izin istiyor. Bu özellik yalnızca fotoğraf kaydetmeyi açıkça seçtiğinizde kullanılır ve izniniz olmadan hiçbir veri saklanmaz.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>TatarAI, profil fotoğrafınızı güncellemek ve bitki analizi yapmak için fotoğraf galerisi erişimi gerektirir. Bu izin yalnızca açıkça bir fotoğraf seçtiğinizde kullanılır ve fotoğraflarınız izniniz olmadan paylaşılmaz veya depolanmaz. Galeri erişimine izin vermezseniz, fotoğraf seçemezsiniz ancak kamera seçeneğini hala kullanabilirsiniz.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>
@@ -58,16 +54,17 @@
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationPortraitUpsideDown</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+	</array>
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
 	</array>
 </dict>
 </plist>

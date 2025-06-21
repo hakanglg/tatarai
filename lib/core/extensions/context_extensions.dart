@@ -32,10 +32,27 @@ extension BuildContextExtensions on BuildContext {
           displayCloseButton: displayCloseButton,
         );
       } else {
-        AppLogger.w('Offerings bulunamadı, varsayılan paywall gösteriliyor');
-        result = await RevenueCatUI.presentPaywall(
-          displayCloseButton: displayCloseButton,
+        AppLogger.w(
+            'Offerings bulunamadı. Premium özellikler şu anda kullanılamıyor.');
+
+        // Kullanıcıya bilgi ver
+        if (onComplete != null) {
+          onComplete(null);
+        }
+
+        // Hata mesajı göster
+        ScaffoldMessenger.of(this).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Premium özellikler şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin.',
+              style: TextStyle(color: Colors.white),
+            ),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 3),
+          ),
         );
+
+        return null;
       }
 
       AppLogger.i('Paywall kapatıldı. Result: $result');

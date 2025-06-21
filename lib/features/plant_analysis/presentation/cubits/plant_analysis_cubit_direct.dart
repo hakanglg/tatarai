@@ -14,6 +14,7 @@ import '../../../../core/services/firestore/firestore_service.dart';
 import '../../../../core/init/localization/localization_manager.dart';
 import '../../../../core/services/ai/gemini_model_config.dart';
 import '../../services/plant_analysis_service.dart';
+import '../../../auth/cubits/auth_cubit.dart';
 
 import 'plant_analysis_state.dart';
 
@@ -73,8 +74,10 @@ class PlantAnalysisCubitDirect extends Cubit<PlantAnalysisState> {
   /// Complete analysis workflow using models directly:
   /// 1. Image validation
   /// 2. Network connectivity check
-  /// 3. Direct Gemini AI analysis → PlantAnalysisModel (no JSON!)
-  /// 4. Emit model directly to UI
+  /// 3. User credits validation
+  /// 4. Direct Gemini AI analysis → PlantAnalysisModel (no JSON!)
+  /// 5. Credit deduction
+  /// 6. Emit model directly to UI
   ///
   /// [imageFile] - Image file to analyze
   /// [user] - User making request
@@ -109,6 +112,90 @@ class PlantAnalysisCubitDirect extends Cubit<PlantAnalysisState> {
       final imageBytes = await imageFile.readAsBytes();
       if (imageBytes.isEmpty) {
         throw Exception('Image file is empty');
+      }
+
+      // User credits validation (non-premium users only)
+      AppLogger.logWithContext(
+        _serviceName,
+        '💳 Checking user credits',
+        'User: ${user.id}, Credits: ${user.analysisCredits}, Premium: ${user.isPremium}',
+      );
+
+      // Real-time credit check from Firestore (don't trust cached AuthCubit data)
+      final firestoreService = ServiceLocator.get<FirestoreService>();
+      try {
+        final userDoc = await firestoreService.firestore
+            .collection('users')
+            .doc(user.id)
+            .get();
+
+        if (userDoc.exists) {
+          final userData = userDoc.data() as Map<String, dynamic>?;
+          final realTimeCredits = userData?['analysisCredits'] ?? 0;
+          final realTimePremium = userData?['isPremium'] ?? false;
+
+          AppLogger.logWithContext(
+            _serviceName,
+            '🔍 Real-time Firestore credit check',
+            'User: ${user.id}, Firestore Credits: $realTimeCredits, Firestore Premium: $realTimePremium',
+          );
+
+          // Use real-time Firestore data for credit validation
+          if (!realTimePremium && realTimeCredits <= 0) {
+            AppLogger.warnWithContext(
+              _serviceName,
+              '❌ Insufficient credits (Firestore real-time check)',
+              'User: ${user.id} has $realTimeCredits credits',
+            );
+            emit(PlantAnalysisError(
+              message:
+                  'Analiz kredileriniz tükendi. Premium üyelik satın alarak sınırsız analiz yapabilirsiniz.',
+              errorType: ErrorType.creditError,
+              needsPremium: true,
+            ));
+            return;
+          }
+
+          AppLogger.successWithContext(
+            _serviceName,
+            '✅ Credit validation passed (real-time check)',
+            'User: ${user.id}, Credits: $realTimeCredits, Premium: $realTimePremium',
+          );
+        } else {
+          AppLogger.warnWithContext(
+            _serviceName,
+            '⚠️ User document not found in Firestore, using cached data',
+            'User: ${user.id}',
+          );
+
+          // Fallback to cached data if Firestore fails
+          if (!user.isPremium && user.analysisCredits <= 0) {
+            emit(PlantAnalysisError(
+              message:
+                  'Analiz kredileriniz tükendi. Premium üyelik satın alarak sınırsız analiz yapabilirsiniz.',
+              errorType: ErrorType.creditError,
+              needsPremium: true,
+            ));
+            return;
+          }
+        }
+      } catch (firestoreError) {
+        AppLogger.warnWithContext(
+          _serviceName,
+          '⚠️ Firestore credit check failed, using cached data',
+          'Error: $firestoreError',
+        );
+
+        // Fallback to cached data if Firestore fails
+        if (!user.isPremium && user.analysisCredits <= 0) {
+          emit(PlantAnalysisError(
+            message:
+                'Analiz kredileriniz tükendi. Premium üyelik satın alarak sınırsız analiz yapabilirsiniz.',
+            errorType: ErrorType.creditError,
+            needsPremium: true,
+          ));
+          return;
+        }
       }
 
       // === STEP 2: NETWORK CHECK ===
@@ -166,7 +253,80 @@ class PlantAnalysisCubitDirect extends Cubit<PlantAnalysisState> {
         'Plant: ${analysisModel.plantName}, Health: ${analysisModel.isHealthy}',
       );
 
-      // === STEP 4: USE DIRECT RESULT FOR NOW (BYPASS REPOSITORY PARSING) ===
+      // === STEP 4: UPDATE USER CREDITS AFTER SUCCESSFUL ANALYSIS ===
+      try {
+        // Get current credits from Firestore again (real-time)
+        final firestoreService = ServiceLocator.get<FirestoreService>();
+        final userDoc = await firestoreService.firestore
+            .collection('users')
+            .doc(user.id)
+            .get();
+
+        if (userDoc.exists) {
+          final userData = userDoc.data() as Map<String, dynamic>?;
+          final currentCredits = userData?['analysisCredits'] ?? 0;
+          final isPremium = userData?['isPremium'] ?? false;
+
+          // Only deduct credits for non-premium users
+          if (!isPremium) {
+            AppLogger.logWithContext(
+              _serviceName,
+              '💳 Updating user credits',
+              'User: ${user.id}, Current Credits: $currentCredits',
+            );
+
+            final newCredits = currentCredits - 1;
+
+            // 1. Firestore'da kullanıcının analysisCredits alanını 1 azalt
+            await firestoreService.firestore
+                .collection('users')
+                .doc(user.id)
+                .update({
+              'analysisCredits': newCredits,
+            });
+
+            // 2. AuthCubit'teki local user state'ini de güncelle
+            try {
+              final authCubit = ServiceLocator.get<AuthCubit>();
+              await authCubit.updateAnalysisCredits(newCredits);
+
+              AppLogger.successWithContext(
+                _serviceName,
+                '✅ User credits updated in both Firestore and local state',
+                'User: ${user.id}, After: $newCredits',
+              );
+            } catch (authUpdateError) {
+              AppLogger.warnWithContext(
+                _serviceName,
+                '⚠️ AuthCubit update failed but Firestore updated successfully',
+                authUpdateError,
+              );
+            }
+          } else {
+            AppLogger.logWithContext(
+              _serviceName,
+              '👑 Premium user - no credit deduction',
+              'User: ${user.id}',
+            );
+          }
+        } else {
+          AppLogger.warnWithContext(
+            _serviceName,
+            '⚠️ User document not found during credit update',
+            'User: ${user.id}',
+          );
+        }
+      } catch (creditError, stackTrace) {
+        AppLogger.errorWithContext(
+          _serviceName,
+          '⚠️ Credit update failed (analysis still successful)',
+          creditError,
+          stackTrace,
+        );
+        // Don't fail the entire analysis for credit update errors
+      }
+
+      // === STEP 5: USE DIRECT RESULT FOR NOW (BYPASS REPOSITORY PARSING) ===
       emit(PlantAnalysisAnalyzing(
         progressMessage: 'Finalizing analysis...',
         progress: 0.9,

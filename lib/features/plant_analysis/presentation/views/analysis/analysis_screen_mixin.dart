@@ -555,15 +555,62 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
     AppLogger.i(
         'Kullanıcının analiz kredileri kontrol ediliyor: ${currentUser.analysisCredits}, Premium: ${currentUser.isPremium}');
 
-    // Eğer kullanıcı premium değilse ve kredisi yoksa, premium satın alma popup'ı göster
-    if (!currentUser.isPremium && currentUser.analysisCredits <= 0) {
+    // Real-time credit check from Firestore (don't trust cached AuthCubit data)
+    try {
+      final firestoreService = ServiceLocator.get<FirestoreService>();
+      final userDoc = await firestoreService.firestore
+          .collection('users')
+          .doc(currentUser.id)
+          .get();
+
+      if (userDoc.exists) {
+        final userData = userDoc.data() as Map<String, dynamic>?;
+        final realTimeCredits = userData?['analysisCredits'] ?? 0;
+        final realTimePremium = userData?['isPremium'] ?? false;
+
+        AppLogger.i(
+            'Real-time Firestore credit check - User: ${currentUser.id}, Credits: $realTimeCredits, Premium: $realTimePremium');
+
+        // Use real-time Firestore data for validation
+        if (!realTimePremium && realTimeCredits <= 0) {
+          AppLogger.w(
+              'Kullanıcının analiz kredisi yok (Firestore real-time check), premium popup gösteriliyor');
+          await _showErrorDialog(
+            'free_analysis_limit_reached'.locale(context),
+            needsPremium: true,
+          );
+          return;
+        }
+
+        AppLogger.i('Credit validation passed - proceeding with analysis');
+      } else {
+        AppLogger.w('User document not found in Firestore, using cached data');
+
+        // Fallback to cached data if Firestore document doesn't exist
+        if (!currentUser.isPremium && currentUser.analysisCredits <= 0) {
+          AppLogger.w(
+              'Kullanıcının analiz kredisi yok (fallback check), premium popup gösteriliyor');
+          await _showErrorDialog(
+            'free_analysis_limit_reached'.locale(context),
+            needsPremium: true,
+          );
+          return;
+        }
+      }
+    } catch (firestoreError) {
       AppLogger.w(
-          'Kullanıcının analiz kredisi yok, premium popup gösteriliyor');
-      await _showErrorDialog(
-        'free_analysis_limit_reached'.locale(context),
-        needsPremium: true,
-      );
-      return;
+          'Firestore credit check failed, using cached data: $firestoreError');
+
+      // Fallback to cached data if Firestore query fails
+      if (!currentUser.isPremium && currentUser.analysisCredits <= 0) {
+        AppLogger.w(
+            'Kullanıcının analiz kredisi yok (fallback check), premium popup gösteriliyor');
+        await _showErrorDialog(
+          'free_analysis_limit_reached'.locale(context),
+          needsPremium: true,
+        );
+        return;
+      }
     }
 
     // Firebase Auth current user kontrolü

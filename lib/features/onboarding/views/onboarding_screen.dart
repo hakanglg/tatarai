@@ -417,8 +417,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     ),
                     child: AppButton(
                       text: _currentPage < _onboardingItems.length - 1
-                          ? 'Devam Et'
-                          : 'Uygulamaya Başla',
+                          ? 'continue_text'.locale(context)
+                          : 'start_analysis'.locale(context),
                       onPressed: _isCompleting
                           ? null
                           : (_currentPage < _onboardingItems.length - 1
@@ -536,7 +536,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 child: Transform.translate(
                   offset: Offset(0, 20 * (1 - value)),
                   child: Text(
-                    item.title,
+                    item.title.locale(context),
                     textAlign: TextAlign.center,
                     style: AppTextTheme.headline2.copyWith(
                       color: AppColors.primary,
@@ -560,7 +560,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 child: Transform.translate(
                   offset: Offset(0, 30 * (1 - value)),
                   child: Text(
-                    item.description,
+                    item.description.locale(context),
                     textAlign: TextAlign.center,
                     style: AppTextTheme.body.copyWith(
                       color: AppColors.textSecondary,
