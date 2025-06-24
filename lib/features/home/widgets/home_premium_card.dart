@@ -8,6 +8,7 @@ import '../../../core/theme/text_theme.dart';
 import '../../../core/utils/logger.dart';
 import '../../../core/extensions/string_extension.dart';
 import '../../../core/extensions/context_extensions.dart';
+import '../../../core/services/paywall_manager.dart';
 import '../../payment/cubits/payment_cubit.dart';
 
 /// Sade Premium Card Widget'ı
@@ -234,24 +235,42 @@ class HomePremiumCard extends StatelessWidget {
   /// Premium satın alma işlemini başlatır
   Future<void> _handlePremiumPurchase(BuildContext context) async {
     try {
-      AppLogger.i('Premium card tıklandı');
+      AppLogger.i('Premium card tıklandı - paywall açılıyor');
 
-      // Context extension kullanarak paywall aç
-      final result = await context.showPaywall(
+      // Context'in hala geçerli olup olmadığını kontrol et
+      if (!context.mounted) {
+        AppLogger.w('Context artık mounted değil, paywall açılamıyor');
+        return;
+      }
+
+      // PaywallManager kullanarak paywall aç
+      final result = await PaywallManager.showPaywall(
+        context,
         displayCloseButton: true,
-        onComplete: (result) {
-          AppLogger.i('Paywall tamamlandı: $result');
-
-          // Başarılı satın alma durumunda callback çağır
-          if (result != null && onPremiumPurchased != null) {
-            onPremiumPurchased!();
-          }
+        onPremiumPurchased: () {
+          AppLogger.i('Premium satın alma başarılı, callback çağrılıyor');
+          onPremiumPurchased?.call();
+        },
+        onCancelled: () {
+          AppLogger.i('Paywall kapatıldı ama satın alma yapılmadı');
+        },
+        onError: (error) {
+          AppLogger.e('Premium satın alma hatası: $error');
         },
       );
 
-      AppLogger.i('Premium satın alma işlemi tamamlandı: $result');
+      AppLogger.i('Premium satın alma işlemi sonucu: $result');
+
+      if (result != null) {
+        AppLogger.i('Paywall başarıyla tamamlandı: ${result.toString()}');
+      } else {
+        AppLogger.w(
+            'Paywall sonucu null - kullanıcı iptal etti veya hata oluştu');
+      }
     } catch (e, stackTrace) {
       AppLogger.e('Premium satın alma hatası', e, stackTrace);
+
+      // Error mesajı PaywallManager tarafından gösterilecek
     }
   }
 }

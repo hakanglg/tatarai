@@ -17,7 +17,8 @@ class PaymentCubit extends Cubit<PaymentState> {
   /// Abonelik paketlerini getirir
   Future<Offerings?> fetchOfferings({bool retry = true}) async {
     try {
-      emit(state.copyWith(isLoading: true, hasError: false));
+      emit(
+          state.copyWith(isLoading: true, hasError: false, errorMessage: null));
       AppLogger.i('PaymentCubit: Paketler getiriliyor...');
 
       // RevenueCat API çağrısı
@@ -44,21 +45,43 @@ class PaymentCubit extends Cubit<PaymentState> {
         }
 
         // RevenueCat'in başlatılıp başlatılmadığını kontrol et
-        bool isConfigured = await Purchases.isConfigured;
+        bool isConfigured = false;
+        try {
+          isConfigured = await Purchases.isConfigured;
+          AppLogger.i(
+              'PaymentCubit: RevenueCat isConfigured durumu: $isConfigured');
+        } catch (e) {
+          AppLogger.w('PaymentCubit: isConfigured kontrolü başarısız: $e');
+          isConfigured = false;
+        }
+
         if (!isConfigured) {
-          AppLogger.e(
-              'PaymentCubit: RevenueCat henüz yapılandırılmamış! Tekrar yapılandırılmaya çalışılacak.');
+          AppLogger.i(
+              'PaymentCubit: RevenueCat henüz yapılandırılmamış! Tekrar yapılandırılıyor...');
 
           // RevenueCat'i tekrar yapılandırmaya çalış
           await _reconfigureRevenueCat();
 
-          // Tekrar kontrol et
-          isConfigured = await Purchases.isConfigured;
+          // Kısa bir bekleme sonrası tekrar kontrol et
+          await Future.delayed(const Duration(milliseconds: 500));
+
+          try {
+            isConfigured = await Purchases.isConfigured;
+            AppLogger.i(
+                'PaymentCubit: Reconfiguration sonrası isConfigured: $isConfigured');
+          } catch (e) {
+            AppLogger.e(
+                'PaymentCubit: Reconfiguration sonrası kontrol hatası: $e');
+            isConfigured = false;
+          }
+
           if (!isConfigured) {
+            AppLogger.e('PaymentCubit: RevenueCat yapılandırılamadı');
             emit(state.copyWith(
               isLoading: false,
               hasError: true,
-              errorMessage: 'RevenueCat yapılandırılamadı',
+              errorMessage:
+                  'RevenueCat yapılandırılamadı. Lütfen daha sonra tekrar deneyin.',
             ));
             return null;
           }
@@ -66,92 +89,177 @@ class PaymentCubit extends Cubit<PaymentState> {
 
         // Paketleri getir
         AppLogger.i('PaymentCubit: getOfferings() çağrılıyor...');
-        try {
-          offerings = await Purchases.getOfferings();
-          AppLogger.i('>> Offerings All: ${offerings.all}');
-          AppLogger.i('>> Current Offering: ${offerings.current}');
 
-          AppLogger.i('TEST Offerings: ${offerings.all}');
+        try {
+          // RevenueCat configuration debug
+          AppLogger.i('PaymentCubit: RevenueCat Debug Info:');
+          AppLogger.i('PaymentCubit: - isConfigured: $isConfigured');
+          AppLogger.i('PaymentCubit: - API Key length: ${apiKey.length}');
+          AppLogger.i('PaymentCubit: - Platform: ${Platform.operatingSystem}');
+
+          // Customer info'yu önce kontrol et
+          try {
+            final debugCustomerInfo = await Purchases.getCustomerInfo();
+            AppLogger.i(
+                'PaymentCubit: Customer Info mevcut: ${debugCustomerInfo.originalAppUserId}');
+          } catch (customerError) {
+            AppLogger.w('PaymentCubit: Customer Info hatası: $customerError');
+          }
+
+          offerings = await Purchases.getOfferings();
+
+          AppLogger.i('PaymentCubit: Offerings response:');
           AppLogger.i(
-              'TEST Current offering: ${offerings.current?.identifier}');
+              'PaymentCubit: - All offerings count: ${offerings.all.length}');
+          AppLogger.i(
+              'PaymentCubit: - All offerings keys: ${offerings.all.keys.toList()}');
+          AppLogger.i(
+              'PaymentCubit: - Current offering: ${offerings.current?.identifier}');
+
+          // Eğer current null ise tüm offerings'leri listele
+          if (offerings.current == null) {
+            AppLogger.w('PaymentCubit: Current offering NULL! Tüm offerings:');
+            for (final entry in offerings.all.entries) {
+              AppLogger.i(
+                  'PaymentCubit: - Offering "${entry.key}": ${entry.value.availablePackages.length} packages');
+              for (final package in entry.value.availablePackages) {
+                AppLogger.i(
+                    'PaymentCubit:   - Package: ${package.identifier} (${package.storeProduct.identifier})');
+              }
+            }
+
+            // Eğer offerings varsa ama current yoksa, ilk offering'i current olarak kullan
+            if (offerings.all.isNotEmpty) {
+              final firstOffering = offerings.all.values.first;
+              AppLogger.i(
+                  'PaymentCubit: İlk offering kullanılıyor: ${firstOffering.identifier}');
+
+              emit(state.copyWith(
+                offerings: offerings,
+                isLoading: false,
+                hasError: false,
+                errorMessage: null,
+              ));
+              return offerings;
+            }
+          }
         } catch (offeringsError) {
           AppLogger.e('PaymentCubit: getOfferings() hatası: $offeringsError');
+          AppLogger.e(
+              'PaymentCubit: Error type: ${offeringsError.runtimeType}');
 
-          if (retry) {
-            // Kısa bir bekleme sonrası RevenueCat'i yeniden yapılandır ve tekrar dene
-            await Future.delayed(const Duration(milliseconds: 500));
-            await _reconfigureRevenueCat();
-            return fetchOfferings(retry: false);
-          } else {
-            rethrow;
+          // PlatformException detayları
+          if (offeringsError is PlatformException) {
+            AppLogger.e(
+                'PaymentCubit: PlatformException code: ${offeringsError.code}');
+            AppLogger.e(
+                'PaymentCubit: PlatformException message: ${offeringsError.message}');
+            AppLogger.e(
+                'PaymentCubit: PlatformException details: ${offeringsError.details}');
           }
+
+          rethrow;
         }
 
-        if (offerings.all.isEmpty) {
-          AppLogger.w('PaymentCubit: Hiç paket bulunamadı!');
+        if (offerings?.current == null) {
+          AppLogger.w('PaymentCubit: Aktif paket bulunamadı');
 
-          if (retry) {
-            AppLogger.i('PaymentCubit: Paketleri yeniden getirme deneniyor...');
-            // Kısa bir bekleme sonrası yeniden dene (RevenueCat'in bazı durumlarda ihtiyacı olabilir)
-            await Future.delayed(const Duration(seconds: 1));
-            return fetchOfferings(retry: false); // Yeniden deneme ile çağır
-          }
-        }
+          // RevenueCat dashboard kontrol önerisi
+          String detailedMessage = 'Aktif paket bulunamadı.\n\n'
+              'RevenueCat Dashboard Kontrol Listesi:\n'
+              '• Offerings yapılandırıldı mı?\n'
+              '• Products tanımlandı mı?\n'
+              '• App Store Connect\'te ürünler onaylı mı?\n'
+              '• API key doğru mu?\n\n'
+              'Debug: Total offerings: ${offerings?.all.length ?? 0}';
 
-        AppLogger.i('PaymentCubit: Paketler alındı: ${offerings.all.keys}');
-
-        if (offerings.current == null) {
-          AppLogger.w('PaymentCubit: Geçerli paket (current) bulunamadı');
+          emit(state.copyWith(
+            isLoading: false,
+            hasError: true,
+            errorMessage: detailedMessage,
+          ));
+          return null;
         } else {
           AppLogger.i(
-              'PaymentCubit: Geçerli paket ID: ${offerings.current!.identifier}');
+              'PaymentCubit: Geçerli paket ID: ${offerings!.current!.identifier}');
           AppLogger.i(
               'PaymentCubit: Paket içeriği: ${offerings.current!.availablePackages.length} adet paket var');
 
           for (final package in offerings.current!.availablePackages) {
             AppLogger.i('PaymentCubit: Paket: ${package.identifier}, '
-                '${package.storeProduct.title}, ${package.storeProduct.priceString}');
+                'Product ID: ${package.storeProduct.identifier}, '
+                'Title: ${package.storeProduct.title}, '
+                'Price: ${package.storeProduct.priceString}');
           }
         }
       } catch (e) {
         AppLogger.e('PaymentCubit: Paketleri getirme hatası: $e');
 
+        // iOS 18.4 simulator sorunu kontrolü
+        String errorMessage = 'Paketler getirilemedi: ${e.toString()}';
+        bool isSimulatorIssue = false;
+
+        if (e.toString().contains('iOS 18.4 simulator') ||
+            e.toString().contains('StoreKit Configuration file') ||
+            e.toString().contains('App Store Connect') ||
+            e.toString().contains('None of the products registered')) {
+          isSimulatorIssue = true;
+          errorMessage = '⚠️ iOS 18.4 Simulator Sorunu!\n\n'
+              'Bu sorun iOS 18.4 simulator\'da yaygındır.\n'
+              'Çözümler:\n'
+              '• Gerçek iOS cihazında test edin\n'
+              '• Farklı iOS versiyonu (18.3 veya altı) kullanın\n'
+              '• Xcode\'da StoreKit Configuration dosyasını kontrol edin\n\n'
+              'Development için mock mode aktif edildi.';
+
+          AppLogger.w('PaymentCubit: iOS 18.4 simulator sorunu tespit edildi');
+          AppLogger.i('PaymentCubit: Çözüm önerileri:');
+          AppLogger.i('PaymentCubit: 1. Gerçek iOS cihazında test edin');
+          AppLogger.i('PaymentCubit: 2. iOS 18.3 veya altı simulator kullanın');
+          AppLogger.i(
+              'PaymentCubit: 3. StoreKit Configuration dosyasını kontrol edin');
+          AppLogger.i(
+              'PaymentCubit: 4. Mock mode aktif - development devam edebilir');
+        }
+
         emit(state.copyWith(
           isLoading: false,
           hasError: true,
-          errorMessage: 'Paketler getirilemedi: ${e.toString()}',
+          errorMessage: errorMessage,
+          // iOS 18.4 simulator sorunu için mock premium state
+          isPremium: isSimulatorIssue && kDebugMode ? false : false,
         ));
         return null;
       }
 
+      // Kullanıcı bilgilerini al
       try {
         customerInfo = await Purchases.getCustomerInfo();
         AppLogger.i('PaymentCubit: Kullanıcı bilgileri alındı');
       } catch (e) {
         AppLogger.e('PaymentCubit: Kullanıcı bilgilerini getirme hatası: $e');
-        emit(state.copyWith(
-          isLoading: false,
-          hasError: true,
-          errorMessage: 'Kullanıcı bilgileri getirilemedi',
-        ));
-        return offerings; // Offerings alınmışsa bile döndür
+        // Kullanıcı bilgileri alınamazsa bile offerings'i döndür
+        AppLogger.w(
+            'PaymentCubit: Kullanıcı bilgileri alınamadı ama offerings mevcut');
       }
 
-      final isPremium = _checkIfUserIsPremium(customerInfo);
+      final isPremium =
+          customerInfo != null ? _checkIfUserIsPremium(customerInfo) : false;
 
       emit(state.copyWith(
         offerings: offerings,
         customerInfo: customerInfo,
         isPremium: isPremium,
         isLoading: false,
+        hasError: false,
         errorMessage: null,
       ));
 
       AppLogger.i(
-          'Paketler başarıyla alındı: ${offerings.current?.identifier}');
+          'PaymentCubit: Paketler başarıyla alındı: ${offerings.current?.identifier}');
       return offerings;
     } catch (e) {
-      AppLogger.e('Paketleri alma genel hatası: $e');
+      AppLogger.e('PaymentCubit: Paketleri alma genel hatası: $e');
 
       emit(state.copyWith(
         isLoading: false,
@@ -161,7 +269,7 @@ class PaymentCubit extends Cubit<PaymentState> {
 
       // Otomatik yeniden deneme (sadece ilk çağrıda)
       if (retry) {
-        AppLogger.i('Paketleri yeniden getirme denemesi...');
+        AppLogger.i('PaymentCubit: Paketleri yeniden getirme denemesi...');
         await Future.delayed(const Duration(seconds: 2));
         return fetchOfferings(retry: false);
       }

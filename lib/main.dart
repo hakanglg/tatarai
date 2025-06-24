@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+
 // Core imports
 import 'package:tatarai/core/constants/app_constants.dart';
 import 'package:tatarai/core/constants/locale_constants.dart';
@@ -22,6 +23,10 @@ import 'package:tatarai/core/repositories/plant_analysis_repository.dart';
 import 'package:tatarai/features/plant_analysis/services/plant_analysis_service.dart';
 import 'package:tatarai/core/services/ai/gemini_service_interface.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:tatarai/features/home/cubits/home_cubit.dart';
+import 'package:tatarai/features/settings/cubits/language_cubit.dart';
+import 'package:tatarai/features/settings/cubits/settings_cubit.dart';
+import 'package:tatarai/core/services/paywall_manager.dart';
 
 /// TatarAI uygulamasının ana giriş noktası
 ///
@@ -61,6 +66,13 @@ Future<void> main() async {
 
       // Debug ayarları
       initializer.configureDebugSettings();
+
+      // 🧪 DEVELOPMENT: RevenueCat sorunları için Mock Mode
+      // RevenueCat yapılandırması düzgün çalışmıyorsa aşağıdaki satırları aç:
+      // if (kDebugMode) {
+      //   PaywallManager.enableMockMode();
+      //   AppLogger.w('🧪 DEVELOPMENT: Mock Mode aktif - RevenueCat simülasyonu');
+      // }
 
       AppLogger.i('📊 Final IsInitialized: ${initializer.isInitialized}');
     } catch (e, stackTrace) {
@@ -336,13 +348,22 @@ class _TatarAIState extends State<TatarAI> {
         lazy: false, // Hemen başlat
       ),
 
-      // Payment Cubit - ServiceLocator'dan
+      // Payment Cubit - ServiceLocator'dan singleton instance
       BlocProvider<PaymentCubit>(
         create: (context) {
-          AppLogger.i('🏗️ PaymentCubit ServiceLocator\'dan oluşturuluyor');
-          return Services.paymentCubit;
+          AppLogger.i('🏗️ PaymentCubit ServiceLocator\'dan alınıyor');
+          try {
+            final paymentCubit = Services.paymentCubit;
+            AppLogger.i('✅ PaymentCubit singleton instance başarıyla alındı');
+            return paymentCubit;
+          } catch (e, stackTrace) {
+            AppLogger.e(
+                '❌ PaymentCubit ServiceLocator\'dan alınamadı', e, stackTrace);
+            // Fallback: Yeni instance oluştur
+            return PaymentCubit();
+          }
         },
-        lazy: true, // Gerektiğinde başlat
+        lazy: false, // Hemen başlat
       ),
 
       // Plant Analysis Cubit - ServiceLocator'dan

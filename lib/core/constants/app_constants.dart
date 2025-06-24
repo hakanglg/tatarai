@@ -37,10 +37,12 @@ class AppConstants {
   // Dosya boyutu limitleri
   static const int maxImageSizeInBytes = 5 * 1024 * 1024; // 5 MB
 
-  // Uygulama içi satın alma ürün ID'leri
-  static const String subscriptionMonthlyId = 'tatarai_premium_monthly';
-  static const String subscriptionYearlyId = 'tatarai_premium_yearly';
-  static const String subscriptionLifetimeId = 'tatarai_premium_lifetime';
+  // Uygulama içi satın alma ürün ID'leri - StoreKit Configuration'dan
+  static const String subscriptionMonthlyId =
+      'rc_499_1m_1wf'; // Monthly $4.99, 1-week free
+  static const String subscriptionYearlyId = 'rc_30_1y'; // Yearly $29.99
+  static const String subscriptionLifetimeId =
+      'tatarai_premium_lifetime'; // Lifetime (henüz StoreKit'te yok)
 
   // Resim sıkıştırma kalitesi (0-100)
   static const int imageQuality = 80;

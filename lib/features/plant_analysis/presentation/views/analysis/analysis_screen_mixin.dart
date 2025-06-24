@@ -260,20 +260,15 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
     if (!mounted) return;
 
     if (needsPremium) {
-      // Premium satın alma diyaloğunu göster
-      await AppDialogManager.showPremiumRequiredDialog(
-        context: context,
-        message: message,
-        onPremiumButtonPressed: () {
-          // Context extension'ı kullanarak paywall'ı aç
-          context.showPaywall(
-              // onComplete: (_) {
-              //   // Paywall kapandıktan sonra kullanıcı bilgilerini yenile
-              //   if (mounted) {
-              //     context.read<ProfileCubit>().refreshUserData();
-              //   }
-              // },
-              );
+      // PaywallManager kullanarak paywall'ı aç
+      PaywallManager.showPaywall(
+        context,
+        displayCloseButton: true,
+        onPremiumPurchased: () {
+          AppLogger.i('Premium satın alındı - Analysis ekranından');
+        },
+        onError: (error) {
+          AppLogger.e('Analysis screen paywall hatası: $error');
         },
       );
     } else {

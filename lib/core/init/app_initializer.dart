@@ -257,20 +257,45 @@ class AppInitializer {
       String? apiKey;
       if (Platform.isIOS) {
         apiKey = dotenv.env['REVENUECAT_IOS_API_KEY'];
+        AppLogger.i('iOS RevenueCat API key kontrol ediliyor...');
       } else if (Platform.isAndroid) {
         apiKey = dotenv.env['REVENUECAT_ANDROID_API_KEY'];
+        AppLogger.i('Android RevenueCat API key kontrol ediliyor...');
       }
 
       if (apiKey == null || apiKey.isEmpty) {
+        AppLogger.w(
+            'RevenueCat API key bulunamadı: ${Platform.operatingSystem}');
         if (kDebugMode) {
           _showRevenueCatWarning(Platform.operatingSystem);
         }
         return;
       }
 
+      AppLogger.i('RevenueCat API key bulundu, configuration başlatılıyor...');
+
       // RevenueCat configuration
       await Purchases.setLogLevel(kDebugMode ? LogLevel.debug : LogLevel.info);
-      await Purchases.configure(PurchasesConfiguration(apiKey));
+
+      // Configure RevenueCat
+      PurchasesConfiguration configuration = PurchasesConfiguration(apiKey);
+      if (Platform.isIOS) {
+        // iOS için StoreKit configuration dosyası kullanıyoruz
+        AppLogger.i('iOS için StoreKit Configuration File kullanılıyor');
+      }
+
+      await Purchases.configure(configuration);
+      AppLogger.i('RevenueCat configuration tamamlandı');
+
+      // Configuration sonrası durum kontrolü
+      await Future.delayed(const Duration(milliseconds: 300));
+      final bool isConfigured = await Purchases.isConfigured;
+      AppLogger.i('RevenueCat isConfigured durumu: $isConfigured');
+
+      if (!isConfigured) {
+        AppLogger.w('⚠️ RevenueCat configuration başarısız oldu');
+        return;
+      }
 
       // Firebase user sync
       await _syncRevenueCatWithFirebase();
@@ -278,6 +303,7 @@ class AppInitializer {
       AppLogger.i('✅ RevenueCat başarıyla başlatıldı');
     } catch (e, stackTrace) {
       AppLogger.e('❌ RevenueCat başlatma hatası', e, stackTrace);
+      // Hata durumunda bile uygulamanın çalışmaya devam etmesini sağla
     }
   }
 

@@ -13,6 +13,7 @@ import 'package:tatarai/core/theme/dimensions.dart';
 import 'package:tatarai/core/theme/text_theme.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/core/widgets/app_button.dart';
+import 'package:tatarai/core/services/paywall_manager.dart';
 import 'package:tatarai/features/home/widgets/home_premium_card.dart';
 import 'package:tatarai/features/plant_analysis/presentation/cubits/plant_analysis_cubit_direct.dart';
 import 'package:tatarai/features/plant_analysis/data/models/location_models.dart';

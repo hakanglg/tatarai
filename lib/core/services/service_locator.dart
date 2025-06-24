@@ -175,9 +175,13 @@ class ServiceLocator {
       ),
     );
 
-    // Payment Cubit
-    _getIt.registerFactory<PaymentCubit>(
-      () => PaymentCubit(),
+    // Payment Cubit - Singleton olarak kayıt et
+    _getIt.registerLazySingleton<PaymentCubit>(
+      () {
+        AppLogger.logWithContext(
+            'ServiceLocator', 'PaymentCubit oluşturuluyor - Singleton');
+        return PaymentCubit();
+      },
     );
 
     // Home Cubit

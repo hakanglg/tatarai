@@ -6,6 +6,7 @@ import '../extensions/context_extensions.dart';
 import '../theme/color_scheme.dart';
 import '../theme/text_theme.dart';
 import '../utils/logger.dart';
+import '../services/paywall_manager.dart';
 import '../../features/payment/cubits/payment_cubit.dart';
 
 /// Premium satın alma butonu
@@ -214,14 +215,19 @@ class PremiumButton extends StatelessWidget {
     try {
       AppLogger.i('Premium button tıklandı');
 
-      // Paywall'ı göster
-      final result = await context.showPaywall(
+      // PaywallManager kullanarak paywall aç
+      final result = await PaywallManager.showPaywall(
+        context,
         displayCloseButton: true,
-        onComplete: (result) {
-          AppLogger.i('Paywall tamamlandı: $result');
-          if (result != null && onPremiumPurchased != null) {
-            onPremiumPurchased!();
-          }
+        onPremiumPurchased: () {
+          AppLogger.i('Paywall tamamlandı - Premium satın alındı');
+          onPremiumPurchased?.call();
+        },
+        onCancelled: () {
+          AppLogger.i('Paywall iptal edildi');
+        },
+        onError: (error) {
+          AppLogger.e('Premium button paywall hatası: $error');
         },
       );
 
