@@ -186,6 +186,7 @@
   "district": "İlçe",
   "neighborhood": "Mahalle",
   "location_info": "Konum Bilgileri",
+  "location_placeholder": "Ülke, İl/Eyalet, Şehir, İlçe/Mahalle",
   "field_info": "Tarla Bilgileri",
   "analysis_tips": "Analiz İpuçları",
   "tip_clear_photo": "Bitkinizin yaprak ve gövdesini net şekilde gösteren fotoğraflar kullanın",

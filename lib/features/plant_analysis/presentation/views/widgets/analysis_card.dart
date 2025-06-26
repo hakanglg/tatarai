@@ -216,10 +216,10 @@ class AnalysisCard extends StatelessWidget {
 
     // Sağlık durumu metni - isHealthy alanına göre
     final String statusText = analysis.isHealthy
-        ? 'Sağlıklı'
+        ? 'healthy'.locale(context)
         : (analysis.diseases.isNotEmpty
             ? analysis.diseases.first.name
-            : 'Sağlık Sorunu');
+            : 'health_issue'.locale(context));
 
     return Stack(
       children: [

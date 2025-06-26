@@ -186,6 +186,7 @@
   "district": "District",
   "neighborhood": "Neighborhood",
   "location_info": "Location Information",
+  "location_placeholder": "Country, State/Province, City, District/Neighborhood",
   "field_info": "Field Information",
   "analysis_tips": "Analysis Tips",
   "tip_clear_photo": "Use photos that clearly show your plant's leaves and stem",

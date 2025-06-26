@@ -440,48 +440,6 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
     );
   }
 
-  /// Tarla adı giriş diyaloğunu göster
-  void _showFieldNameDialog() {
-    final TextEditingController controller = TextEditingController();
-    controller.text = _fieldNameController.text;
-
-    showCupertinoDialog(
-      context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: Text('field_name'.locale(context)),
-        content: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16.0),
-          child: CupertinoTextField(
-            controller: controller,
-            placeholder: 'enter_field_name'.locale(context),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.primary.withOpacity(0.2)),
-            ),
-          ),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            isDefaultAction: false,
-            onPressed: () => Navigator.pop(context),
-            child: Text('cancel'.locale(context)),
-          ),
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            onPressed: () {
-              setState(() {
-                _fieldNameController.text = controller.text.trim();
-              });
-              Navigator.pop(context);
-            },
-            child: Text('save'.locale(context)),
-          ),
-        ],
-      ),
-    );
-  }
-
   /// Yükleniyor diyaloğunu göster
   void _showLoadingDialog(String message) {
     if (!mounted) return;
@@ -515,11 +473,24 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
       return;
     }
 
-    if (_selectedProvince == null ||
-        _selectedDistrict == null ||
-        _selectedNeighborhood == null) {
-      _showErrorDialog('select_location_first'.locale(context));
-      return;
+    // Dil kontrolü ile location validation
+    final currentLanguage =
+        LocalizationManager.instance.currentLocale.languageCode;
+
+    if (currentLanguage == 'tr') {
+      // Türkçe için il/ilçe/mahalle kontrolü
+      if (_selectedProvince == null ||
+          _selectedDistrict == null ||
+          _selectedNeighborhood == null) {
+        _showErrorDialog('select_location_first'.locale(context));
+        return;
+      }
+    } else {
+      // Diğer diller için text field kontrolü
+      if (_locationController.text.trim().isEmpty) {
+        _showErrorDialog('select_location_first'.locale(context));
+        return;
+      }
     }
 
     // Kullanıcının authentication durumunu kontrol et

@@ -27,6 +27,8 @@ import 'package:tatarai/features/auth/cubits/auth_state.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:tatarai/core/services/service_locator.dart';
 import 'package:tatarai/core/services/firestore/firestore_service.dart';
+import 'package:tatarai/core/init/localization/localization_manager.dart';
+import 'package:tatarai/core/widgets/app_text_field.dart';
 
 part 'analysis_screen_mixin.dart';
 
@@ -465,7 +467,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
 
                     const SizedBox(height: 24),
 
-                    // Konum seçimi (il, ilçe, mahalle)
+                    // Konum seçimi - Türkçe dil kontrolü ile
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
                       child: Column(
@@ -479,187 +481,207 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                           ),
                           const SizedBox(height: 10),
 
-                          // İl seçimi
-                          GestureDetector(
-                            onTap: _showProvinceSelection,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: CupertinoColors.systemGrey6,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: CupertinoColors.systemGrey4,
-                                  width: 0.5,
+                          // Dil kontrolü - Türkçe ise İl/İlçe/Mahalle seçimi
+                          if (LocalizationManager
+                                  .instance.currentLocale.languageCode ==
+                              'tr') ...[
+                            // İl seçimi
+                            GestureDetector(
+                              onTap: _showProvinceSelection,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: CupertinoColors.systemGrey6,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: CupertinoColors.systemGrey4,
+                                    width: 0.5,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      CupertinoIcons.map_pin,
+                                      color: AppColors.primary,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'province'.locale(context),
+                                            style:
+                                                AppTextTheme.caption.copyWith(
+                                              color: CupertinoColors.systemGrey,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            _selectedProvince?.name ??
+                                                'select_province'
+                                                    .locale(context),
+                                            style:
+                                                AppTextTheme.bodyText2.copyWith(
+                                              color: _selectedProvince == null
+                                                  ? CupertinoColors.systemGrey
+                                                  : CupertinoColors.label,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    _loadingProvinces
+                                        ? const CupertinoActivityIndicator()
+                                        : const Icon(
+                                            CupertinoIcons.chevron_down,
+                                            color: CupertinoColors.systemGrey,
+                                            size: 16,
+                                          ),
+                                  ],
                                 ),
                               ),
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    CupertinoIcons.map_pin,
-                                    color: AppColors.primary,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'province'.locale(context),
-                                          style: AppTextTheme.caption.copyWith(
-                                            color: CupertinoColors.systemGrey,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          _selectedProvince?.name ??
-                                              'select_province'.locale(context),
-                                          style:
-                                              AppTextTheme.bodyText2.copyWith(
-                                            color: _selectedProvince == null
-                                                ? CupertinoColors.systemGrey
-                                                : CupertinoColors.label,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  _loadingProvinces
-                                      ? const CupertinoActivityIndicator()
-                                      : const Icon(
-                                          CupertinoIcons.chevron_down,
-                                          color: CupertinoColors.systemGrey,
-                                          size: 16,
-                                        ),
-                                ],
-                              ),
                             ),
-                          ),
 
-                          const SizedBox(height: 12),
+                            const SizedBox(height: 12),
 
-                          // İlçe seçimi
-                          GestureDetector(
-                            onTap: _showDistrictSelection,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: CupertinoColors.systemGrey6,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: CupertinoColors.systemGrey4,
-                                  width: 0.5,
+                            // İlçe seçimi
+                            GestureDetector(
+                              onTap: _showDistrictSelection,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: CupertinoColors.systemGrey6,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: CupertinoColors.systemGrey4,
+                                    width: 0.5,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      CupertinoIcons.location,
+                                      color: AppColors.primary,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'district'.locale(context),
+                                            style:
+                                                AppTextTheme.caption.copyWith(
+                                              color: CupertinoColors.systemGrey,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            _selectedDistrict?.name ??
+                                                'select_district'
+                                                    .locale(context),
+                                            style:
+                                                AppTextTheme.bodyText2.copyWith(
+                                              color: _selectedDistrict == null
+                                                  ? CupertinoColors.systemGrey
+                                                  : CupertinoColors.label,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    _loadingDistricts
+                                        ? const CupertinoActivityIndicator()
+                                        : const Icon(
+                                            CupertinoIcons.chevron_down,
+                                            color: CupertinoColors.systemGrey,
+                                            size: 16,
+                                          ),
+                                  ],
                                 ),
                               ),
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    CupertinoIcons.location,
-                                    color: AppColors.primary,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'district'.locale(context),
-                                          style: AppTextTheme.caption.copyWith(
-                                            color: CupertinoColors.systemGrey,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          _selectedDistrict?.name ??
-                                              'select_district'.locale(context),
-                                          style:
-                                              AppTextTheme.bodyText2.copyWith(
-                                            color: _selectedDistrict == null
-                                                ? CupertinoColors.systemGrey
-                                                : CupertinoColors.label,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  _loadingDistricts
-                                      ? const CupertinoActivityIndicator()
-                                      : const Icon(
-                                          CupertinoIcons.chevron_down,
-                                          color: CupertinoColors.systemGrey,
-                                          size: 16,
-                                        ),
-                                ],
-                              ),
                             ),
-                          ),
 
-                          const SizedBox(height: 12),
+                            const SizedBox(height: 12),
 
-                          // Mahalle seçimi
-                          GestureDetector(
-                            onTap: _showNeighborhoodSelection,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: CupertinoColors.systemGrey6,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: CupertinoColors.systemGrey4,
-                                  width: 0.5,
+                            // Mahalle seçimi
+                            GestureDetector(
+                              onTap: _showNeighborhoodSelection,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: CupertinoColors.systemGrey6,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: CupertinoColors.systemGrey4,
+                                    width: 0.5,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      CupertinoIcons.location_solid,
+                                      color: AppColors.info,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'neighborhood'.locale(context),
+                                            style:
+                                                AppTextTheme.caption.copyWith(
+                                              color: CupertinoColors.systemGrey,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            _selectedNeighborhood?.name ??
+                                                'select_neighborhood'
+                                                    .locale(context),
+                                            style:
+                                                AppTextTheme.bodyText2.copyWith(
+                                              color: _selectedNeighborhood ==
+                                                      null
+                                                  ? CupertinoColors.systemGrey
+                                                  : CupertinoColors.label,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    _loadingNeighborhoods
+                                        ? const CupertinoActivityIndicator()
+                                        : const Icon(
+                                            CupertinoIcons.chevron_down,
+                                            color: CupertinoColors.systemGrey,
+                                            size: 16,
+                                          ),
+                                  ],
                                 ),
                               ),
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    CupertinoIcons.location_solid,
-                                    color: AppColors.info,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'neighborhood'.locale(context),
-                                          style: AppTextTheme.caption.copyWith(
-                                            color: CupertinoColors.systemGrey,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          _selectedNeighborhood?.name ??
-                                              'select_neighborhood'
-                                                  .locale(context),
-                                          style:
-                                              AppTextTheme.bodyText2.copyWith(
-                                            color: _selectedNeighborhood == null
-                                                ? CupertinoColors.systemGrey
-                                                : CupertinoColors.label,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  _loadingNeighborhoods
-                                      ? const CupertinoActivityIndicator()
-                                      : const Icon(
-                                          CupertinoIcons.chevron_down,
-                                          color: CupertinoColors.systemGrey,
-                                          size: 16,
-                                        ),
-                                ],
-                              ),
                             ),
-                          ),
+                          ] else ...[
+                            // Türkçe olmayan diller için tek text field
+                            AppTextField(
+                              controller: _locationController,
+                              hintText: 'location_placeholder'.locale(context),
+                              prefixIcon: CupertinoIcons.location,
+                              maxLines: 2,
+                              textCapitalization: TextCapitalization.words,
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -680,63 +702,12 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                           ),
                           const SizedBox(height: 10),
 
-                          // Tarla seçimi
-                          GestureDetector(
-                            onTap: _showFieldNameDialog,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: CupertinoColors.systemGrey6,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: CupertinoColors.systemGrey4,
-                                  width: 0.5,
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    CupertinoIcons.tree,
-                                    color: AppColors.success,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'field_name'.locale(context),
-                                          style: AppTextTheme.caption.copyWith(
-                                            color: CupertinoColors.systemGrey,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          _fieldNameController.text.isEmpty
-                                              ? 'field_name'.locale(context)
-                                              : _fieldNameController.text,
-                                          style:
-                                              AppTextTheme.bodyText2.copyWith(
-                                            color: _fieldNameController
-                                                    .text.isEmpty
-                                                ? CupertinoColors.systemGrey
-                                                : CupertinoColors.label,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const Icon(
-                                    CupertinoIcons.chevron_down,
-                                    color: CupertinoColors.systemGrey,
-                                    size: 16,
-                                  ),
-                                ],
-                              ),
-                            ),
+                          // Tarla adı text field
+                          AppTextField(
+                            controller: _fieldNameController,
+                            hintText: 'enter_field_name'.locale(context),
+                            prefixIcon: CupertinoIcons.tree,
+                            textCapitalization: TextCapitalization.words,
                           ),
                         ],
                       ),

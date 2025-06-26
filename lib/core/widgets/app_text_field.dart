@@ -140,7 +140,10 @@ class _AppTextFieldState extends State<AppTextField> {
             ),
             prefix: widget.prefixIcon != null
                 ? Padding(
-                    padding: EdgeInsets.only(left: context.dimensions.paddingM),
+                    padding: EdgeInsets.only(
+                      left: context.dimensions.paddingM,
+                      right: context.dimensions.paddingS,
+                    ),
                     child: Icon(
                       widget.prefixIcon,
                       color: AppColors.textSecondary,
