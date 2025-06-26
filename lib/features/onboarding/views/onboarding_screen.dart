@@ -582,223 +582,227 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
     return Padding(
       padding: EdgeInsets.all(context.dimensions.paddingS),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Hoş geldiniz rozeti
-          Container(
-            margin: EdgeInsets.only(top: 0, bottom: context.dimensions.spaceM),
-            padding: EdgeInsets.symmetric(
-                horizontal: context.dimensions.paddingM,
-                vertical: context.dimensions.spaceXXS + 1),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.primary,
-                  Colors.green.shade700,
-                ],
-              ),
-              borderRadius: BorderRadius.circular(context.dimensions.radiusL),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primary.withOpacity(0.4),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  CupertinoIcons.checkmark_alt_circle_fill,
-                  color: Colors.white,
-                  size: context.dimensions.iconSizeXS,
-                ),
-                SizedBox(width: context.dimensions.spaceXXS),
-                Text(
-                  'welcome'.locale(context).toUpperCase(),
-                  style: AppTextTheme.captionL.copyWith(
-                    color: Colors.white,
-                    letterSpacing: 1.2,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Başlık
-          TweenAnimationBuilder<double>(
-            tween: Tween<double>(begin: 0, end: 1),
-            duration: const Duration(milliseconds: 800),
-            curve: Sprung.overDamped,
-            builder: (context, value, child) {
-              return Opacity(
-                opacity: value,
-                child: Transform.translate(
-                  offset: Offset(0, 20 * (1 - value)),
-                  child: Text(
-                    item.title.locale(context),
-                    textAlign: TextAlign.center,
-                    style: AppTextTheme.headline2.copyWith(
-                      color: AppColors.primary,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-          SizedBox(height: context.dimensions.spaceM),
-
-          // Açıklama
-          TweenAnimationBuilder<double>(
-            tween: Tween<double>(begin: 0, end: 1),
-            duration: const Duration(milliseconds: 1000),
-            curve: Sprung.overDamped,
-            builder: (context, value, child) {
-              return Opacity(
-                opacity: value,
-                child: Transform.translate(
-                  offset: Offset(0, 30 * (1 - value)),
-                  child: Text(
-                    item.description.locale(context),
-                    textAlign: TextAlign.center,
-                    style: AppTextTheme.body.copyWith(
-                      color: AppColors.textSecondary,
-                      height: 1.5,
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-          SizedBox(height: context.dimensions.paddingL),
-
-          // Görsel
-          TweenAnimationBuilder<double>(
-            tween: Tween<double>(begin: 0.8, end: 1.0),
-            duration: const Duration(milliseconds: 800),
-            curve: Sprung.overDamped,
-            builder: (context, value, child) {
-              return Transform.scale(
-                scale: value,
-                child: Container(
-                  width: imageSize,
-                  height: imageSize,
-                  margin: EdgeInsets.only(bottom: context.dimensions.spaceL),
-                  decoration: BoxDecoration(
-                    color: Colors.transparent,
-                    borderRadius:
-                        BorderRadius.circular(context.dimensions.radiusL),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: context.dimensions.radiusL,
-                        spreadRadius: 0,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  alignment: Alignment.center,
-                  child: item.illustrationPath != null &&
-                          item.illustrationPath!.isNotEmpty
-                      ? ClipRRect(
-                          borderRadius:
-                              BorderRadius.circular(context.dimensions.radiusL),
-                          child: Image.asset(
-                            item.illustrationPath!,
-                            fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) {
-                              return _buildIconFallback(item);
-                            },
-                          ),
-                        )
-                      : _buildIconFallback(item),
-                ),
-              );
-            },
-          ),
-
-          const Spacer(),
-
-          // Özel teklif kartı (fiyat yerine)
-          if (item.specialOffer.isNotEmpty) ...[
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Column(
+          children: [
+            // Hoş geldiniz rozeti
             Container(
-              margin: EdgeInsets.only(bottom: context.dimensions.spaceM),
+              margin:
+                  EdgeInsets.only(top: 0, bottom: context.dimensions.spaceM),
               padding: EdgeInsets.symmetric(
-                  vertical: context.dimensions.paddingS,
-                  horizontal: context.dimensions.paddingL),
+                  horizontal: context.dimensions.paddingM,
+                  vertical: context.dimensions.spaceXXS + 1),
               decoration: BoxDecoration(
-                color: AppColors.surface,
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.primary,
+                    Colors.green.shade700,
+                  ],
+                ),
                 borderRadius: BorderRadius.circular(context.dimensions.radiusL),
-                border: Border.all(color: AppColors.primary.withOpacity(0.2)),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primary.withOpacity(0.1),
+                    color: AppColors.primary.withOpacity(0.4),
                     blurRadius: 8,
                     offset: const Offset(0, 3),
                   ),
                 ],
               ),
-              child: Column(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        CupertinoIcons.gift_fill,
-                        color: AppColors.primary,
-                        size: context.dimensions.iconSizeXS,
-                      ),
-                      SizedBox(width: context.dimensions.spaceXXS),
-                      Text(
-                        'welcome_gift'.locale(context).toUpperCase(),
-                        style: AppTextTheme.captionL.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+                  Icon(
+                    CupertinoIcons.checkmark_alt_circle_fill,
+                    color: Colors.white,
+                    size: context.dimensions.iconSizeXS,
                   ),
-                  SizedBox(height: context.dimensions.spaceXXS),
+                  SizedBox(width: context.dimensions.spaceXXS),
                   Text(
-                    item.specialOffer.locale(context),
-                    textAlign: TextAlign.center,
-                    style: AppTextTheme.headline4.copyWith(
-                      color: AppColors.primary,
+                    'welcome'.locale(context).toUpperCase(),
+                    style: AppTextTheme.captionL.copyWith(
+                      color: Colors.white,
+                      letterSpacing: 1.2,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Başlık
+            TweenAnimationBuilder<double>(
+              tween: Tween<double>(begin: 0, end: 1),
+              duration: const Duration(milliseconds: 800),
+              curve: Sprung.overDamped,
+              builder: (context, value, child) {
+                return Opacity(
+                  opacity: value,
+                  child: Transform.translate(
+                    offset: Offset(0, 20 * (1 - value)),
+                    child: Text(
+                      item.title.locale(context),
+                      textAlign: TextAlign.center,
+                      style: AppTextTheme.headline2.copyWith(
+                        color: AppColors.primary,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            SizedBox(height: context.dimensions.spaceM),
+
+            // Açıklama
+            TweenAnimationBuilder<double>(
+              tween: Tween<double>(begin: 0, end: 1),
+              duration: const Duration(milliseconds: 1000),
+              curve: Sprung.overDamped,
+              builder: (context, value, child) {
+                return Opacity(
+                  opacity: value,
+                  child: Transform.translate(
+                    offset: Offset(0, 30 * (1 - value)),
+                    child: Text(
+                      item.description.locale(context),
+                      textAlign: TextAlign.center,
+                      style: AppTextTheme.body.copyWith(
+                        color: AppColors.textSecondary,
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            SizedBox(height: context.dimensions.paddingL),
+
+            // Görsel
+            TweenAnimationBuilder<double>(
+              tween: Tween<double>(begin: 0.8, end: 1.0),
+              duration: const Duration(milliseconds: 800),
+              curve: Sprung.overDamped,
+              builder: (context, value, child) {
+                return Transform.scale(
+                  scale: value,
+                  child: Container(
+                    width: imageSize,
+                    height: imageSize,
+                    margin: EdgeInsets.only(bottom: context.dimensions.spaceL),
+                    decoration: BoxDecoration(
+                      color: Colors.transparent,
+                      borderRadius:
+                          BorderRadius.circular(context.dimensions.radiusL),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: context.dimensions.radiusL,
+                          spreadRadius: 0,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    alignment: Alignment.center,
+                    child: item.illustrationPath != null &&
+                            item.illustrationPath!.isNotEmpty
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(
+                                context.dimensions.radiusL),
+                            child: Image.asset(
+                              item.illustrationPath!,
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) {
+                                return _buildIconFallback(item);
+                              },
+                            ),
+                          )
+                        : _buildIconFallback(item),
+                  ),
+                );
+              },
+            ),
+
+            SizedBox(height: context.dimensions.spaceL),
+
+            // Özel teklif kartı (fiyat yerine)
+            if (item.specialOffer.isNotEmpty) ...[
+              Container(
+                margin: EdgeInsets.only(bottom: context.dimensions.spaceM),
+                padding: EdgeInsets.symmetric(
+                    vertical: context.dimensions.paddingS,
+                    horizontal: context.dimensions.paddingL),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius:
+                      BorderRadius.circular(context.dimensions.radiusL),
+                  border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          CupertinoIcons.gift_fill,
+                          color: AppColors.primary,
+                          size: context.dimensions.iconSizeXS,
+                        ),
+                        SizedBox(width: context.dimensions.spaceXXS),
+                        Text(
+                          'welcome_gift'.locale(context).toUpperCase(),
+                          style: AppTextTheme.captionL.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: context.dimensions.spaceXXS),
+                    Text(
+                      item.specialOffer.locale(context),
+                      textAlign: TextAlign.center,
+                      style: AppTextTheme.headline4.copyWith(
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            SizedBox(height: context.dimensions.spaceL),
+
+            // Güven oluşturucu etiket
+            Container(
+              margin: EdgeInsets.only(bottom: context.dimensions.spaceXS),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    CupertinoIcons.shield_fill,
+                    color: Colors.grey[600],
+                    size: context.dimensions.iconSizeXS,
+                  ),
+                  SizedBox(width: context.dimensions.spaceXS),
+                  Text(
+                    'app_features'.locale(context),
+                    style: AppTextTheme.captionL.copyWith(
+                      color: Colors.grey[600],
                     ),
                   ),
                 ],
               ),
             ),
           ],
-
-          const Spacer(),
-
-          // Güven oluşturucu etiket
-          Container(
-            margin: EdgeInsets.only(bottom: context.dimensions.spaceXS),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  CupertinoIcons.shield_fill,
-                  color: Colors.grey[600],
-                  size: context.dimensions.iconSizeXS,
-                ),
-                SizedBox(width: context.dimensions.spaceXS),
-                Text(
-                  'app_features'.locale(context),
-                  style: AppTextTheme.captionL.copyWith(
-                    color: Colors.grey[600],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

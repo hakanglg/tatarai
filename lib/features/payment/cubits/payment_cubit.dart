@@ -379,17 +379,48 @@ class PaymentCubit extends Cubit<PaymentState> {
 
   /// Kullanıcının premium olup olmadığını kontrol et
   bool _checkIfUserIsPremium(CustomerInfo customerInfo) {
-    // "premium" adlı bir entitlement olduğunu varsayıyoruz
+    // AppConstants'dan entitlement ID'sini al
     // Bu, RevenueCat konsolunda yapılandırılmalıdır
-    final isEntitlementActive =
-        customerInfo.entitlements.active.containsKey('premium');
+    final isEntitlementActive = customerInfo.entitlements.active
+        .containsKey(AppConstants.entitlementId);
     AppLogger.d(
-        'PaymentCubit: _checkIfUserIsPremium - "premium" entitlement durumu: $isEntitlementActive');
+        'PaymentCubit: _checkIfUserIsPremium - "${AppConstants.entitlementId}" entitlement durumu: $isEntitlementActive');
     return isEntitlementActive;
   }
 
   /// Kullanıcının kalan analiz hakkını güncelle
   Future<void> updateRemainingAnalyses(int count) async {
     emit(state.copyWith(remainingFreeAnalyses: count));
+  }
+
+  /// Kullanıcı bilgilerini yenile (premium satın alma sonrası)
+  Future<void> refreshCustomerInfo() async {
+    try {
+      AppLogger.i('PaymentCubit: Kullanıcı bilgileri yenileniyor...');
+
+      emit(state.copyWith(isLoading: true));
+
+      // RevenueCat'ten güncel kullanıcı bilgilerini al
+      final customerInfo = await Purchases.getCustomerInfo();
+      final isPremium = _checkIfUserIsPremium(customerInfo);
+
+      emit(state.copyWith(
+        customerInfo: customerInfo,
+        isPremium: isPremium,
+        isLoading: false,
+        hasError: false,
+        errorMessage: null,
+      ));
+
+      AppLogger.i(
+          'PaymentCubit: Kullanıcı bilgileri güncellendi. Premium: $isPremium');
+    } catch (e) {
+      AppLogger.e('PaymentCubit: Kullanıcı bilgileri yenileme hatası: $e');
+      emit(state.copyWith(
+        isLoading: false,
+        hasError: true,
+        errorMessage: 'Kullanıcı bilgileri güncellenemedi',
+      ));
+    }
   }
 }

@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/features/payment/cubits/payment_cubit.dart';
+import 'package:tatarai/core/extensions/string_extension.dart';
 
 /// Merkezi Paywall yönetim sınıfı
 ///
@@ -17,32 +18,12 @@ import 'package:tatarai/features/payment/cubits/payment_cubit.dart';
 /// - Callback desteği
 /// - Context validation
 /// - Premium upgrade tracking
-/// - Development mock mode
 class PaywallManager {
   PaywallManager._();
 
   /// Singleton instance
   static final PaywallManager _instance = PaywallManager._();
   static PaywallManager get instance => _instance;
-
-  /// Development mock mode - RevenueCat sorunlarında kullan
-  static bool _mockModeEnabled = false;
-  static bool get isMockMode => _mockModeEnabled && kDebugMode;
-
-  /// Mock mode'u etkinleştir (sadece debug modda)
-  static void enableMockMode() {
-    if (kDebugMode) {
-      _mockModeEnabled = true;
-      AppLogger.w(
-          '🧪 PaywallManager: Mock mode ETKİNLEŞTİRİLDİ - Development için');
-    }
-  }
-
-  /// Mock mode'u devre dışı bırak
-  static void disableMockMode() {
-    _mockModeEnabled = false;
-    AppLogger.i('PaywallManager: Mock mode devre dışı bırakıldı');
-  }
 
   /// Paywall'ı açar
   ///
@@ -69,14 +50,6 @@ class PaywallManager {
         AppLogger.w('PaywallManager: $error');
         onError?.call(error);
         return null;
-      }
-
-      // Mock mode kontrolü
-      if (isMockMode) {
-        AppLogger.w(
-            '🧪 PaywallManager: Mock mode aktif - Test paywall gösteriliyor');
-        return await _showMockPaywall(
-            context, onPremiumPurchased, onCancelled, onError);
       }
 
       // PaymentCubit validation
@@ -115,6 +88,16 @@ class PaywallManager {
           // Result handling
           if (result != null) {
             AppLogger.i('PaywallManager: Premium satın alma başarılı');
+
+            // Premium satın alma sonrası kullanıcı bilgilerini yenile
+            try {
+              await paymentCubit.refreshCustomerInfo();
+              AppLogger.i('PaywallManager: Kullanıcı bilgileri güncellendi');
+            } catch (e) {
+              AppLogger.e(
+                  'PaywallManager: Kullanıcı bilgilerini güncelleme hatası: $e');
+            }
+
             onPremiumPurchased?.call();
           } else {
             AppLogger.i('PaywallManager: Kullanıcı paywall\'ı iptal etti');
@@ -123,7 +106,8 @@ class PaywallManager {
         } catch (paywallError) {
           final error = 'Paywall gösterilirken hata: $paywallError';
           AppLogger.e('PaywallManager: $error');
-          _showErrorSnackBar(context, 'Paywall açılamadı. Mock mode deneyin.');
+          _showErrorSnackBar(
+              context, 'Paywall açılamadı. Lütfen daha sonra tekrar deneyin.');
           onError?.call(error);
           return null;
         }
@@ -131,10 +115,8 @@ class PaywallManager {
         const error =
             'Offerings bulunamadı. Premium özellikler şu anda kullanılamıyor.';
         AppLogger.w('PaywallManager: $error');
-
-        // RevenueCat sorunu için mock mode önerisi
-        _showMockModeDialog(context, onPremiumPurchased, onCancelled, onError);
-
+        _showErrorSnackBar(
+            context, 'Premium özellikler şu anda kullanılamıyor.');
         onError?.call(error);
         return null;
       }
@@ -143,91 +125,11 @@ class PaywallManager {
     } catch (e, stackTrace) {
       final error = 'Paywall açılırken genel hata: $e';
       AppLogger.e('PaywallManager: $error', e, stackTrace);
-      _showErrorSnackBar(context, 'Beklenmeyen hata. Mock mode deneyin.');
+      _showErrorSnackBar(context,
+          'Beklenmeyen hata oluştu. Lütfen daha sonra tekrar deneyin.');
       onError?.call(error);
       return null;
     }
-  }
-
-  /// Mock paywall göster (development için)
-  static Future<PaywallResult?> _showMockPaywall(
-    BuildContext context,
-    VoidCallback? onPremiumPurchased,
-    VoidCallback? onCancelled,
-    Function(String error)? onError,
-  ) async {
-    return await showDialog<PaywallResult?>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('🧪 Mock Paywall'),
-        content: const Text(
-          'Development mock mode aktif.\n\n'
-          'Bu gerçek paywall değil.\n'
-          'RevenueCat yapılandırmasını düzelttikten sonra mock mode\'u kapatın.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop(null);
-              onCancelled?.call();
-            },
-            child: const Text('İptal'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop(PaywallResult.purchased);
-              AppLogger.i('🧪 Mock Premium satın alma simüle edildi');
-              onPremiumPurchased?.call();
-            },
-            child: const Text('Mock Satın Al'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Mock mode önerisi diyaloğu
-  static void _showMockModeDialog(
-    BuildContext context,
-    VoidCallback? onPremiumPurchased,
-    VoidCallback? onCancelled,
-    Function(String error)? onError,
-  ) {
-    if (!kDebugMode) return;
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('⚠️ RevenueCat Sorunu'),
-        content: const Text(
-          'RevenueCat offerings bulunamadı.\n\n'
-          'Development için mock mode kullanabilirsin:\n'
-          '• Paywall simülasyonu\n'
-          '• Premium test senaryoları\n'
-          '• UI testi\n\n'
-          'RevenueCat yapılandırmasını düzelttikten sonra mock mode\'u kapat.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('İptal'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              enableMockMode();
-              showPaywall(
-                context,
-                onPremiumPurchased: onPremiumPurchased,
-                onCancelled: onCancelled,
-                onError: onError,
-              );
-            },
-            child: const Text('Mock Mode Etkinleştir'),
-          ),
-        ],
-      ),
-    );
   }
 
   /// Basit paywall açma (geriye uyumluluk için)

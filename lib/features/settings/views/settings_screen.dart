@@ -12,6 +12,9 @@ import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
 import 'package:tatarai/features/settings/cubits/settings_cubit.dart';
 import 'package:tatarai/features/settings/cubits/settings_state.dart';
 import 'package:tatarai/core/extensions/context_extensions.dart';
+import 'package:tatarai/core/utils/logger.dart';
+import 'package:tatarai/core/services/paywall_manager.dart';
+import 'package:tatarai/features/payment/cubits/payment_cubit.dart';
 
 /// Uygulama ayarları ekranı
 /// Apple Human Interface Guidelines'a uygun modern tasarım
@@ -303,9 +306,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ],
                     ),
-                    onPressed: () {
-                      // Premium upgrade ekranına git
+                    onPressed: () async {
+                      // Premium upgrade için paywall aç
                       HapticFeedback.lightImpact();
+
+                      try {
+                        AppLogger.i(
+                            'Settings ekranından premium buton tıklandı');
+
+                        await PaywallManager.showPaywall(
+                          context,
+                          displayCloseButton: true,
+                          onPremiumPurchased: () {
+                            AppLogger.i(
+                                'Settings ekranından premium satın alındı');
+                          },
+                          onError: (error) {
+                            AppLogger.e(
+                                'Settings premium button hatası: $error');
+                          },
+                        );
+                      } catch (e) {
+                        AppLogger.e('Settings premium paywall hatası: $e');
+                      }
                     },
                   ),
                 ),
