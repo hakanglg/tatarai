@@ -46,12 +46,12 @@ class GeminiResponseParser {
         );
 
         // Debug: Key değerlerini logla
-        print('🔍 GeminiResponseParser - JSON values:');
-        print(
+        AppLogger.d('🔍 GeminiResponseParser - JSON values:');
+        AppLogger.d(
             '🔍 plantName: ${jsonData['plantName']} (type: ${jsonData['plantName']?.runtimeType})');
-        print(
+        AppLogger.d(
             '🔍 isHealthy: ${jsonData['isHealthy']} (type: ${jsonData['isHealthy']?.runtimeType})');
-        print(
+        AppLogger.d(
             '🔍 probability: ${jsonData['probability']} (type: ${jsonData['probability']?.runtimeType})');
       } catch (jsonError) {
         AppLogger.errorWithContext(
@@ -121,7 +121,7 @@ class GeminiResponseParser {
       }
 
       // 4. Model Construction
-      print(
+      AppLogger.d(
           '🔍 About to build PlantAnalysisResult with jsonData keys: ${jsonData.keys.toList()}');
 
       final result = _buildPlantAnalysisResult(
@@ -131,7 +131,7 @@ class GeminiResponseParser {
         fieldName: fieldName,
       );
 
-      print(
+      AppLogger.d(
           '🔍 Built PlantAnalysisResult: ${result.plantName} (healthy: ${result.isHealthy})');
 
       AppLogger.successWithContext(

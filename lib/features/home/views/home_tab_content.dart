@@ -187,7 +187,7 @@ class _HomeTabContentState extends State<HomeTabContent> {
         color: CupertinoColors.systemBackground.resolveFrom(context),
         border: Border(
           bottom: BorderSide(
-            color: AppColors.divider.withOpacity(0.3),
+            color: AppColors.divider.withValues(alpha: 0.3),
             width: 0.33,
           ),
         ),
@@ -204,7 +204,7 @@ class _HomeTabContentState extends State<HomeTabContent> {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: AppColors.primary.withOpacity(0.1),
+                    color: AppColors.primary.withValues(alpha: 0.1),
                     width: 0.5,
                   ),
                 ),
@@ -289,7 +289,7 @@ class _HomeTabContentState extends State<HomeTabContent> {
           borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withOpacity(0.2),
+              color: AppColors.primary.withValues(alpha: 0.2),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -310,7 +310,7 @@ class _HomeTabContentState extends State<HomeTabContent> {
                   child: Image.asset(
                     'assets/images/background_3.jpg',
                     fit: BoxFit.cover,
-                    color: AppColors.primary.withOpacity(0.7),
+                    color: AppColors.primary.withValues(alpha: 0.7),
                     colorBlendMode: BlendMode.multiply,
                   ),
                 ),
@@ -340,7 +340,7 @@ class _HomeTabContentState extends State<HomeTabContent> {
                             Text(
                               headerMessage['subtitle']!,
                               style: AppTextTheme.bodyText1.copyWith(
-                                color: Colors.white.withOpacity(0.95),
+                                color: Colors.white.withValues(alpha: 0.95),
                                 fontWeight: FontWeight.w500,
                                 fontSize: 16,
                               ),
@@ -411,12 +411,12 @@ class _HomeTabContentState extends State<HomeTabContent> {
               _navigateToAllAnalyses();
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white.withOpacity(0.2),
+              backgroundColor: Colors.white.withValues(alpha: 0.2),
               foregroundColor: Colors.white,
               elevation: 4,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(18),
-                side: BorderSide(color: Colors.white.withOpacity(0.3)),
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
             ),
@@ -502,7 +502,7 @@ class _HomeTabContentState extends State<HomeTabContent> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.08),
+            color: AppColors.primary.withValues(alpha: 0.08),
             blurRadius: 20,
             offset: const Offset(0, 4),
           ),
@@ -624,13 +624,13 @@ class _HomeTabContentState extends State<HomeTabContent> {
         borderRadius: BorderRadius.circular(32),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.12),
+            color: AppColors.primary.withValues(alpha: 0.12),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
         ],
         border: Border.all(
-          color: AppColors.primary.withOpacity(0.08),
+          color: AppColors.primary.withValues(alpha: 0.08),
           width: 0.5,
         ),
       ),
@@ -641,7 +641,7 @@ class _HomeTabContentState extends State<HomeTabContent> {
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
+              color: AppColors.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(40),
             ),
             child: const Icon(
@@ -698,7 +698,7 @@ class _HomeTabContentState extends State<HomeTabContent> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Icon(
@@ -754,7 +754,7 @@ class _HomeTabContentState extends State<HomeTabContent> {
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withOpacity(0.1),
+                        color: AppColors.primary.withValues(alpha: 0.1),
                         blurRadius: 20,
                         offset: const Offset(0, 8),
                       ),
@@ -769,8 +769,8 @@ class _HomeTabContentState extends State<HomeTabContent> {
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              CupertinoColors.systemRed.withOpacity(0.2),
-                              CupertinoColors.systemRed.withOpacity(0.05),
+                              CupertinoColors.systemRed.withValues(alpha: 0.2),
+                              CupertinoColors.systemRed.withValues(alpha: 0.05),
                             ],
                           ),
                           borderRadius: BorderRadius.circular(40),

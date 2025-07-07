@@ -171,8 +171,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     );
 
     _backgroundAnimation = ColorTween(
-      begin: AppColors.primary.withOpacity(0.15),
-      end: AppColors.primary.withOpacity(0.35),
+      begin: AppColors.primary.withValues(alpha: 0.15),
+      end: AppColors.primary.withValues(alpha: 0.35),
     ).animate(_backgroundAnimationController);
 
     // Floating items animation
@@ -353,7 +353,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 end: Alignment.bottomCenter,
                 colors: [
                   Colors.white,
-                  item.mainColor.withOpacity(0.15),
+                  item.mainColor.withValues(alpha: 0.15),
                 ],
               ),
             ),
@@ -603,7 +603,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 borderRadius: BorderRadius.circular(context.dimensions.radiusL),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primary.withOpacity(0.4),
+                    color: AppColors.primary.withValues(alpha: 0.4),
                     blurRadius: 8,
                     offset: const Offset(0, 3),
                   ),
@@ -696,7 +696,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                           BorderRadius.circular(context.dimensions.radiusL),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
+                          color: Colors.black.withValues(alpha: 0.1),
                           blurRadius: context.dimensions.radiusL,
                           spreadRadius: 0,
                           offset: const Offset(0, 10),
@@ -736,10 +736,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   color: AppColors.surface,
                   borderRadius:
                       BorderRadius.circular(context.dimensions.radiusL),
-                  border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withOpacity(0.1),
+                      color: AppColors.primary.withValues(alpha: 0.1),
                       blurRadius: 8,
                       offset: const Offset(0, 3),
                     ),
@@ -810,11 +810,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   Widget _buildIconFallback(OnboardingItem item) {
     return Container(
       decoration: BoxDecoration(
-        color: item.mainColor.withOpacity(item.backgroundOpacity + 0.05),
+        color: item.mainColor.withValues(alpha: item.backgroundOpacity + 0.05),
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
-            color: item.mainColor.withOpacity(0.2),
+            color: item.mainColor.withValues(alpha: 0.2),
             blurRadius: context.dimensions.radiusL * 2,
             spreadRadius: context.dimensions.radiusXS,
           ),
@@ -827,7 +827,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           Positioned.fill(
             child: CustomPaint(
               painter: CirclePatternPainter(
-                color: Colors.white.withOpacity(0.1),
+                color: Colors.white.withValues(alpha: 0.1),
               ),
             ),
           ),
@@ -845,9 +845,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               shape: BoxShape.circle,
               gradient: RadialGradient(
                 colors: [
-                  Colors.white.withOpacity(0.0),
-                  Colors.white.withOpacity(0.15),
-                  Colors.white.withOpacity(0.0),
+                  Colors.white.withValues(alpha: 0.0),
+                  Colors.white.withValues(alpha: 0.15),
+                  Colors.white.withValues(alpha: 0.0),
                 ],
                 stops: const [0.0, 0.3, 1.0],
                 center: Alignment.topLeft,

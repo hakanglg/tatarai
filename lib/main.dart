@@ -19,14 +19,7 @@ import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
 import 'package:tatarai/features/auth/cubits/auth_state.dart';
 import 'package:tatarai/features/payment/cubits/payment_cubit.dart';
 import 'package:tatarai/features/plant_analysis/presentation/cubits/plant_analysis_cubit_direct.dart';
-import 'package:tatarai/core/repositories/plant_analysis_repository.dart';
-import 'package:tatarai/features/plant_analysis/services/plant_analysis_service.dart';
 import 'package:tatarai/core/services/ai/gemini_service_interface.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:tatarai/features/home/cubits/home_cubit.dart';
-import 'package:tatarai/features/settings/cubits/language_cubit.dart';
-import 'package:tatarai/features/settings/cubits/settings_cubit.dart';
-import 'package:tatarai/core/services/paywall_manager.dart';
 
 /// TatarAI uygulamasının ana giriş noktası
 ///
@@ -99,13 +92,52 @@ class TatarAI extends StatefulWidget {
   State<TatarAI> createState() => _TatarAIState();
 }
 
-class _TatarAIState extends State<TatarAI> {
+class _TatarAIState extends State<TatarAI> with WidgetsBindingObserver {
   bool _forceBypass = false; // Debug için zorla bypass flag'i
 
   @override
   void initState() {
     super.initState();
+
+    // App lifecycle observer ekle
+    WidgetsBinding.instance.addObserver(this);
+
     _waitForInitialization();
+  }
+
+  @override
+  void dispose() {
+    // App lifecycle observer'ı kaldır
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    AppLogger.i('📱 TatarAI - App lifecycle değişti: $state');
+
+    if (state == AppLifecycleState.resumed) {
+      // Kullanıcı settings'den geri döndü, app'i refresh et
+      AppLogger.i('🔄 TatarAI app resumed - refreshing app state');
+      _handleAppResume();
+    }
+  }
+
+  /// App resume olduğunda çalışacak handler
+  void _handleAppResume() {
+    if (!mounted) return;
+
+    try {
+      // Global app state'i refresh et
+      setState(() {
+        // Force UI refresh
+      });
+
+      AppLogger.i('✅ TatarAI app resume handling tamamlandı');
+    } catch (e) {
+      AppLogger.e('❌ TatarAI app resume handling hatası: $e');
+    }
   }
 
   /// AppInitializer'ın tamamlanmasını bekler ve UI'yi günceller

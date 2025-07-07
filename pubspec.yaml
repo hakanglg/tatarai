@@ -21,7 +21,7 @@ version: 1.0.1
 # Platform kısıtlaması
 platforms:
   android:
-  ios:
+  ios: '13.0'
 
 environment:
   sdk: ^3.6.0

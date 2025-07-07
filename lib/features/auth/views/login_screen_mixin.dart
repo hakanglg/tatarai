@@ -281,7 +281,7 @@
 //                       ),
 //                       style: AppTextTheme.body,
 //                       placeholderStyle: AppTextTheme.body.copyWith(
-//                         color: AppColors.textSecondary.withOpacity(0.7),
+//                         color: AppColors.textSecondary.withValues(alpha: 0.7),
 //                       ),
 //                     ),
 //                   ),

@@ -1,19 +1,21 @@
-import 'dart:typed_data';
+import 'dart:async';
 import 'dart:convert';
-import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../base/base_service.dart';
 import '../../constants/app_constants.dart';
-import '../../../features/plant_analysis/data/models/plant_analysis_model.dart';
-import 'models/plant_care_advice_model.dart';
-import 'models/disease_recommendations_model.dart';
 import 'gemini_service_interface.dart';
+import 'models/disease_recommendations_model.dart';
+import 'models/plant_care_advice_model.dart';
 import 'gemini_model_config.dart';
 import 'gemini_prompt_builder.dart';
+import '../../../core/utils/logger.dart';
+import '../../../features/plant_analysis/data/models/plant_analysis_model.dart';
 
 /// Gemini AI service implementation
 ///
@@ -298,12 +300,12 @@ class GeminiServiceImpl extends BaseService implements GeminiServiceInterface {
     _dio.close();
   }
 
-  // ============================================================================
-  // LANGUAGE MANAGEMENT
-  // ============================================================================
+  @override
+  void setLanguage(String languageCode) {
+    final language = languageCode == 'tr'
+        ? GeminiResponseLanguage.turkish
+        : GeminiResponseLanguage.english;
 
-  /// Changes the response language
-  void setLanguage(GeminiResponseLanguage language) {
     if (_currentLanguage != language) {
       _currentLanguage = language;
       logInfo('Language Changed', 'New language: ${language.code}');
@@ -312,6 +314,10 @@ class GeminiServiceImpl extends BaseService implements GeminiServiceInterface {
       _models.clear();
     }
   }
+
+  // ============================================================================
+  // LANGUAGE MANAGEMENT
+  // ============================================================================
 
   /// Gets current language
   GeminiResponseLanguage get currentLanguage => _currentLanguage;
@@ -629,18 +635,18 @@ class GeminiServiceImpl extends BaseService implements GeminiServiceInterface {
       final cleanedJson = _cleanJsonResponse(jsonResponse);
 
       // Debug: Log the cleaned JSON
-      print(
+      AppLogger.d(
           '🔍 Cleaned JSON (first 1000 chars): ${cleanedJson.substring(0, cleanedJson.length > 1000 ? 1000 : cleanedJson.length)}');
 
       final jsonData = json.decode(cleanedJson) as Map<String, dynamic>;
 
       // Debug: Log JSON keys and critical values
-      print('🔍 JSON keys: ${jsonData.keys.toList()}');
-      print(
+      AppLogger.d('🔍 JSON keys: ${jsonData.keys.toList()}');
+      AppLogger.d(
           '🔍 plantName value: ${jsonData['plantName']} (type: ${jsonData['plantName'].runtimeType})');
-      print(
+      AppLogger.d(
           '🔍 isHealthy value: ${jsonData['isHealthy']} (type: ${jsonData['isHealthy'].runtimeType})');
-      print(
+      AppLogger.d(
           '🔍 probability value: ${jsonData['probability']} (type: ${jsonData['probability'].runtimeType})');
 
       // Add location info if provided
@@ -673,7 +679,7 @@ class GeminiServiceImpl extends BaseService implements GeminiServiceInterface {
       return model;
     } catch (e, stackTrace) {
       logError('Analysis Response Parsing Failed', e.toString());
-      print('🚨 JSON parsing stackTrace: $stackTrace');
+      AppLogger.d('🚨 JSON parsing stackTrace: $stackTrace');
 
       // Return fallback model
       return _createFallbackAnalysisModel(

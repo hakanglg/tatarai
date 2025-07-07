@@ -1,17 +1,15 @@
-import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sprung/sprung.dart';
-import 'package:tatarai/core/constants/locale_constants.dart';
-import 'package:tatarai/core/extensions/context_extensions.dart';
-import 'package:tatarai/core/extensions/string_extension.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
 import 'package:tatarai/core/theme/dimensions.dart';
 import 'package:tatarai/core/theme/text_theme.dart';
-import 'package:tatarai/core/utils/logger.dart';
-import 'package:tatarai/core/widgets/app_dialog_manager.dart';
 import 'package:tatarai/features/settings/cubits/language_cubit.dart';
 import 'package:tatarai/features/settings/cubits/language_state.dart';
+import 'package:tatarai/core/extensions/string_extension.dart';
+import 'package:tatarai/core/constants/locale_constants.dart';
+import 'package:tatarai/core/utils/logger.dart';
+import 'package:tatarai/core/widgets/app_dialog_manager.dart';
 
 /// Apple HIG prensiplerine uygun modern dil seçici widget'ı
 /// Zarif animasyonlar ve kullanıcı dostu tasarım sunar
@@ -153,10 +151,10 @@ class _LanguageSelectorContentState extends State<_LanguageSelectorContent>
     return Container(
       padding: EdgeInsets.all(context.dimensions.paddingM),
       decoration: BoxDecoration(
-        color: AppColors.surface.withOpacity(0.8),
+        color: AppColors.surface.withValues(alpha: 0.8),
         borderRadius: BorderRadius.circular(context.dimensions.radiusL),
         border: Border.all(
-          color: AppColors.divider.withOpacity(0.2),
+          color: AppColors.divider.withValues(alpha: 0.2),
           width: 1,
         ),
       ),
@@ -251,12 +249,12 @@ class _LanguageSelectorContentState extends State<_LanguageSelectorContent>
       curve: Sprung.criticallyDamped,
       decoration: BoxDecoration(
         color:
-            isSelected ? AppColors.primary.withOpacity(0.1) : AppColors.surface,
+            isSelected ? AppColors.primary.withValues(alpha: 0.1) : AppColors.surface,
         borderRadius: BorderRadius.circular(context.dimensions.radiusM),
         border: Border.all(
           color: isSelected
-              ? AppColors.primary.withOpacity(0.3)
-              : AppColors.divider.withOpacity(0.2),
+              ? AppColors.primary.withValues(alpha: 0.3)
+              : AppColors.divider.withValues(alpha: 0.2),
           width: isSelected ? 2 : 1,
         ),
       ),
@@ -273,7 +271,7 @@ class _LanguageSelectorContentState extends State<_LanguageSelectorContent>
                 height: 40,
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? AppColors.primary.withOpacity(0.2)
+                      ? AppColors.primary.withValues(alpha: 0.2)
                       : AppColors.surfaceVariant,
                   borderRadius:
                       BorderRadius.circular(context.dimensions.radiusS),

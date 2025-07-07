@@ -42,7 +42,7 @@ class UpdateDialog extends StatelessWidget {
               width: 70,
               height: 70,
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
+                color: AppColors.primary.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: const Center(

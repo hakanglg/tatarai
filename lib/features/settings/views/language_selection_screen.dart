@@ -46,7 +46,7 @@ class LanguageSelectionScreen extends StatelessWidget {
           ),
         ),
         // iOS tarzı şeffaf arkaplan
-        backgroundColor: CupertinoColors.systemBackground.withOpacity(0.9),
+        backgroundColor: CupertinoColors.systemBackground.withValues(alpha: 0.9),
         border: null, // Modern iOS look için border kaldır
       ),
       child: SafeArea(

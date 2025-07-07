@@ -1,50 +1,47 @@
 part of 'analysis_screen.dart';
 
+/// Mixin for handling the business logic of the [AnalysisScreen].
+/// This includes image selection, location management, animations,
+/// and starting the plant analysis process.
 mixin _AnalysisScreenMixin on State<AnalysisScreen> {
-  // Çekilen fotoğrafın dosya yolu
+  /// The file path of the selected image for analysis.
   File? _selectedImage;
 
-  // Konum ve tarla adı için kontrolcüler
+  /// Controllers for the location and field name text fields.
   final TextEditingController _locationController = TextEditingController();
   final TextEditingController _fieldNameController = TextEditingController();
 
-  // Konum servisi
+  /// Service for handling location-related operations, like fetching provinces.
   final LocationService _locationService = LocationService();
 
-  // Cihaz bilgisi için
-  final DeviceInfoPlugin _deviceInfoPlugin = DeviceInfoPlugin();
 
-  // Konum seçim verileri
+  /// Data lists for location selection dropdowns.
   List<Province> _provinces = [];
   List<District> _districts = [];
   List<Neighborhood> _neighborhoods = [];
 
-  // Gelecekte kullanılabilecek değişkenler (şu an pasif)
-  // final int _selectedProvinceIndex = 0;
-  // final int _selectedDistrictIndex = 0;
-  // final int _selectedNeighborhoodIndex = 0;
-  // final bool _districtsLoaded = false;
-  // final bool _neighborhoodsLoaded = false;
-
-  // Seçilen konum değerleri
+  /// Selected location values from the dropdowns.
   Province? _selectedProvince;
   District? _selectedDistrict;
   Neighborhood? _selectedNeighborhood;
 
-  // Yükleniyor durumları
+  /// Loading state flags for location data fetching.
   bool _loadingProvinces = false;
   bool _loadingDistricts = false;
   bool _loadingNeighborhoods = false;
 
-  // Son navigasyon yapılan analiz ID'sini tutmak için
+  /// Stores the ID of the last analysis that was navigated to,
+  /// to prevent duplicate navigation.
   String? _lastNavigatedAnalysisId;
 
-  // Görüntü seçici
-  final ImagePicker _imagePicker = ImagePicker();
 
-  // Animasyon kontrolcüsü
+  /// Controller for managing the screen's entry animations.
   late AnimationController _animationController;
+
+  /// Scale animation for the content.
   late Animation<double> _scaleAnimation;
+
+  /// Fade animation for the content.
   late Animation<double> _fadeAnimation;
 
   @override
@@ -55,13 +52,12 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
     super.dispose();
   }
 
-  // Animasyonları başlat
+  /// Initializes the animations for the screen.
+  /// Sets up the fade and scale transitions.
   void _initializeAnimations() {
-    AppLogger.i('AnalysisScreen - Animasyonlar başlatılıyor');
+    AppLogger.i('AnalysisScreen - Initializing animations');
     try {
       if (!mounted) {
-        AppLogger.w(
-            'AnalysisScreen - Widget mounted değil, animasyonlar başlatılamadı');
         return;
       }
 
@@ -71,159 +67,70 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
         duration: const Duration(milliseconds: 300),
       );
 
-      _scaleAnimation = Tween<double>(
-        begin: 0.8,
-        end: 1.0,
-      ).animate(
-        CurvedAnimation(
-          parent: _animationController,
-          curve: Sprung(30),
-        ),
+      _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+        CurvedAnimation(parent: _animationController, curve: Sprung(30)),
+      );
+      _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+        CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
       );
 
-      _fadeAnimation = Tween<double>(
-        begin: 0.0,
-        end: 1.0,
-      ).animate(
-        CurvedAnimation(
-          parent: _animationController,
-          curve: Curves.easeOut,
-        ),
-      );
-
-      // Animasyonu başlat
-      if (mounted) {
-        _animationController.forward();
-        AppLogger.i('AnalysisScreen - Animasyonlar başarıyla başlatıldı');
-      }
+      _animationController.forward();
     } catch (e, stackTrace) {
-      AppLogger.e(
-          'AnalysisScreen - Animasyon başlatma hatası: $e\n$stackTrace');
+      AppLogger.e('Animation initialization error', e, stackTrace);
     }
   }
 
-  // Emülatör kontrolü (şu an kullanılmıyor ama gelecekte yararlı olabilir)
+  /// Checks if the app is running on an emulator.
+  /// This method is currently a placeholder for future implementation.
   Future<void> _checkEmulator() async {
-    // TODO: Emülatör kontrolü gerekirse buraya kod eklenebilir
+    // TODO(developer): Add emulator check logic if needed in the future.
     AppLogger.i('Device check completed');
   }
 
-  // Fotoğraf seçim menüsünü göster
+  /// Displays a dialog to choose the photo source (camera or gallery).
+  ///
+  /// Uses MediaPermissionHandler with on-demand permission requests.
+  /// Permissions will be requested only when user chooses camera or gallery.
   Future<void> _showPhotoSourceDialog() async {
     if (!mounted) return;
 
-    await showCupertinoModalPopup<void>(
-      context: context,
-      builder: (BuildContext context) => CupertinoActionSheet(
-        title: Text(
-          'photo_source_description'.locale(context),
-          style: AppTextTheme.bodyLarge.copyWith(
-            color: AppColors.textSecondary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        // message: Text(
-        //   'photo_source_description'.locale(context),
-        //   style: AppTextTheme.bodyMedium,
-        // ),
-        actions: <CupertinoActionSheetAction>[
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(context);
-              _pickImage(ImageSource.camera);
-            },
-            child: Text('camera'.locale(context)),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(context);
-              _pickImage(ImageSource.gallery);
-            },
-            child: Text('gallery'.locale(context)),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          isDestructiveAction: true,
-          onPressed: () {
-            Navigator.pop(context);
-          },
-          child: Text('cancel'.locale(context)),
-        ),
-      ),
-    );
-  }
+    AppLogger.i('📸 Analysis screen: Starting photo source selection');
 
-  // Fotoğraf seç
-  Future<void> _pickImage(ImageSource source) async {
     try {
-      // Kamera izni kontrolü
-      if (source == ImageSource.camera) {
-        final hasPermission = await PermissionManager.requestPermission(
-          AppPermissionType.camera,
-          context: context,
-        );
-        if (!hasPermission) {
-          if (!mounted) return;
-          AppLogger.w('Kamera izni reddedildi');
-          return;
-        }
-      }
-
-      final XFile? pickedFile = await _imagePicker.pickImage(
-        source: source,
-        imageQuality: 80,
-        maxWidth: 1920,
-        maxHeight: 1920,
-      );
-
-      if (pickedFile != null) {
-        if (!mounted) return;
-
+      final selectedImage = await MediaPermissionHandler.instance.selectMedia(context);
+      
+      if (selectedImage != null && mounted) {
+        final file = File(selectedImage.path);
         setState(() {
-          _selectedImage = File(pickedFile.path);
+          _selectedImage = file;
         });
-
-        // Hafif titreşim geri bildirimi
+        
         HapticFeedback.lightImpact();
-
-        // Animasyonu başlat
         _animationController.forward(from: 0.0);
-
-        AppLogger.i('Fotoğraf seçildi: ${pickedFile.path}');
+        AppLogger.i('✅ Analysis screen: Image selected successfully: ${selectedImage.path}');
       } else {
-        AppLogger.i('Fotoğraf seçimi iptal edildi');
+        AppLogger.i('ℹ️ Analysis screen: User cancelled image selection or permission denied');
       }
     } catch (e) {
-      AppLogger.e('Fotoğraf seçimi hatası: $e');
-      if (!mounted) return;
-
-      await showCupertinoDialog(
-        context: context,
-        builder: (context) => CupertinoAlertDialog(
-          title: Text('error'.locale(context)),
-          content: Text('photo_selection_error'.locale(context)),
-          actions: [
-            CupertinoDialogAction(
-              child: Text('ok'.locale(context)),
-              onPressed: () => Navigator.pop(context),
-            ),
-          ],
-        ),
-      );
+      AppLogger.e('❌ Analysis screen: Error in photo selection', e);
+      if (mounted) {
+        await _showErrorDialog('photo_selection_error'.locale(context));
+      }
     }
   }
 
-  // Fotoğraf seçenekleri menüsünü göster
+
+
+
+  /// Shows an action sheet with options for the selected image.
+  ///
+  /// Options include changing the photo or deleting it.
   Future<void> _showImageOptionsMenu() async {
     if (!mounted) return;
-
     await showCupertinoModalPopup<void>(
       context: context,
       builder: (BuildContext context) => CupertinoActionSheet(
-        title: Text(
-          'photo_ops'.locale(context),
-          style: AppTextTheme.bodyLarge,
-        ),
+        title: Text('photo_ops'.locale(context)),
         actions: <CupertinoActionSheetAction>[
           CupertinoActionSheetAction(
             onPressed: () {
@@ -236,52 +143,92 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
             isDestructiveAction: true,
             onPressed: () {
               Navigator.pop(context);
-              setState(() {
-                _selectedImage = null;
-              });
-              AppLogger.i('Fotoğraf kaldırıldı');
+              setState(() => _selectedImage = null);
+              AppLogger.i('Photo removed');
             },
             child: Text('delete_photo'.locale(context)),
           ),
         ],
         cancelButton: CupertinoActionSheetAction(
-          onPressed: () {
-            Navigator.pop(context);
-          },
+          onPressed: () => Navigator.pop(context),
           child: Text('cancel'.locale(context)),
         ),
       ),
     );
   }
 
-  /// Hata mesajını göster
+  /// Displays a generic error dialog.
+  ///
+  /// If [needsPremium] is true, it shows a dialog prompting the user
+  /// to upgrade to a premium plan. Otherwise, a standard error dialog is shown.
   Future<void> _showErrorDialog(String message,
       {bool needsPremium = false}) async {
     if (!mounted) return;
 
     if (needsPremium) {
-      // PaywallManager kullanarak paywall'ı aç
-      PaywallManager.showPaywall(
-        context,
-        displayCloseButton: true,
-        onPremiumPurchased: () {
-          AppLogger.i('Premium satın alındı - Analysis ekranından');
-        },
-        onError: (error) {
-          AppLogger.e('Analysis screen paywall hatası: $error');
+      await AppDialogManager.showPremiumRequiredDialog(
+        context: context,
+        title: 'premium_required_title'.locale(context),
+        message: message,
+        onPremiumButtonPressed: () {
+          if (mounted) {
+            context.go(RoutePaths.premium);
+          }
         },
       );
     } else {
-      // Normal hata mesajı göster
-      AppDialogManager.showErrorDialog(
+      await AppDialogManager.showErrorDialog(
         context: context,
-        title: 'error_title'.locale(context),
+        title: 'error'.locale(context),
         message: message,
       );
     }
   }
 
-  /// İl seçim diyaloğunu göster
+  /// Shows a generic Cupertino action sheet for selecting an item from a list.
+  ///
+  /// This method is used to display selection dialogs for provinces, districts,
+  /// and neighborhoods in a consistent way.
+  ///
+  /// - [title]: The title of the action sheet.
+  /// - [message]: A descriptive message displayed below the title.
+  /// - [items]: A list of items to be displayed as actions.
+  /// - [onItemSelected]: A callback that is triggered when an item is selected.
+  void _showLocationSelectionSheet<T>({
+    required String title,
+    required String message,
+    required List<T> items,
+    required String Function(T) itemTitleBuilder,
+    required VoidCallback Function(T) onItemSelected,
+  }) {
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (BuildContext context) => CupertinoActionSheet(
+        title: Text(title),
+        message: Text(message),
+        actions: items
+            .map(
+              (item) => CupertinoActionSheetAction(
+                onPressed: () {
+                  Navigator.of(context).pop(); // Önce modal'ı kapat
+                  onItemSelected(item)(); // Sonra callback'i çağır
+                },
+                child: Text(itemTitleBuilder(item)),
+              ),
+            )
+            .toList(),
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.of(context).pop(),
+          isDestructiveAction: true,
+          child: Text('cancel'.locale(context)),
+        ),
+      ),
+    );
+  }
+
+  /// Shows the province selection action sheet.
+  ///
+  /// If provinces are not yet loaded, it initiates the loading process.
   void _showProvinceSelection() {
     if (_loadingProvinces) {
       _showLoadingDialog('provinces_loading'.locale(context));
@@ -294,43 +241,35 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
       return;
     }
 
-    showCupertinoModalPopup(
-      context: context,
-      builder: (context) => CupertinoActionSheet(
-        title: Text('select_province'.locale(context)),
-        message: Text('select_province_desc'.locale(context)),
-        actions: _provinces
-            .map((province) => CupertinoActionSheetAction(
-                  onPressed: () {
-                    setState(() {
-                      _selectedProvince = province;
-                      _updateLocationText();
-                    });
-                    Navigator.pop(context);
+    _showLocationSelectionSheet<Province>(
+      title: 'select_province'.locale(context),
+      message: 'select_province_desc'.locale(context),
+      items: _provinces,
+      itemTitleBuilder: (province) => province.name,
+      onItemSelected: (province) => () {
+        setState(() {
+          _selectedProvince = province;
+          _updateLocationText();
+        });
 
-                    // İl seçildiğinde ilçeleri yükle
-                    _loadDistricts(province).then((_) {
-                      // İlçeler yüklendikten sonra ilçe seçim diyaloğunu otomatik göster
-                      if (_districts.isNotEmpty) {
-                        Future.delayed(const Duration(milliseconds: 300), () {
-                          _showDistrictSelection();
-                        });
-                      }
-                    });
-                  },
-                  child: Text(province.name),
-                ))
-            .toList(),
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(context),
-          isDestructiveAction: true,
-          child: Text('cancel'.locale(context)),
-        ),
-      ),
+        // After selecting a province, load its districts.
+        _loadDistricts(province).then((_) {
+          // Automatically show the district selection dialog.
+          if (_districts.isNotEmpty && mounted) {
+            Future.delayed(const Duration(milliseconds: 300), () {
+              if (mounted) {
+                _showDistrictSelection();
+              }
+            });
+          }
+        });
+      },
     );
   }
 
-  /// İlçe seçim diyaloğunu göster
+  /// Shows the district selection action sheet.
+  ///
+  /// Requires a province to be selected first.
   void _showDistrictSelection() {
     if (_selectedProvince == null) {
       _showErrorDialog('select_province_first'.locale(context));
@@ -348,43 +287,35 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
       return;
     }
 
-    showCupertinoModalPopup(
-      context: context,
-      builder: (context) => CupertinoActionSheet(
-        title: Text('select_district'.locale(context)),
-        message: Text('select_district_desc'.locale(context)),
-        actions: _districts
-            .map((district) => CupertinoActionSheetAction(
-                  onPressed: () {
-                    setState(() {
-                      _selectedDistrict = district;
-                      _updateLocationText();
-                    });
-                    Navigator.pop(context);
+    _showLocationSelectionSheet<District>(
+      title: 'select_district'.locale(context),
+      message: 'select_district_desc'.locale(context),
+      items: _districts,
+      itemTitleBuilder: (district) => district.name,
+      onItemSelected: (district) => () {
+        setState(() {
+          _selectedDistrict = district;
+          _updateLocationText();
+        });
 
-                    // İlçe seçildiğinde mahalleleri yükle
-                    _loadNeighborhoods(_selectedProvince!, district).then((_) {
-                      // Mahalleler yüklendikten sonra mahalle seçim diyaloğunu otomatik göster
-                      if (_neighborhoods.isNotEmpty) {
-                        Future.delayed(const Duration(milliseconds: 300), () {
-                          _showNeighborhoodSelection();
-                        });
-                      }
-                    });
-                  },
-                  child: Text(district.name),
-                ))
-            .toList(),
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(context),
-          isDestructiveAction: true,
-          child: Text('cancel'.locale(context)),
-        ),
-      ),
+        // After selecting a district, load its neighborhoods.
+        _loadNeighborhoods(_selectedProvince!, district).then((_) {
+          // Automatically show the neighborhood selection dialog.
+          if (_neighborhoods.isNotEmpty && mounted) {
+            Future.delayed(const Duration(milliseconds: 300), () {
+              if (mounted) {
+                _showNeighborhoodSelection();
+              }
+            });
+          }
+        });
+      },
     );
   }
 
-  /// Mahalle seçim diyaloğunu göster
+  /// Shows the neighborhood selection action sheet.
+  ///
+  /// Requires a district to be selected first.
   void _showNeighborhoodSelection() {
     if (_selectedDistrict == null) {
       _showErrorDialog('select_district_first'.locale(context));
@@ -402,45 +333,38 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
       return;
     }
 
-    showCupertinoModalPopup(
-      context: context,
-      builder: (context) => CupertinoActionSheet(
-        title: Text('select_neighborhood'.locale(context)),
-        message: Text('select_neighborhood_desc'.locale(context)),
-        actions: _neighborhoods
-            .map((neighborhood) => CupertinoActionSheetAction(
-                  onPressed: () {
-                    setState(() {
-                      _selectedNeighborhood = neighborhood;
-                      _updateLocationText();
-                    });
-                    Navigator.pop(context);
+    _showLocationSelectionSheet<Neighborhood>(
+      title: 'select_neighborhood'.locale(context),
+      message: 'select_neighborhood_desc'.locale(context),
+      items: _neighborhoods,
+      itemTitleBuilder: (neighborhood) => neighborhood.name,
+      onItemSelected: (neighborhood) => () {
+        setState(() {
+          _selectedNeighborhood = neighborhood;
+          _updateLocationText();
+        });
 
-                    // Tüm konum seçimleri tamamlandığında, isteğe bağlı olarak tarla adı seçimine yönlendirebiliriz
-                    // veya direkt olarak analiz sürecine odaklanmasını sağlayabiliriz
-                    if (_selectedImage != null) {
-                      // Eğer görsel zaten seçilmiş ise, kullanıcının analiz butonuna odaklanmasına yardımcı ol
-                      HapticFeedback.mediumImpact();
-                    } else {
-                      // Görsel seçilmemişse, kullanıcıyı görsel seçmeye yönlendir
-                      Future.delayed(const Duration(milliseconds: 300), () {
-                        _showPhotoSourceDialog();
-                      });
-                    }
-                  },
-                  child: Text(neighborhood.name),
-                ))
-            .toList(),
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(context),
-          isDestructiveAction: true,
-          child: Text('cancel'.locale(context)),
-        ),
-      ),
+        // After location selection is complete, guide the user.
+        if (_selectedImage != null) {
+          // If an image is already selected, provide haptic feedback
+          // to draw attention to the analysis button.
+          HapticFeedback.mediumImpact();
+        } else {
+          // If no image is selected, prompt the user to choose one.
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (mounted) {
+              _showPhotoSourceDialog();
+            }
+          });
+        }
+      },
     );
   }
 
-  /// Yükleniyor diyaloğunu göster
+  /// Shows a temporary loading dialog.
+  ///
+  /// The dialog displays an activity indicator and a [message].
+  /// It automatically dismisses after 2 seconds.
   void _showLoadingDialog(String message) {
     if (!mounted) return;
 
@@ -458,70 +382,112 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
       ),
     );
 
-    // 2 saniye sonra otomatik kapat
+    // Automatically close the dialog after a short period.
     Future.delayed(const Duration(seconds: 2), () {
-      if (mounted && Navigator.of(context).canPop()) {
-        Navigator.pop(context);
+      if (mounted) {
+        try {
+          if (Navigator.of(context).canPop()) {
+            Navigator.pop(context);
+          }
+        } catch (e) {
+          AppLogger.w('Loading dialog auto-close error: $e');
+        }
       }
     });
   }
 
-  /// Yapay zeka analizi başlatma
+  /// Orchestrates the entire analysis process by calling validation and execution steps.
   void _startAnalysis() async {
-    if (_selectedImage == null) {
-      _showErrorDialog('select_photo_first'.locale(context));
+    if (!_validateInputs()) {
       return;
     }
 
-    // Dil kontrolü ile location validation
+    final authState = await _ensureUserIsAuthenticated();
+    if (authState == null) {
+      return; // Authentication failed
+    }
+
+    final canProceed = await _checkAnalysisCredits(authState);
+    if (!canProceed) {
+      return; // Insufficient credits
+    }
+
+    // If all checks pass, proceed with the analysis.
+    _initiateAnalysis(authState.user);
+  }
+
+  /// Validates that an image and location have been selected.
+  /// Returns `true` if inputs are valid, otherwise shows an error and returns `false`.
+  bool _validateInputs() {
+    if (_selectedImage == null) {
+      _showErrorDialog('select_photo_first'.locale(context));
+      return false;
+    }
+
     final currentLanguage =
         LocalizationManager.instance.currentLocale.languageCode;
+    bool isLocationMissing = false;
 
     if (currentLanguage == 'tr') {
-      // Türkçe için il/ilçe/mahalle kontrolü
       if (_selectedProvince == null ||
           _selectedDistrict == null ||
           _selectedNeighborhood == null) {
-        _showErrorDialog('select_location_first'.locale(context));
-        return;
+        isLocationMissing = true;
       }
     } else {
-      // Diğer diller için text field kontrolü
       if (_locationController.text.trim().isEmpty) {
-        _showErrorDialog('select_location_first'.locale(context));
-        return;
+        isLocationMissing = true;
       }
     }
 
-    // Kullanıcının authentication durumunu kontrol et
-    final authState = context.read<AuthCubit>().state;
-    if (authState is! AuthAuthenticated) {
-      // Eğer kullanıcı authenticated değilse, anonim giriş yapmaya çalış
-      AppLogger.w('Kullanıcı authenticated değil, anonim giriş yapılıyor...');
-      try {
-        await context.read<AuthCubit>().signInAnonymously();
-        // Giriş sonrası tekrar kontrol et
-        final newAuthState = context.read<AuthCubit>().state;
-        if (newAuthState is! AuthAuthenticated) {
-          _showErrorDialog('auth_required_for_analysis'.locale(context));
-          return;
+    if (isLocationMissing) {
+      _showErrorDialog('select_location_first'.locale(context));
+      return false;
+    }
+
+    return true;
+  }
+
+  /// Ensures the user is authenticated.
+  ///
+  /// If the user is not logged in, it attempts to sign in anonymously.
+  /// Returns [AuthAuthenticated] state if successful, otherwise `null`.
+  Future<AuthAuthenticated?> _ensureUserIsAuthenticated() async {
+    final authCubit = context.read<AuthCubit>();
+    if (authCubit.state is AuthAuthenticated) {
+      return authCubit.state as AuthAuthenticated;
+    }
+
+    AppLogger.w('User not authenticated, attempting anonymous sign-in...');
+    try {
+      await authCubit.signInAnonymously();
+      final newAuthState = authCubit.state;
+      if (newAuthState is AuthAuthenticated) {
+        return newAuthState;
+      } else {
+        if (mounted) {
+          await _showErrorDialog('auth_required_for_analysis'.locale(context));
         }
-      } catch (e) {
-        AppLogger.e('Anonim giriş hatası: $e');
-        _showErrorDialog('auth_login_error'.locale(context));
-        return;
+        return null;
       }
+    } catch (e) {
+      AppLogger.e('Anonymous sign-in error: $e');
+      if (mounted) {
+        await _showErrorDialog('auth_login_error'.locale(context));
+      }
+      return null;
     }
+  }
 
-    // Kullanıcının analiz kredilerini kontrol et
-    final authenticatedState =
-        context.read<AuthCubit>().state as AuthAuthenticated;
-    final currentUser = authenticatedState.user;
-
+  /// Checks if the user has enough credits or is a premium user.
+  ///
+  /// Performs a real-time check against Firestore for accuracy.
+  /// Returns `true` if the user can proceed, otherwise `false`.
+  Future<bool> _checkAnalysisCredits(AuthAuthenticated authState) async {
+    final currentUser = authState.user;
     AppLogger.i(
-        'Kullanıcının analiz kredileri kontrol ediliyor: ${currentUser.analysisCredits}, Premium: ${currentUser.isPremium}');
+        'Checking analysis credits for user: ${currentUser.analysisCredits}, Premium: ${currentUser.isPremium}');
 
-    // Real-time credit check from Firestore (don't trust cached AuthCubit data)
     try {
       final firestoreService = ServiceLocator.get<FirestoreService>();
       final userDoc = await firestoreService.firestore
@@ -529,83 +495,66 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
           .doc(currentUser.id)
           .get();
 
+      bool canProceed = false;
       if (userDoc.exists) {
-        final userData = userDoc.data() as Map<String, dynamic>?;
+        final userData = userDoc.data();
         final realTimeCredits = userData?['analysisCredits'] ?? 0;
         final realTimePremium = userData?['isPremium'] ?? false;
-
         AppLogger.i(
             'Real-time Firestore credit check - User: ${currentUser.id}, Credits: $realTimeCredits, Premium: $realTimePremium');
-
-        // Use real-time Firestore data for validation
-        if (!realTimePremium && realTimeCredits <= 0) {
-          AppLogger.w(
-              'Kullanıcının analiz kredisi yok (Firestore real-time check), premium popup gösteriliyor');
-          await _showErrorDialog(
-            'free_analysis_limit_reached'.locale(context),
-            needsPremium: true,
-          );
-          return;
-        }
-
-        AppLogger.i('Credit validation passed - proceeding with analysis');
+        canProceed = realTimePremium || realTimeCredits > 0;
       } else {
-        AppLogger.w('User document not found in Firestore, using cached data');
+        AppLogger.w(
+            'User document not found in Firestore, using cached data as fallback.');
+        canProceed = currentUser.isPremium || currentUser.analysisCredits > 0;
+      }
 
-        // Fallback to cached data if Firestore document doesn't exist
-        if (!currentUser.isPremium && currentUser.analysisCredits <= 0) {
-          AppLogger.w(
-              'Kullanıcının analiz kredisi yok (fallback check), premium popup gösteriliyor');
+      if (!canProceed) {
+        AppLogger.w('User has no analysis credits, showing premium dialog.');
+        if (mounted) {
           await _showErrorDialog(
             'free_analysis_limit_reached'.locale(context),
             needsPremium: true,
           );
-          return;
         }
+        return false;
       }
+
+      AppLogger.i('Credit validation passed.');
+      return true;
     } catch (firestoreError) {
       AppLogger.w(
-          'Firestore credit check failed, using cached data: $firestoreError');
-
-      // Fallback to cached data if Firestore query fails
-      if (!currentUser.isPremium && currentUser.analysisCredits <= 0) {
-        AppLogger.w(
-            'Kullanıcının analiz kredisi yok (fallback check), premium popup gösteriliyor');
-        await _showErrorDialog(
-          'free_analysis_limit_reached'.locale(context),
-          needsPremium: true,
-        );
-        return;
+          'Firestore credit check failed, using cached data as fallback: $firestoreError');
+      // Fallback to cached data if Firestore query fails.
+      final canProceed =
+          currentUser.isPremium || currentUser.analysisCredits > 0;
+      if (!canProceed) {
+        if (mounted) {
+          await _showErrorDialog(
+            'free_analysis_limit_reached'.locale(context),
+            needsPremium: true,
+          );
+        }
+        return false;
       }
+      return true;
+    }
+  }
+
+  /// Triggers the actual image analysis process.
+  void _initiateAnalysis(UserModel user) {
+    // Double-check Firebase Auth user status just before the final call.
+    if (FirebaseAuth.instance.currentUser == null) {
+      _showErrorDialog('firebase_auth_error'.locale(context));
+      AppLogger.e('Critical: Firebase user became null before analysis call.');
+      return;
     }
 
-    // Firebase Auth current user kontrolü
-    final firebaseUser = FirebaseAuth.instance.currentUser;
-    AppLogger.i(
-        'Firebase Auth current user: ${firebaseUser?.uid ?? "null"} (anonim: ${firebaseUser?.isAnonymous ?? false})');
-
-    if (firebaseUser == null) {
-      AppLogger.w('Firebase Auth current user null, 2 saniye bekleniyor...');
-      // 2 saniye bekle ve tekrar kontrol et
-      await Future.delayed(const Duration(seconds: 2));
-      final retryFirebaseUser = FirebaseAuth.instance.currentUser;
-
-      if (retryFirebaseUser == null) {
-        _showErrorDialog('firebase_auth_error'.locale(context));
-        return;
-      }
-
-      AppLogger.i(
-          'Firebase Auth current user (retry): ${retryFirebaseUser.uid} (anonim: ${retryFirebaseUser.isAnonymous})');
-    }
-
-    // Haptic feedback ekle
     HapticFeedback.heavyImpact();
 
-    // Plant Analysis Cubit Direct üzerinden analizi başlat
     context.read<PlantAnalysisCubitDirect>().analyzeImageDirect(
           imageFile: _selectedImage!,
-          user: currentUser,
+          user: user,
           location: _locationController.text.trim(),
           province: _selectedProvince?.name,
           district: _selectedDistrict?.name,
@@ -616,38 +565,32 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
         );
   }
 
-  /// İlleri API'den yükle
+  /// Fetches the list of provinces from the location service.
   Future<void> _loadProvinces() async {
     if (!mounted) return;
-
-    setState(() {
-      _loadingProvinces = true;
-    });
-
+    setState(() => _loadingProvinces = true);
     try {
       final provinces = await _locationService.getProvinces();
-
-      if (!mounted) return;
-
-      setState(() {
-        _provinces = provinces;
-        _loadingProvinces = false;
-      });
+      if (mounted) {
+        setState(() {
+          _provinces = provinces;
+          _loadingProvinces = false;
+        });
+      }
     } catch (e) {
-      if (!mounted) return;
-
-      AppLogger.e('İller yüklenirken hata: $e');
-      setState(() {
-        _loadingProvinces = false;
-      });
-      _showErrorDialog('provinces_load_error'.locale(context));
+      AppLogger.e('Failed to load provinces', e);
+      if (mounted) {
+        setState(() => _loadingProvinces = false);
+        _showErrorDialog('provinces_load_error'.locale(context));
+      }
     }
   }
 
-  /// Seçilen ile göre ilçeleri yükle
+  /// Fetches the list of districts for the selected [province].
+  ///
+  /// This also resets the selected district and neighborhood.
   Future<void> _loadDistricts(Province province) async {
     if (!mounted) return;
-
     setState(() {
       _loadingDistricts = true;
       _districts = [];
@@ -656,76 +599,61 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
       _selectedNeighborhood = null;
       _updateLocationText();
     });
-
     try {
       final districts = await _locationService.getDistricts(province.name);
-
-      if (!mounted) return;
-
-      setState(() {
-        _districts = districts;
-        _loadingDistricts = false;
-      });
+      if (mounted) {
+        setState(() {
+          _districts = districts;
+          _loadingDistricts = false;
+        });
+      }
     } catch (e) {
-      if (!mounted) return;
-
-      AppLogger.e('İlçeler yüklenirken hata: $e');
-      setState(() {
-        _loadingDistricts = false;
-      });
-      _showErrorDialog('districts_load_error'.locale(context));
+      AppLogger.e('Failed to load districts', e);
+      if (mounted) {
+        setState(() => _loadingDistricts = false);
+        _showErrorDialog('districts_load_error'.locale(context));
+      }
     }
   }
 
-  /// Seçilen ilçeye göre mahalleleri yükle
+  /// Fetches the list of neighborhoods for the selected [district].
+  ///
+  /// This also resets the selected neighborhood.
   Future<void> _loadNeighborhoods(Province province, District district) async {
     if (!mounted) return;
-
     setState(() {
       _loadingNeighborhoods = true;
       _neighborhoods = [];
       _selectedNeighborhood = null;
       _updateLocationText();
     });
-
     try {
       final neighborhoods =
           await _locationService.getNeighborhoods(province.name, district.name);
-
-      if (!mounted) return;
-
-      setState(() {
-        _neighborhoods = neighborhoods;
-        _loadingNeighborhoods = false;
-      });
+      if (mounted) {
+        setState(() {
+          _neighborhoods = neighborhoods;
+          _loadingNeighborhoods = false;
+        });
+      }
     } catch (e) {
-      if (!mounted) return;
-
-      AppLogger.e('Mahalleler yüklenirken hata: $e');
-      setState(() {
-        _loadingNeighborhoods = false;
-      });
-      _showErrorDialog('neighborhoods_load_error'.locale(context));
+      AppLogger.e('Failed to load neighborhoods', e);
+      if (mounted) {
+        setState(() => _loadingNeighborhoods = false);
+        _showErrorDialog('neighborhoods_load_error'.locale(context));
+      }
     }
   }
 
-  /// Konum metin alanını güncelle
+  /// Updates the location text field with the selected province,
+  /// district, and neighborhood.
   void _updateLocationText() {
-    String locationText = '';
-
-    if (_selectedProvince != null) {
-      locationText = _selectedProvince!.name;
-
-      if (_selectedDistrict != null) {
-        locationText += '/${_selectedDistrict!.name}';
-
-        if (_selectedNeighborhood != null) {
-          locationText += '/${_selectedNeighborhood!.name}';
-        }
-      }
-    }
-
-    _locationController.text = locationText;
+    final parts = [
+      _selectedProvince?.name,
+      _selectedDistrict?.name,
+      _selectedNeighborhood?.name,
+    ];
+    _locationController.text = parts.where((p) => p != null).join('/');
   }
 
   // Premium navigation artık HomePremiumCard widget'ı içinde handle ediliyor

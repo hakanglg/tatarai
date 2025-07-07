@@ -43,7 +43,7 @@ mixin AnalysisResultScreenMixin {
       return result;
     } catch (e) {
       if (kDebugMode) {
-        print('AnalysisResult conversion error: $e');
+        AppLogger.d('AnalysisResult conversion error: $e');
       }
       setAnalysisResult(null);
       return null;
@@ -66,7 +66,7 @@ mixin AnalysisResultScreenMixin {
     } catch (e) {
       completer.complete(null);
       if (kDebugMode) {
-        print('Async analysis loading error: $e');
+        AppLogger.d('Async analysis loading error: $e');
       }
     }
 

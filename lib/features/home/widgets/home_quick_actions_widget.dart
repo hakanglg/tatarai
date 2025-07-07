@@ -100,13 +100,13 @@ class HomeQuickActionsWidget extends StatelessWidget {
             borderRadius: BorderRadius.circular(context.dimensions.radiusL),
             boxShadow: [
               BoxShadow(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
             ],
             border: Border.all(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               width: 1,
             ),
           ),
@@ -138,7 +138,7 @@ class HomeQuickActionsWidget extends StatelessWidget {
       width: 56,
       height: 56,
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Icon(

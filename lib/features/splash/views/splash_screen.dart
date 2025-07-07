@@ -1,27 +1,24 @@
 import 'dart:async';
-
+import 'dart:math';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sprung/sprung.dart';
-
-import '../../../core/base/base_state_widget.dart';
-import '../../../core/extensions/string_extension.dart';
-import '../../../core/init/app_initializer.dart';
-import '../../../core/routing/route_names.dart';
-import '../../../core/routing/route_paths.dart';
-import '../../../core/theme/color_scheme.dart';
-import '../../../core/theme/text_theme.dart';
-import '../../../core/utils/logger.dart';
-import '../../auth/cubits/auth_cubit.dart';
-import '../../auth/cubits/auth_state.dart';
-import '../../update/views/force_update_screen.dart';
-import '../../update/views/update_dialog.dart';
+import 'package:tatarai/core/extensions/string_extension.dart';
+import 'package:tatarai/core/theme/color_scheme.dart';
+import 'package:tatarai/core/theme/dimensions.dart';
+import 'package:tatarai/core/theme/text_theme.dart';
+import 'package:tatarai/core/utils/logger.dart';
+import 'package:tatarai/core/routing/route_paths.dart';
+import 'package:tatarai/core/routing/route_names.dart';
+import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
+import 'package:tatarai/features/auth/cubits/auth_state.dart';
+import 'package:tatarai/features/splash/services/splash_service.dart';
+import 'package:tatarai/features/splash/widgets/splash_logo_widget.dart';
 import '../constants/splash_constants.dart';
-import '../services/splash_service.dart';
-import '../widgets/splash_logo_widget.dart';
 
 /// TatarAI uygulamasının giriş ekranı
 ///
@@ -41,7 +38,7 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends BaseState<SplashScreen>
+class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   // ============================================================================
   // ANIMATION PROPERTIES
@@ -157,7 +154,10 @@ class _SplashScreenState extends BaseState<SplashScreen>
   // ============================================================================
 
   /// Authentication flow'unu başlatır
-  void _startAuthFlow() {
+  void _startAuthFlow() async {
+    // Permissions will be requested when user actually tries to use camera/gallery
+    // await _splashService.initializePermissions();
+
     _authSubscription = context.read<AuthCubit>().stream.listen(
           _handleAuthStateChange,
           onError: _handleAuthError,
@@ -504,5 +504,37 @@ class _SplashScreenState extends BaseState<SplashScreen>
   /// Loading indicator'ı oluşturur
   Widget _buildLoadingIndicator() {
     return const CupertinoActivityIndicator();
+  }
+
+  // ============================================================================
+  // UTILITY METHODS
+  // ============================================================================
+
+  /// Güvenli Future çalıştırma (mounted kontrolü ile)
+  Future<T?> runFutureSafe<T>(
+    Future<T> future, {
+    String? errorMessage,
+  }) async {
+    if (!mounted) return null;
+    try {
+      final result = await future;
+      return mounted ? result : null;
+    } catch (e, stackTrace) {
+      if (mounted) {
+        AppLogger.e(errorMessage ?? 'Future execution error', e, stackTrace);
+      }
+      return null;
+    }
+  }
+
+  /// Güvenli method çalıştırma (mounted kontrolü ile)
+  void runIfMounted(VoidCallback callback) {
+    if (mounted) {
+      try {
+        callback();
+      } catch (e, stackTrace) {
+        AppLogger.e('Callback execution error', e, stackTrace);
+      }
+    }
   }
 }

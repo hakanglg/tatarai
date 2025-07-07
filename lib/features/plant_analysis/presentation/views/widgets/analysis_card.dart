@@ -1,16 +1,25 @@
-import 'dart:io';
-import 'dart:ui';
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:flutter/services.dart';
 import 'package:tatarai/core/extensions/string_extension.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
 import 'package:tatarai/core/theme/dimensions.dart';
 import 'package:tatarai/core/theme/text_theme.dart';
-import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/features/plant_analysis/data/models/plant_analysis_model.dart';
+import 'package:tatarai/features/plant_analysis/data/models/disease_model.dart';
+import 'package:tatarai/core/utils/logger.dart';
+import 'package:tatarai/core/widgets/app_button.dart';
 import 'package:tatarai/features/plant_analysis/presentation/views/analyses_result/analysis_result_screen.dart';
+import 'package:tatarai/features/plant_analysis/presentation/views/widgets/font_size_control.dart';
+import 'package:tatarai/features/plant_analysis/presentation/views/widgets/info_card_item.dart';
+import 'package:tatarai/core/constants/app_constants.dart';
+import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
+import 'dart:typed_data';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 /// Analiz kartı widget'ı
 ///
@@ -56,7 +65,7 @@ class AnalysisCard extends StatelessWidget {
             : context.dimensions.radiusL),
         boxShadow: [
           BoxShadow(
-            color: AppColors.black.withOpacity(0.1),
+            color: AppColors.black.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
             spreadRadius: 0,
@@ -261,7 +270,7 @@ class AnalysisCard extends StatelessWidget {
                         vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.1),
+                        color: statusColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
@@ -341,7 +350,7 @@ class AnalysisCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
                 boxShadow: [
                   BoxShadow(
-                    color: CupertinoColors.black.withOpacity(0.05),
+                    color: CupertinoColors.black.withValues(alpha: 0.05),
                     blurRadius: 3,
                     offset: const Offset(0, 1),
                   ),
@@ -432,7 +441,7 @@ class AnalysisCard extends StatelessWidget {
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: CupertinoColors.black.withOpacity(0.2),
+                            color: CupertinoColors.black.withValues(alpha: 0.2),
                             blurRadius: 2,
                             offset: const Offset(0, 1),
                           ),
@@ -537,10 +546,10 @@ class AnalysisCard extends StatelessWidget {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
+                    color: statusColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: statusColor.withOpacity(0.2),
+                      color: statusColor.withValues(alpha: 0.2),
                       width: 1,
                     ),
                   ),
@@ -683,7 +692,7 @@ class AnalysisCard extends StatelessWidget {
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: CupertinoColors.black.withOpacity(0.2),
+                      color: CupertinoColors.black.withValues(alpha: 0.2),
                       blurRadius: 3,
                       offset: const Offset(0, 1),
                     ),
@@ -713,7 +722,7 @@ class AnalysisCard extends StatelessWidget {
                     end: Alignment.bottomCenter,
                     colors: [
                       Colors.transparent,
-                      Colors.black.withOpacity(0.3),
+                      Colors.black.withValues(alpha: 0.3),
                     ],
                   ),
                 ),

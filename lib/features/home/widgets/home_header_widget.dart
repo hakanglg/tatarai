@@ -166,21 +166,21 @@ class _HomeHeaderWidgetState extends State<HomeHeaderWidget>
         boxShadow: [
           // Primary depth shadow
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.25),
+            color: AppColors.primary.withValues(alpha: 0.25),
             blurRadius: 40,
             offset: const Offset(0, 20),
             spreadRadius: -8,
           ),
           // Secondary ambient shadow
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 80,
             offset: const Offset(0, 40),
             spreadRadius: -20,
           ),
           // Surface highlight
           BoxShadow(
-            color: Colors.white.withOpacity(0.8),
+            color: Colors.white.withValues(alpha: 0.8),
             blurRadius: 2,
             offset: const Offset(0, 1),
             spreadRadius: 0,
@@ -222,7 +222,7 @@ class _HomeHeaderWidgetState extends State<HomeHeaderWidget>
         child: Image.asset(
           'assets/images/background_3.jpg',
           fit: BoxFit.cover,
-          color: AppColors.primary.withOpacity(0.75),
+          color: AppColors.primary.withValues(alpha: 0.75),
           colorBlendMode: BlendMode.multiply,
         ),
       ),
@@ -238,10 +238,10 @@ class _HomeHeaderWidgetState extends State<HomeHeaderWidget>
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              AppColors.primary.withOpacity(0.88),
-              AppColors.primary.withOpacity(0.65),
-              AppColors.primary.withOpacity(0.78),
-              AppColors.primary.withOpacity(0.85),
+              AppColors.primary.withValues(alpha: 0.88),
+              AppColors.primary.withValues(alpha: 0.65),
+              AppColors.primary.withValues(alpha: 0.78),
+              AppColors.primary.withValues(alpha: 0.85),
             ],
             stops: const [0.0, 0.4, 0.7, 1.0],
           ),
@@ -281,7 +281,7 @@ class _HomeHeaderWidgetState extends State<HomeHeaderWidget>
             fontSize: 34,
             shadows: [
               Shadow(
-                color: Colors.black.withOpacity(0.3),
+                color: Colors.black.withValues(alpha: 0.3),
                 offset: const Offset(0, 2),
                 blurRadius: 8,
               ),
@@ -293,13 +293,13 @@ class _HomeHeaderWidgetState extends State<HomeHeaderWidget>
         Text(
           headerMessage.subtitle,
           style: AppTextTheme.bodyText1.copyWith(
-            color: Colors.white.withOpacity(0.95),
+            color: Colors.white.withValues(alpha: 0.95),
             height: 1.6,
             fontWeight: FontWeight.w500,
             fontSize: 17,
             shadows: [
               Shadow(
-                color: Colors.black.withOpacity(0.2),
+                color: Colors.black.withValues(alpha: 0.2),
                 offset: const Offset(0, 1),
                 blurRadius: 4,
               ),
@@ -358,28 +358,28 @@ class _HomeHeaderWidgetState extends State<HomeHeaderWidget>
                 ? LinearGradient(
                     colors: [
                       Colors.white,
-                      Colors.white.withOpacity(0.95),
+                      Colors.white.withValues(alpha: 0.95),
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   )
                 : null,
-            color: isPrimary ? null : Colors.white.withOpacity(0.15),
+            color: isPrimary ? null : Colors.white.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(isPrimary ? 20 : 18),
             border: Border.all(
-              color: Colors.white.withOpacity(isPrimary ? 0.3 : 0.25),
+              color: Colors.white.withValues(alpha: isPrimary ? 0.3 : 0.25),
               width: isPrimary ? 0.5 : 1,
             ),
             boxShadow: isPrimary
                 ? [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.15),
+                      color: Colors.black.withValues(alpha: 0.15),
                       blurRadius: 25,
                       offset: const Offset(0, 10),
                       spreadRadius: -5,
                     ),
                     BoxShadow(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                       spreadRadius: -2,
@@ -387,7 +387,7 @@ class _HomeHeaderWidgetState extends State<HomeHeaderWidget>
                   ]
                 : [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 15,
                       offset: const Offset(0, 6),
                       spreadRadius: -3,
@@ -401,7 +401,7 @@ class _HomeHeaderWidgetState extends State<HomeHeaderWidget>
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
+                    color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
@@ -428,14 +428,14 @@ class _HomeHeaderWidgetState extends State<HomeHeaderWidget>
                 Icon(
                   icon,
                   size: 18,
-                  color: Colors.white.withOpacity(0.9),
+                  color: Colors.white.withValues(alpha: 0.9),
                 ),
                 const SizedBox(width: 8),
                 Flexible(
                   child: Text(
                     title,
                     style: AppTextTheme.bodyText2.copyWith(
-                      color: Colors.white.withOpacity(0.9),
+                      color: Colors.white.withValues(alpha: 0.9),
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
                     ),
@@ -458,7 +458,7 @@ class _HomeHeaderWidgetState extends State<HomeHeaderWidget>
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(32),
           border: Border.all(
-            color: Colors.white.withOpacity(0.2),
+            color: Colors.white.withValues(alpha: 0.2),
             width: 0.5,
           ),
         ),
@@ -482,7 +482,7 @@ class _HomeHeaderWidgetState extends State<HomeHeaderWidget>
                   colors: [
                     Colors.transparent,
                     Colors.white
-                        .withOpacity(0.1 * (1 - _shimmerAnimation.value.abs())),
+                        .withValues(alpha: 0.1 * (1 - _shimmerAnimation.value.abs())),
                     Colors.transparent,
                   ],
                   stops: [

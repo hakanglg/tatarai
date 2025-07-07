@@ -113,12 +113,12 @@ class _AppButtonState extends State<AppButton>
         color: _getBackgroundColor(),
         borderRadius: BorderRadius.circular(10),
         border: widget.type == AppButtonType.secondary
-            ? Border.all(color: AppColors.primary.withOpacity(0.3), width: 1)
+            ? Border.all(color: AppColors.primary.withValues(alpha: 0.3), width: 1)
             : null,
         boxShadow: widget.type != AppButtonType.text
             ? [
                 BoxShadow(
-                  color: AppColors.primary.withOpacity(0.1),
+                  color: AppColors.primary.withValues(alpha: 0.1),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -183,7 +183,7 @@ class _AppButtonState extends State<AppButton>
     };
 
     if (_isPressed && widget.onPressed != null && !widget.isLoading) {
-      return baseColor.withOpacity(0.8);
+      return baseColor.withValues(alpha: 0.8);
     }
 
     return baseColor;

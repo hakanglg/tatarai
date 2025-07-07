@@ -282,7 +282,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
             boxShadow: [
               BoxShadow(
-                color: AppColors.primary.withOpacity(0.1),
+                color: AppColors.primary.withValues(alpha: 0.1),
                 blurRadius: 20,
                 offset: const Offset(0, -5),
               ),
@@ -296,7 +296,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                 decoration: BoxDecoration(
                   border: Border(
                     bottom: BorderSide(
-                      color: AppColors.divider.withOpacity(0.3),
+                      color: AppColors.divider.withValues(alpha: 0.3),
                       width: 0.5,
                     ),
                   ),
@@ -392,7 +392,8 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                           margin:
                               EdgeInsets.only(top: context.dimensions.spaceL),
                           child: CupertinoButton(
-                            color: AppColors.textSecondary.withOpacity(0.1),
+                            color:
+                                AppColors.textSecondary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                             onPressed: () {
                               setModalState(() {
@@ -445,7 +446,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
             Container(
               padding: EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
+                color: AppColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(icon, color: AppColors.primary, size: 18),
@@ -477,13 +478,13 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
           padding: EdgeInsets.all(context.dimensions.paddingM),
           decoration: BoxDecoration(
             color: option.isSelected
-                ? AppColors.primary.withOpacity(0.1)
+                ? AppColors.primary.withValues(alpha: 0.1)
                 : CupertinoColors.systemBackground.resolveFrom(context),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: option.isSelected
-                  ? AppColors.primary.withOpacity(0.3)
-                  : AppColors.divider.withOpacity(0.3),
+                  ? AppColors.primary.withValues(alpha: 0.3)
+                  : AppColors.divider.withValues(alpha: 0.3),
               width: 1,
             ),
           ),
@@ -668,18 +669,18 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
             decoration: BoxDecoration(
               color: CupertinoColors.systemBackground
                   .resolveFrom(context)
-                  .withOpacity(0.85 + (_parallaxAnimation.value * 0.15)),
+                  .withValues(alpha: 0.85 + (_parallaxAnimation.value * 0.15)),
               border: Border(
                 bottom: BorderSide(
                   color: AppColors.divider
-                      .withOpacity(_parallaxAnimation.value * 0.5),
+                      .withValues(alpha: _parallaxAnimation.value * 0.5),
                   width: 0.5,
                 ),
               ),
               boxShadow: _isHeaderCollapsed
                   ? [
                       BoxShadow(
-                        color: AppColors.primary.withOpacity(0.05),
+                        color: AppColors.primary.withValues(alpha: 0.05),
                         blurRadius: 10,
                         offset: const Offset(0, 2),
                       ),
@@ -701,13 +702,13 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.primary.withOpacity(0.1),
+                              color: AppColors.primary.withValues(alpha: 0.1),
                               blurRadius: 8,
                               offset: const Offset(0, 2),
                             ),
                           ],
                           border: Border.all(
-                            color: AppColors.divider.withOpacity(0.3),
+                            color: AppColors.divider.withValues(alpha: 0.3),
                             width: 0.5,
                           ),
                         ),
@@ -768,19 +769,19 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                 //       child: Container(
                 //         decoration: BoxDecoration(
                 //           color: _hasActiveFilters()
-                //               ? AppColors.primary.withOpacity(0.15)
-                //               : AppColors.primary.withOpacity(0.1),
+                //               ? AppColors.primary.withValues(alpha: 0.15)
+                //               : AppColors.primary.withValues(alpha: 0.1),
                 //           borderRadius: BorderRadius.circular(12),
                 //           border: Border.all(
                 //             color: _hasActiveFilters()
-                //                 ? AppColors.primary.withOpacity(0.4)
-                //                 : AppColors.primary.withOpacity(0.2),
+                //                 ? AppColors.primary.withValues(alpha: 0.4)
+                //                 : AppColors.primary.withValues(alpha: 0.2),
                 //             width: 0.5,
                 //           ),
                 //           boxShadow: _hasActiveFilters()
                 //               ? [
                 //                   BoxShadow(
-                //                     color: AppColors.primary.withOpacity(0.2),
+                //                     color: AppColors.primary.withValues(alpha: 0.2),
                 //                     blurRadius: 8,
                 //                     offset: const Offset(0, 2),
                 //                   ),
@@ -833,12 +834,12 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                             scale: _pulseAnimation.value,
                             child: Container(
                               decoration: BoxDecoration(
-                                color:
-                                    CupertinoColors.systemRed.withOpacity(0.1),
+                                color: CupertinoColors.systemRed
+                                    .withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
                                   color: CupertinoColors.systemRed
-                                      .withOpacity(0.3),
+                                      .withValues(alpha: 0.3),
                                   width: 0.5,
                                 ),
                               ),
@@ -937,7 +938,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primary.withOpacity(0.1),
+                    color: AppColors.primary.withValues(alpha: 0.1),
                     blurRadius: 20,
                     offset: const Offset(0, 8),
                   ),
@@ -953,8 +954,8 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          AppColors.primary.withOpacity(0.15),
-                          AppColors.primary.withOpacity(0.05),
+                          AppColors.primary.withValues(alpha: 0.15),
+                          AppColors.primary.withValues(alpha: 0.05),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -1043,7 +1044,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
+                        color: AppColors.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: const CupertinoActivityIndicator(
@@ -1067,15 +1068,15 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        AppColors.primary.withOpacity(0.1),
-                        AppColors.primary.withOpacity(0.05),
+                        AppColors.primary.withValues(alpha: 0.1),
+                        AppColors.primary.withValues(alpha: 0.05),
                       ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: AppColors.primary.withOpacity(0.2),
+                      color: AppColors.primary.withValues(alpha: 0.2),
                       width: 0.5,
                     ),
                   ),
@@ -1194,7 +1195,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                     CupertinoColors.systemBackground.resolveFrom(context),
                     CupertinoColors.systemBackground
                         .resolveFrom(context)
-                        .withOpacity(0.95),
+                        .withValues(alpha: 0.95),
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -1202,13 +1203,13 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: errorInfo.color.withOpacity(0.1),
+                    color: errorInfo.color.withValues(alpha: 0.1),
                     blurRadius: 20,
                     offset: const Offset(0, 8),
                   ),
                 ],
                 border: Border.all(
-                  color: errorInfo.color.withOpacity(0.2),
+                  color: errorInfo.color.withValues(alpha: 0.2),
                   width: 1,
                 ),
               ),
@@ -1222,8 +1223,8 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          errorInfo.color.withOpacity(0.2),
-                          errorInfo.color.withOpacity(0.05),
+                          errorInfo.color.withValues(alpha: 0.2),
+                          errorInfo.color.withValues(alpha: 0.05),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -1265,7 +1266,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                     Container(
                       padding: EdgeInsets.all(context.dimensions.paddingM),
                       decoration: BoxDecoration(
-                        color: errorInfo.color.withOpacity(0.05),
+                        color: errorInfo.color.withValues(alpha: 0.05),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -1289,7 +1290,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                       gradient: LinearGradient(
                         colors: [
                           AppColors.primary,
-                          AppColors.primary.withOpacity(0.8),
+                          AppColors.primary.withValues(alpha: 0.8),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -1297,7 +1298,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.primary.withOpacity(0.3),
+                          color: AppColors.primary.withValues(alpha: 0.3),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),
@@ -1362,7 +1363,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                     CupertinoColors.systemBackground.resolveFrom(context),
                     CupertinoColors.systemBackground
                         .resolveFrom(context)
-                        .withOpacity(0.95),
+                        .withValues(alpha: 0.95),
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -1370,20 +1371,20 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                 borderRadius: BorderRadius.circular(28),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primary.withOpacity(0.1),
+                    color: AppColors.primary.withValues(alpha: 0.1),
                     blurRadius: 25,
                     offset: const Offset(0, 10),
                     spreadRadius: 0,
                   ),
                   BoxShadow(
-                    color: AppColors.primary.withOpacity(0.05),
+                    color: AppColors.primary.withValues(alpha: 0.05),
                     blurRadius: 50,
                     offset: const Offset(0, 20),
                     spreadRadius: 0,
                   ),
                 ],
                 border: Border.all(
-                  color: AppColors.primary.withOpacity(0.15),
+                  color: AppColors.primary.withValues(alpha: 0.15),
                   width: 1,
                 ),
               ),
@@ -1399,8 +1400,8 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            AppColors.primary.withOpacity(0.15),
-                            AppColors.primary.withOpacity(0.08),
+                            AppColors.primary.withValues(alpha: 0.15),
+                            AppColors.primary.withValues(alpha: 0.08),
                           ],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
@@ -1446,7 +1447,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                       vertical: context.dimensions.paddingS,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.05),
+                      color: AppColors.primary.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Text(
@@ -1469,7 +1470,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                       gradient: LinearGradient(
                         colors: [
                           AppColors.primary,
-                          AppColors.primary.withOpacity(0.8),
+                          AppColors.primary.withValues(alpha: 0.8),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -1477,7 +1478,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                       borderRadius: BorderRadius.circular(18),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.primary.withOpacity(0.35),
+                          color: AppColors.primary.withValues(alpha: 0.35),
                           blurRadius: 16,
                           offset: const Offset(0, 6),
                         ),
@@ -1502,7 +1503,8 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                             padding:
                                 EdgeInsets.all(context.dimensions.paddingS),
                             decoration: BoxDecoration(
-                              color: CupertinoColors.white.withOpacity(0.2),
+                              color:
+                                  CupertinoColors.white.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Icon(
@@ -1524,7 +1526,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                           SizedBox(width: context.dimensions.spaceS),
                           Icon(
                             CupertinoIcons.arrow_right,
-                            color: CupertinoColors.white.withOpacity(0.8),
+                            color: CupertinoColors.white.withValues(alpha: 0.8),
                             size: 16,
                           ),
                         ],
@@ -1566,7 +1568,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                     CupertinoColors.systemBackground.resolveFrom(context),
                     CupertinoColors.systemBackground
                         .resolveFrom(context)
-                        .withOpacity(0.95),
+                        .withValues(alpha: 0.95),
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -1574,14 +1576,14 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                 borderRadius: BorderRadius.circular(28),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primary.withOpacity(0.1),
+                    color: AppColors.primary.withValues(alpha: 0.1),
                     blurRadius: 25,
                     offset: const Offset(0, 10),
                     spreadRadius: 0,
                   ),
                 ],
                 border: Border.all(
-                  color: AppColors.primary.withOpacity(0.15),
+                  color: AppColors.primary.withValues(alpha: 0.15),
                   width: 1,
                 ),
               ),
@@ -1597,8 +1599,8 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            AppColors.primary.withOpacity(0.15),
-                            AppColors.primary.withOpacity(0.08),
+                            AppColors.primary.withValues(alpha: 0.15),
+                            AppColors.primary.withValues(alpha: 0.08),
                           ],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
@@ -1644,7 +1646,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                       vertical: context.dimensions.paddingS,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.05),
+                      color: AppColors.primary.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Text(
@@ -1667,7 +1669,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                       gradient: LinearGradient(
                         colors: [
                           AppColors.primary,
-                          AppColors.primary.withOpacity(0.8),
+                          AppColors.primary.withValues(alpha: 0.8),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -1675,7 +1677,7 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                       borderRadius: BorderRadius.circular(18),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.primary.withOpacity(0.35),
+                          color: AppColors.primary.withValues(alpha: 0.35),
                           blurRadius: 16,
                           offset: const Offset(0, 6),
                         ),
@@ -1697,7 +1699,8 @@ class _AllAnalysesScreenState extends State<AllAnalysesScreen>
                             padding:
                                 EdgeInsets.all(context.dimensions.paddingS),
                             decoration: BoxDecoration(
-                              color: CupertinoColors.white.withOpacity(0.2),
+                              color:
+                                  CupertinoColors.white.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Icon(

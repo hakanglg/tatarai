@@ -2,10 +2,10 @@ import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:sprung/sprung.dart';
-import 'package:tatarai/core/utils/permission_manager.dart';
-import 'package:device_info_plus/device_info_plus.dart';
+import 'package:tatarai/core/services/permission_service.dart';
+import 'package:tatarai/core/services/media_permission_handler.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:tatarai/core/extensions/string_extension.dart';
 import 'package:tatarai/core/widgets/app_dialog_manager.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
@@ -13,7 +13,6 @@ import 'package:tatarai/core/theme/dimensions.dart';
 import 'package:tatarai/core/theme/text_theme.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/core/widgets/app_button.dart';
-import 'package:tatarai/core/services/paywall_manager.dart';
 import 'package:tatarai/features/home/widgets/home_premium_card.dart';
 import 'package:tatarai/features/plant_analysis/presentation/cubits/plant_analysis_cubit_direct.dart';
 import 'package:tatarai/features/plant_analysis/data/models/location_models.dart';
@@ -21,7 +20,6 @@ import 'package:tatarai/features/plant_analysis/data/models/plant_analysis_model
 import 'package:tatarai/features/plant_analysis/presentation/cubits/plant_analysis_state.dart';
 import 'package:tatarai/features/plant_analysis/services/location_service.dart';
 import 'package:tatarai/features/plant_analysis/presentation/views/analyses_result/analysis_result_screen.dart';
-import 'package:tatarai/core/extensions/context_extensions.dart';
 import 'package:tatarai/features/auth/cubits/auth_cubit.dart';
 import 'package:tatarai/features/auth/cubits/auth_state.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -29,6 +27,9 @@ import 'package:tatarai/core/services/service_locator.dart';
 import 'package:tatarai/core/services/firestore/firestore_service.dart';
 import 'package:tatarai/core/init/localization/localization_manager.dart';
 import 'package:tatarai/core/widgets/app_text_field.dart';
+import 'package:go_router/go_router.dart';
+import 'package:tatarai/core/routing/route_paths.dart';
+import 'package:tatarai/core/models/user_model.dart';
 
 part 'analysis_screen_mixin.dart';
 
@@ -46,11 +47,17 @@ class AnalysisScreen extends StatefulWidget {
 }
 
 class _AnalysisScreenState extends State<AnalysisScreen>
-    with _AnalysisScreenMixin, TickerProviderStateMixin {
+    with
+        _AnalysisScreenMixin,
+        TickerProviderStateMixin,
+        WidgetsBindingObserver {
   @override
   void initState() {
     AppLogger.i('AnalysisScreen - initState başladı');
     super.initState();
+
+    // App lifecycle observer ekle
+    WidgetsBinding.instance.addObserver(this);
 
     try {
       _initializeAnimations();
@@ -59,6 +66,65 @@ class _AnalysisScreenState extends State<AnalysisScreen>
       AppLogger.i('AnalysisScreen - initState tamamlandı');
     } catch (e) {
       AppLogger.e('AnalysisScreen - initState hatası: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    // App lifecycle observer'ı kaldır
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    AppLogger.i('📱 App lifecycle değişti: $state');
+
+    if (state == AppLifecycleState.resumed) {
+      // Kullanıcı settings'den geri döndü, state'i refresh et
+      AppLogger.i('🔄 App resumed - state refresh ediliyor');
+      _handleAppResume();
+    }
+  }
+
+  /// App resume olduğunda çalışacak handler
+  void _handleAppResume() {
+    if (!mounted) return;
+
+    try {
+      // State'i refresh et
+      setState(() {
+        // UI'ı force update et
+      });
+
+      // Permission status'unu tekrar kontrol et
+      _checkPermissionsAfterResume();
+
+      AppLogger.i('✅ App resume handling tamamlandı');
+    } catch (e) {
+      AppLogger.e('❌ App resume handling hatası: $e');
+    }
+  }
+
+  /// Resume sonrası permission kontrolü
+  Future<void> _checkPermissionsAfterResume() async {
+    if (!mounted) return;
+
+    try {
+      // Permission Service ile cache refresh
+      await PermissionService().onAppResume();
+
+      // İzin durumlarını log'la
+      final cameraStatus =
+          PermissionService().getCachedPermissionStatus(Permission.camera);
+      final photosStatus =
+          PermissionService().getCachedPermissionStatus(Permission.photos);
+
+      AppLogger.i('📷 Resume sonrası kamera izni: $cameraStatus');
+      AppLogger.i('📸 Resume sonrası galeri izni: $photosStatus');
+    } catch (e) {
+      AppLogger.e('Permission kontrolü hatası: $e');
     }
   }
 
@@ -91,6 +157,9 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                   // Entity'den model'e dönüştür
                   final analysisModel =
                       PlantAnalysisModel.fromEntity(analysisEntity);
+                  
+                  // Store cubit reference before async operation
+                  final cubit = context.read<PlantAnalysisCubitDirect>();
 
                   await Navigator.of(context)
                       .push(
@@ -104,7 +173,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                       .then((_) {
                     // Sonuç ekranından dönüldüğünde state'i sıfırla
                     if (mounted) {
-                      context.read<PlantAnalysisCubitDirect>().resetState();
+                      cubit.resetState();
                       // Navigation ID'sini temizle
                       _lastNavigatedAnalysisId = null;
                     }
@@ -183,7 +252,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                             borderRadius: BorderRadius.circular(20),
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.black.withOpacity(0.2),
+                                color: AppColors.black.withValues(alpha: 0.2),
                                 blurRadius: 10,
                                 offset: const Offset(0, 5),
                               ),
@@ -221,7 +290,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                                               end: Alignment.center,
                                               colors: [
                                                 CupertinoColors.black
-                                                    .withOpacity(0.4),
+                                                    .withValues(alpha: 0.4),
                                                 CupertinoColors.transparent,
                                               ],
                                             ),
@@ -243,7 +312,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                                                 ),
                                                 decoration: BoxDecoration(
                                                   color: CupertinoColors.white
-                                                      .withOpacity(0.8),
+                                                      .withValues(alpha: 0.8),
                                                   borderRadius:
                                                       BorderRadius.circular(
                                                           context.dimensions
@@ -252,7 +321,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                                                     BoxShadow(
                                                       color: CupertinoColors
                                                           .black
-                                                          .withOpacity(0.1),
+                                                          .withValues(alpha: 0.1),
                                                       blurRadius: 8,
                                                       offset:
                                                           const Offset(0, 2),
@@ -307,12 +376,12 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                                       //             0.7,
                                       //     decoration: BoxDecoration(
                                       //       color: CupertinoColors.white
-                                      //           .withOpacity(0.8),
+                                      //           .withValues(alpha: 0.8),
                                       //       shape: BoxShape.circle,
                                       //       boxShadow: [
                                       //         BoxShadow(
                                       //           color: CupertinoColors.black
-                                      //               .withOpacity(0.1),
+                                      //               .withValues(alpha: 0.1),
                                       //           blurRadius: 8,
                                       //           offset: const Offset(0, 2),
                                       //         ),
@@ -343,7 +412,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                                         boxShadow: [
                                           BoxShadow(
                                             color: CupertinoColors.systemGrey5
-                                                .withOpacity(0.5),
+                                                .withValues(alpha: 0.5),
                                             blurRadius: 10,
                                             offset: const Offset(0, 2),
                                           ),
@@ -372,9 +441,9 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                                                     gradient: LinearGradient(
                                                       colors: [
                                                         AppColors.primary
-                                                            .withOpacity(0.1),
+                                                            .withValues(alpha: 0.1),
                                                         AppColors.primary
-                                                            .withOpacity(0.05),
+                                                            .withValues(alpha: 0.05),
                                                       ],
                                                       begin: Alignment.topLeft,
                                                       end:
@@ -383,7 +452,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                                                     shape: BoxShape.circle,
                                                     border: Border.all(
                                                       color: AppColors.primary
-                                                          .withOpacity(0.2),
+                                                          .withValues(alpha: 0.2),
                                                       width: 2,
                                                     ),
                                                   ),
@@ -443,7 +512,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                                                 boxShadow: [
                                                   BoxShadow(
                                                     color: AppColors.primary
-                                                        .withOpacity(0.3),
+                                                        .withValues(alpha: 0.3),
                                                     blurRadius: 10,
                                                     offset: const Offset(0, 4),
                                                   ),
@@ -745,15 +814,15 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 colors: [
-                                  AppColors.info.withOpacity(0.1),
-                                  AppColors.primary.withOpacity(0.05),
+                                  AppColors.info.withValues(alpha: 0.1),
+                                  AppColors.primary.withValues(alpha: 0.05),
                                 ],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               ),
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                color: AppColors.info.withOpacity(0.3),
+                                color: AppColors.info.withValues(alpha: 0.3),
                               ),
                             ),
                             child: Column(
@@ -764,7 +833,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                                     Container(
                                       padding: const EdgeInsets.all(6),
                                       decoration: BoxDecoration(
-                                        color: AppColors.info.withOpacity(0.2),
+                                        color: AppColors.info.withValues(alpha: 0.2),
                                         shape: BoxShape.circle,
                                       ),
                                       child: const Icon(

@@ -30,7 +30,7 @@ class InfoCardItem extends StatelessWidget {
         Container(
           padding: EdgeInsets.all(dim.paddingS),
           decoration: BoxDecoration(
-            color: (iconColor ?? AppColors.primary).withOpacity(0.1),
+            color: (iconColor ?? AppColors.primary).withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
           child: Icon(

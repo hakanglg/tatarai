@@ -57,6 +57,10 @@ abstract class GeminiServiceInterface {
   /// API anahtarı değiştiğinde veya servis hatası durumunda kullanılır
   void reinitialize();
 
+  /// Yanıt dilini değiştirir
+  /// [languageCode] - Dil kodu ('tr', 'en')
+  void setLanguage(String languageCode);
+
   /// Servisi temizler ve kaynakları serbest bırakır
   void dispose();
 }

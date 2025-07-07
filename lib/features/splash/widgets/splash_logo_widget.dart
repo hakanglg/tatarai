@@ -1,7 +1,8 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:sprung/sprung.dart';
+import 'package:tatarai/core/theme/color_scheme.dart';
+import 'package:tatarai/core/theme/dimensions.dart';
 
-import '../../../core/theme/color_scheme.dart';
 import '../constants/splash_constants.dart';
 
 /// Splash screen logo widget'ı
@@ -26,7 +27,7 @@ class SplashLogoWidget extends StatelessWidget {
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: AppColors.primary
-              .withOpacity(SplashConstants.logoBackgroundOpacity),
+              .withValues(alpha: SplashConstants.logoBackgroundOpacity),
           shape: BoxShape.circle,
         ),
         child: const Center(

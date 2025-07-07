@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
+import 'package:tatarai/core/constants/app_constants.dart';
 import 'package:tatarai/core/utils/logger.dart';
+import 'package:tatarai/core/widgets/app_dialog_manager.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:tatarai/features/payment/cubits/payment_cubit.dart';
 import 'package:tatarai/core/extensions/string_extension.dart';
 
@@ -91,17 +93,36 @@ class PaywallManager {
 
             // Premium satın alma sonrası kullanıcı bilgilerini yenile
             try {
+              AppLogger.i(
+                  'PaywallManager: Kullanıcı bilgileri güncelleniyor...');
+
+              // RevenueCat bilgilerini yenile
               await paymentCubit.refreshCustomerInfo();
-              AppLogger.i('PaywallManager: Kullanıcı bilgileri güncellendi');
+              AppLogger.i('PaywallManager: RevenueCat bilgileri güncellendi');
+
+              // Kısa bir gecikme sonrası tekrar yenile (bazen ilk refresh eksik olabiliyor)
+              await Future.delayed(const Duration(milliseconds: 1000));
+              await paymentCubit.refreshCustomerInfo();
+              AppLogger.i('PaywallManager: İkinci güncelleme de tamamlandı');
             } catch (e) {
               AppLogger.e(
                   'PaywallManager: Kullanıcı bilgilerini güncelleme hatası: $e');
             }
 
-            onPremiumPurchased?.call();
+            // Context kontrolü ile callback çağır
+            if (context.mounted) {
+              onPremiumPurchased?.call();
+              AppLogger.i(
+                  'PaywallManager: onPremiumPurchased callback çağrıldı');
+            } else {
+              AppLogger.w(
+                  'PaywallManager: Context mounted değil, callback çağrılmadı');
+            }
           } else {
             AppLogger.i('PaywallManager: Kullanıcı paywall\'ı iptal etti');
-            onCancelled?.call();
+            if (context.mounted) {
+              onCancelled?.call();
+            }
           }
         } catch (paywallError) {
           final error = 'Paywall gösterilirken hata: $paywallError';

@@ -19,10 +19,14 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+
+    // App lifecycle observer ekle
+    WidgetsBinding.instance.addObserver(this);
+
     // NavigationManager örneğini başlat
     if (NavigationManager.instance == null) {
       NavigationManager.initialize(initialIndex: 0);
@@ -32,6 +36,41 @@ class _HomeScreenState extends State<HomeScreen> {
     // WidgetsBinding.instance.addPostFrameCallback((_) {
     //   _checkForOptionalUpdate();
     // });
+  }
+
+  @override
+  void dispose() {
+    // App lifecycle observer'ı kaldır
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    AppLogger.i('📱 HomeScreen - App lifecycle değişti: $state');
+
+    if (state == AppLifecycleState.resumed) {
+      // Kullanıcı settings'den geri döndü, state'i refresh et
+      AppLogger.i('🔄 HomeScreen resumed - refreshing state');
+      _handleAppResume();
+    }
+  }
+
+  /// App resume olduğunda çalışacak handler
+  void _handleAppResume() {
+    if (!mounted) return;
+
+    try {
+      // State'i refresh et
+      setState(() {
+        // UI'ı force update et
+      });
+
+      AppLogger.i('✅ HomeScreen resume handling tamamlandı');
+    } catch (e) {
+      AppLogger.e('❌ HomeScreen resume handling hatası: $e');
+    }
   }
 
   // /// İsteğe bağlı güncelleme kontrolü yapar

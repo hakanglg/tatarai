@@ -69,7 +69,7 @@ class HomePremiumCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.2),
+            color: AppColors.primary.withValues(alpha: 0.2),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -95,8 +95,8 @@ class HomePremiumCard extends StatelessWidget {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      AppColors.primary.withOpacity(0.8),
-                      AppColors.primary.withOpacity(0.6),
+                      AppColors.primary.withValues(alpha: 0.8),
+                      AppColors.primary.withValues(alpha: 0.6),
                     ],
                   ),
                 ),
@@ -116,7 +116,7 @@ class HomePremiumCard extends StatelessWidget {
                         Container(
                           padding: EdgeInsets.all(context.dimensions.paddingS),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
+                            color: Colors.white.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Icon(
@@ -150,7 +150,7 @@ class HomePremiumCard extends StatelessWidget {
                                 child: Text(
                                   'unlimited_analysis_premium'.locale(context),
                                   style: AppTextTheme.bodyText2.copyWith(
-                                    color: Colors.white.withOpacity(0.9),
+                                    color: Colors.white.withValues(alpha: 0.9),
                                     fontSize: 12, // Font boyutunu küçülttük
                                     height: 1.3, // Satır yüksekliğini ayarladık
                                   ),
@@ -195,7 +195,7 @@ class HomePremiumCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),

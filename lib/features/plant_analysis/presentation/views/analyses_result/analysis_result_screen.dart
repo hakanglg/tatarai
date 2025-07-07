@@ -243,23 +243,23 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
           end: Alignment.bottomRight,
           colors: [
             CupertinoColors.systemBackground,
-            color.withOpacity(0.05),
+            color.withValues(alpha: 0.05),
           ],
         ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: color.withOpacity(0.2),
+          color: color.withValues(alpha: 0.2),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.15),
+            color: color.withValues(alpha: 0.15),
             blurRadius: 20,
             offset: const Offset(0, 8),
             spreadRadius: -4,
           ),
           BoxShadow(
-            color: CupertinoColors.black.withOpacity(0.05),
+            color: CupertinoColors.black.withValues(alpha: 0.05),
             blurRadius: 1,
             offset: const Offset(0, 1),
           ),
@@ -283,7 +283,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                       height: 64,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: color.withOpacity(0.1),
+                        color: color.withValues(alpha: 0.1),
                       ),
                     ),
                     // Progress circle
@@ -292,7 +292,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                         value: score / 100,
                         strokeWidth: 6,
                         valueColor: AlwaysStoppedAnimation<Color>(color),
-                        backgroundColor: color.withOpacity(0.2),
+                        backgroundColor: color.withValues(alpha: 0.2),
                       ),
                     ),
                     // Score text in center
@@ -339,13 +339,13 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            color.withOpacity(0.15),
-                            color.withOpacity(0.08),
+                            color.withValues(alpha: 0.15),
+                            color.withValues(alpha: 0.08),
                           ],
                         ),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: color.withOpacity(0.3),
+                          color: color.withValues(alpha: 0.3),
                           width: 1,
                         ),
                       ),
@@ -377,20 +377,20 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    color.withOpacity(0.15),
-                    color.withOpacity(0.08),
+                    color.withValues(alpha: 0.15),
+                    color.withValues(alpha: 0.08),
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(dim.radiusM),
                 border: Border.all(
-                  color: color.withOpacity(0.4),
+                  color: color.withValues(alpha: 0.4),
                   width: 1.5,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: color.withOpacity(0.1),
+                    color: color.withValues(alpha: 0.1),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -401,7 +401,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                   Container(
                     padding: EdgeInsets.all(dim.paddingS),
                     decoration: BoxDecoration(
-                      color: color.withOpacity(0.2),
+                      color: color.withValues(alpha: 0.2),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
@@ -418,7 +418,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                         SelectableText(
                           'growth_stage'.locale(context),
                           style: AppTextTheme.captionL.copyWith(
-                            color: color.withOpacity(0.8),
+                            color: color.withValues(alpha: 0.8),
                             fontWeight: FontWeight.w600,
                             fontSize: _currentFontSize * 0.85,
                           ),
@@ -458,7 +458,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
           Container(
             height: AppConstants.progressBarHeight,
             decoration: BoxDecoration(
-              color: color.withOpacity(AppConstants.opacityLight * 2),
+              color: color.withValues(alpha: AppConstants.opacityLight * 2),
               borderRadius:
                   BorderRadius.circular(AppConstants.progressBarRadius),
             ),
@@ -508,10 +508,10 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
           Container(
             padding: EdgeInsets.all(dim.paddingM),
             decoration: BoxDecoration(
-              color: CupertinoColors.systemBlue.withOpacity(0.08),
+              color: CupertinoColors.systemBlue.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(dim.radiusM),
               border: Border.all(
-                color: CupertinoColors.systemBlue.withOpacity(0.2),
+                color: CupertinoColors.systemBlue.withValues(alpha: 0.2),
                 width: 1,
               ),
             ),
@@ -576,10 +576,10 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
           Container(
             padding: EdgeInsets.all(dim.paddingM),
             decoration: BoxDecoration(
-              color: CupertinoColors.systemYellow.withOpacity(0.1),
+              color: CupertinoColors.systemYellow.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(dim.radiusM),
               border: Border.all(
-                color: CupertinoColors.systemYellow.withOpacity(0.3),
+                color: CupertinoColors.systemYellow.withValues(alpha: 0.3),
                 width: 1,
               ),
             ),
@@ -629,7 +629,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
             Container(
               padding: EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
+                color: AppColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Icon(
@@ -718,13 +718,13 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                AppColors.primary.withOpacity(0.05),
-                AppColors.info.withOpacity(0.03),
+                AppColors.primary.withValues(alpha: 0.05),
+                AppColors.info.withValues(alpha: 0.03),
               ],
             ),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: AppColors.primary.withOpacity(0.1),
+              color: AppColors.primary.withValues(alpha: 0.1),
               width: 1,
             ),
           ),
@@ -738,13 +738,13 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                       gradient: LinearGradient(
                         colors: [
                           AppColors.primary,
-                          AppColors.primary.withOpacity(0.8),
+                          AppColors.primary.withValues(alpha: 0.8),
                         ],
                       ),
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.primary.withOpacity(0.3),
+                          color: AppColors.primary.withValues(alpha: 0.3),
                           blurRadius: 8,
                           offset: const Offset(0, 4),
                         ),
@@ -778,7 +778,8 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: CupertinoColors.systemGrey4.withOpacity(0.3),
+                          color: CupertinoColors.systemGrey4
+                              .withValues(alpha: 0.3),
                           blurRadius: 4,
                           offset: const Offset(0, 2),
                         ),
@@ -798,7 +799,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
               ),
               SizedBox(height: dim.spaceM),
               Divider(
-                color: AppColors.primary.withOpacity(0.1),
+                color: AppColors.primary.withValues(alpha: 0.1),
                 height: 1,
               ),
             ],
@@ -813,18 +814,18 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
             borderRadius: BorderRadius.circular(dim.radiusL),
             boxShadow: [
               BoxShadow(
-                color: AppColors.primary.withOpacity(0.08),
+                color: AppColors.primary.withValues(alpha: 0.08),
                 offset: Offset(0, 4),
                 blurRadius: 12,
               ),
               BoxShadow(
-                color: CupertinoColors.systemGrey4.withOpacity(0.3),
+                color: CupertinoColors.systemGrey4.withValues(alpha: 0.3),
                 offset: Offset(0, 1),
                 blurRadius: 3,
               ),
             ],
             border: Border.all(
-              color: AppColors.primary.withOpacity(0.15),
+              color: AppColors.primary.withValues(alpha: 0.15),
               width: 1,
             ),
           ),
@@ -835,14 +836,15 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
               Container(
                 padding: EdgeInsets.all(dim.paddingM),
                 decoration: BoxDecoration(
-                  color: result.getHealthStatusColor().withOpacity(0.08),
+                  color: result.getHealthStatusColor().withValues(alpha: 0.08),
                   borderRadius: BorderRadius.only(
                     topLeft: Radius.circular(dim.radiusL),
                     topRight: Radius.circular(dim.radiusL),
                   ),
                   border: Border(
                     bottom: BorderSide(
-                      color: result.getHealthStatusColor().withOpacity(0.2),
+                      color:
+                          result.getHealthStatusColor().withValues(alpha: 0.2),
                       width: 1,
                     ),
                   ),
@@ -854,7 +856,9 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                       height: 48,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: result.getHealthStatusColor().withOpacity(0.1),
+                        color: result
+                            .getHealthStatusColor()
+                            .withValues(alpha: 0.1),
                         border: Border.all(
                           color: result.getHealthStatusColor(),
                           width: 1.5,
@@ -979,7 +983,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                 Container(
                   padding: EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
+                    color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
@@ -1025,23 +1029,23 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                   end: Alignment.bottomRight,
                   colors: [
                     CupertinoColors.systemBackground,
-                    severityColor.withOpacity(0.02),
+                    severityColor.withValues(alpha: 0.02),
                   ],
                 ),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: severityColor.withOpacity(0.2),
+                  color: severityColor.withValues(alpha: 0.2),
                   width: 1.5,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: severityColor.withOpacity(0.15),
+                    color: severityColor.withValues(alpha: 0.15),
                     offset: const Offset(0, 8),
                     blurRadius: 24,
                     spreadRadius: -4,
                   ),
                   BoxShadow(
-                    color: CupertinoColors.black.withOpacity(0.05),
+                    color: CupertinoColors.black.withValues(alpha: 0.05),
                     offset: const Offset(0, 2),
                     blurRadius: 8,
                   ),
@@ -1052,12 +1056,12 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                 child: Theme(
                   data: Theme.of(context).copyWith(
                     dividerColor: Colors.transparent,
-                    splashColor: severityColor.withOpacity(0.08),
-                    highlightColor: severityColor.withOpacity(0.08),
+                    splashColor: severityColor.withValues(alpha: 0.08),
+                    highlightColor: severityColor.withValues(alpha: 0.08),
                   ),
                   child: ExpansionTile(
                     iconColor: severityColor,
-                    collapsedIconColor: severityColor.withOpacity(0.7),
+                    collapsedIconColor: severityColor.withValues(alpha: 0.7),
                     backgroundColor: Colors.transparent,
                     collapsedBackgroundColor: Colors.transparent,
                     childrenPadding: EdgeInsets.zero,
@@ -1073,13 +1077,13 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                             gradient: LinearGradient(
                               colors: [
                                 severityColor,
-                                severityColor.withOpacity(0.7),
+                                severityColor.withValues(alpha: 0.7),
                               ],
                             ),
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: severityColor.withOpacity(0.3),
+                                color: severityColor.withValues(alpha: 0.3),
                                 blurRadius: 12,
                                 offset: const Offset(0, 4),
                               ),
@@ -1106,8 +1110,8 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                                 SelectableText(
                                   'risk'.locale(context),
                                   style: AppTextTheme.captionL.copyWith(
-                                    color:
-                                        CupertinoColors.white.withOpacity(0.9),
+                                    color: CupertinoColors.white
+                                        .withValues(alpha: 0.9),
                                     fontSize: 10,
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -1149,13 +1153,13 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
                                     colors: [
-                                      severityColor.withOpacity(0.15),
-                                      severityColor.withOpacity(0.08),
+                                      severityColor.withValues(alpha: 0.15),
+                                      severityColor.withValues(alpha: 0.08),
                                     ],
                                   ),
                                   borderRadius: BorderRadius.circular(20),
                                   border: Border.all(
-                                    color: severityColor.withOpacity(0.3),
+                                    color: severityColor.withValues(alpha: 0.3),
                                     width: 1,
                                   ),
                                 ),
@@ -1180,7 +1184,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                         Container(
                           padding: EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: severityColor.withOpacity(0.1),
+                            color: severityColor.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Icon(
@@ -1200,8 +1204,8 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
                             colors: [
-                              severityColor.withOpacity(0.03),
-                              severityColor.withOpacity(0.08),
+                              severityColor.withValues(alpha: 0.03),
+                              severityColor.withValues(alpha: 0.08),
                             ],
                           ),
                           borderRadius: BorderRadius.only(
@@ -1273,7 +1277,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: CupertinoColors.systemRed.withOpacity(0.1),
+                  color: CupertinoColors.systemRed.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -1350,7 +1354,8 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
     return CupertinoPageScaffold(
       backgroundColor: CupertinoColors.systemGroupedBackground,
       navigationBar: CupertinoNavigationBar(
-        backgroundColor: CupertinoColors.systemBackground.withOpacity(0.8),
+        backgroundColor:
+            CupertinoColors.systemBackground.withValues(alpha: 0.8),
         border: const Border(),
         middle: SelectableText(
           result.fieldName != null && result.fieldName!.isNotEmpty
@@ -1379,7 +1384,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: CupertinoColors.black.withOpacity(0.1),
+                  color: CupertinoColors.black.withValues(alpha: 0.1),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -1401,10 +1406,10 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
+              color: AppColors.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: AppColors.primary.withOpacity(0.2),
+                color: AppColors.primary.withValues(alpha: 0.2),
                 width: 1,
               ),
             ),
@@ -1497,13 +1502,13 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withOpacity(0.15),
+              color: AppColors.primary.withValues(alpha: 0.15),
               blurRadius: 20,
               offset: const Offset(0, 8),
               spreadRadius: -2,
             ),
             BoxShadow(
-              color: CupertinoColors.black.withOpacity(0.1),
+              color: CupertinoColors.black.withValues(alpha: 0.1),
               blurRadius: 40,
               offset: const Offset(0, 16),
               spreadRadius: -8,
@@ -1526,8 +1531,8 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                             colors: [
-                              AppColors.primary.withOpacity(0.1),
-                              AppColors.info.withOpacity(0.1),
+                              AppColors.primary.withValues(alpha: 0.1),
+                              AppColors.info.withValues(alpha: 0.1),
                             ],
                           ),
                         ),
@@ -1553,8 +1558,8 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                     colors: [
                       Colors.transparent,
                       Colors.transparent,
-                      CupertinoColors.black.withOpacity(0.3),
-                      CupertinoColors.black.withOpacity(0.7),
+                      CupertinoColors.black.withValues(alpha: 0.3),
+                      CupertinoColors.black.withValues(alpha: 0.7),
                     ],
                     stops: const [0.0, 0.5, 0.8, 1.0],
                   ),
@@ -1585,7 +1590,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                       fontWeight: FontWeight.bold,
                       shadows: [
                         Shadow(
-                          color: CupertinoColors.black.withOpacity(0.5),
+                          color: CupertinoColors.black.withValues(alpha: 0.5),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -1606,14 +1611,15 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                         Icon(
                           CupertinoIcons.location_solid,
                           size: 14,
-                          color: CupertinoColors.white.withOpacity(0.9),
+                          color: CupertinoColors.white.withValues(alpha: 0.9),
                         ),
                         const SizedBox(width: 4),
                         Expanded(
                           child: SelectableText(
                             result.location!,
                             style: AppTextTheme.bodyText2.copyWith(
-                              color: CupertinoColors.white.withOpacity(0.9),
+                              color:
+                                  CupertinoColors.white.withValues(alpha: 0.9),
                               fontWeight: FontWeight.w500,
                             ),
                             toolbarOptions: const ToolbarOptions(
@@ -1641,15 +1647,15 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: result.getHealthStatusColor().withOpacity(0.9),
+        color: result.getHealthStatusColor().withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: CupertinoColors.white.withOpacity(0.3),
+          color: CupertinoColors.white.withValues(alpha: 0.3),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: CupertinoColors.black.withOpacity(0.2),
+            color: CupertinoColors.black.withValues(alpha: 0.2),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -1695,18 +1701,18 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
         color: CupertinoColors.systemBackground,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: AppColors.primary.withOpacity(0.1),
+          color: AppColors.primary.withValues(alpha: 0.1),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.08),
+            color: AppColors.primary.withValues(alpha: 0.08),
             blurRadius: 20,
             offset: const Offset(0, 8),
             spreadRadius: -4,
           ),
           BoxShadow(
-            color: CupertinoColors.systemGrey4.withOpacity(0.3),
+            color: CupertinoColors.systemGrey4.withValues(alpha: 0.3),
             blurRadius: 1,
             offset: const Offset(0, 1),
           ),
@@ -1722,7 +1728,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
+                    color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
@@ -1751,7 +1757,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
             ),
             const SizedBox(height: 16),
             Divider(
-              color: AppColors.primary.withOpacity(0.1),
+              color: AppColors.primary.withValues(alpha: 0.1),
               height: 1,
             ),
             const SizedBox(height: 16),
@@ -1849,76 +1855,6 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
         },
       );
     }
-  }
-
-  /// Sağlık durumu widget'ı
-  Widget _buildHealthStatusWidget(PlantAnalysisModel result) {
-    final dim = context.dimensions;
-    return Container(
-      margin: EdgeInsets.symmetric(vertical: dim.spaceL),
-      width: double.infinity,
-      padding: EdgeInsets.all(dim.paddingM),
-      decoration: BoxDecoration(
-        color: result.getHealthStatusColor().withOpacity(0.12),
-        borderRadius: BorderRadius.circular(dim.radiusM),
-        border: Border.all(
-          color: result.getHealthStatusColor().withOpacity(0.3),
-          width: 1.5,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: EdgeInsets.all(dim.paddingS),
-            decoration: BoxDecoration(
-              color: result.getHealthStatusColor().withOpacity(0.2),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              result.isHealthy
-                  ? CupertinoIcons.checkmark_circle_fill
-                  : CupertinoIcons.exclamationmark_circle_fill,
-              color: result.getHealthStatusColor(),
-              size: dim.iconSizeM,
-            ),
-          ),
-          SizedBox(width: dim.spaceM),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SelectableText(
-                  result.getHealthStatusTitle(context),
-                  style: AppTextTheme.caption.copyWith(
-                    color: result.getHealthStatusColor(),
-                    fontWeight: FontWeight.w600,
-                  ),
-                  toolbarOptions: const ToolbarOptions(
-                    copy: true,
-                    selectAll: true,
-                    cut: false,
-                    paste: false,
-                  ),
-                ),
-                SizedBox(height: dim.spaceXXS),
-                SelectableText(
-                  result.getHealthStatusDescription(context),
-                  style: AppTextTheme.caption.copyWith(
-                    color: result.getHealthStatusColor().withOpacity(0.8),
-                  ),
-                  toolbarOptions: const ToolbarOptions(
-                    copy: true,
-                    selectAll: true,
-                    cut: false,
-                    paste: false,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   // Bakım bilgileri widget'ı
@@ -2025,10 +1961,10 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
               Container(
                 padding: EdgeInsets.all(dim.paddingM),
                 decoration: BoxDecoration(
-                  color: CupertinoColors.systemBlue.withOpacity(0.1),
+                  color: CupertinoColors.systemBlue.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(dim.radiusM),
                   border: Border.all(
-                    color: CupertinoColors.systemBlue.withOpacity(0.3),
+                    color: CupertinoColors.systemBlue.withValues(alpha: 0.3),
                     width: 1,
                   ),
                 ),
@@ -2068,7 +2004,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                 borderRadius: BorderRadius.circular(dim.radiusL),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 10,
                     offset: const Offset(0, 2),
                   ),
@@ -2099,18 +2035,18 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            color.withOpacity(0.08),
-            color.withOpacity(0.03),
+            color.withValues(alpha: 0.08),
+            color.withValues(alpha: 0.03),
           ],
         ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: color.withOpacity(0.2),
+          color: color.withValues(alpha: 0.2),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             blurRadius: 12,
             offset: const Offset(0, 4),
             spreadRadius: -2,
@@ -2127,13 +2063,13 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
               gradient: LinearGradient(
                 colors: [
                   color,
-                  color.withOpacity(0.8),
+                  color.withValues(alpha: 0.8),
                 ],
               ),
               borderRadius: BorderRadius.circular(14),
               boxShadow: [
                 BoxShadow(
-                  color: color.withOpacity(0.3),
+                  color: color.withValues(alpha: 0.3),
                   blurRadius: 8,
                   offset: const Offset(0, 3),
                 ),
@@ -2185,7 +2121,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
             width: 4,
             height: 32,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.3),
+              color: color.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -2229,7 +2165,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.12),
+                color: AppColors.primary.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -2289,8 +2225,8 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
           children: [
             Icon(icon,
                 size: 18,
-                color: iconColor
-                    .withOpacity(0.8)), // İkon boyutu ve opaklığı ayarlandı
+                color: iconColor.withValues(
+                    alpha: 0.8)), // İkon boyutu ve opaklığı ayarlandı
             SizedBox(width: dim.spaceS),
             FittedBox(
               fit: BoxFit.scaleDown,
@@ -2300,7 +2236,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                   // Stil güncellendi
                   fontWeight: FontWeight.w600, // Kalınlık arttırıldı
                   color: AppColors.textPrimary
-                      .withOpacity(0.85), // Renk opaklığı ayarlandı
+                      .withValues(alpha: 0.85), // Renk opaklığı ayarlandı
                   fontSize: _currentFontSize * 1.05, // Boyut ayarlandı
                 ),
                 toolbarOptions: const ToolbarOptions(
@@ -2321,7 +2257,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
             content,
             style: AppTextTheme.bodyText2.copyWith(
               color: AppColors.textPrimary
-                  .withOpacity(0.75), // Renk opaklığı ayarlandı
+                  .withValues(alpha: 0.75), // Renk opaklığı ayarlandı
               fontSize: _currentFontSize,
               height: 1.5, // Satır yüksekliği arttırıldı
             ),
@@ -2354,7 +2290,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
           children: [
             Icon(baseIcon,
                 size: 18,
-                color: iconColor.withOpacity(0.8)), // baseIcon kullanıldı
+                color: iconColor.withValues(alpha: 0.8)), // baseIcon kullanıldı
             SizedBox(width: dim.spaceS),
             FittedBox(
               fit: BoxFit.scaleDown,
@@ -2362,7 +2298,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                 title,
                 style: AppTextTheme.bodyText1.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary.withOpacity(0.85),
+                  color: AppColors.textPrimary.withValues(alpha: 0.85),
                   fontSize: _currentFontSize * 1.05,
                 ),
                 toolbarOptions: const ToolbarOptions(
@@ -2384,7 +2320,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
             height: dim.spaceM, // Öğeler arası boşluk arttırıldı
             thickness: 0.5,
             color: CupertinoColors.systemGrey4
-                .withOpacity(0.3), // Daha ince ayırıcı
+                .withValues(alpha: 0.3), // Daha ince ayırıcı
             indent: dim.spaceL, // Ayırıcı için girinti
             endIndent: dim.spaceS,
           ),
@@ -2400,7 +2336,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                     // Her öğe için baseIcon kullanılıyor
                     baseIcon,
                     size: 16,
-                    color: iconColor.withOpacity(0.7),
+                    color: iconColor.withValues(alpha: 0.7),
                   ),
                   SizedBox(
                       width:
@@ -2409,7 +2345,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                     child: SelectableText(
                       methods[index],
                       style: AppTextTheme.bodyText2.copyWith(
-                        color: AppColors.textPrimary.withOpacity(0.75),
+                        color: AppColors.textPrimary.withValues(alpha: 0.75),
                         fontSize: _currentFontSize,
                         height: 1.5,
                       ),
@@ -2463,7 +2399,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
         borderRadius: BorderRadius.circular(dim.radiusL),
         boxShadow: [
           BoxShadow(
-            color: AppColors.black.withOpacity(0.1),
+            color: AppColors.black.withValues(alpha: 0.1),
             blurRadius: 12,
             offset: const Offset(0, 2),
             spreadRadius: 2,
@@ -2477,7 +2413,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
           Container(
             padding: EdgeInsets.all(dim.paddingL),
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.08),
+              color: AppColors.primary.withValues(alpha: 0.08),
               borderRadius: BorderRadius.only(
                 topLeft: Radius.circular(dim.radiusL),
                 topRight: Radius.circular(dim.radiusL),
@@ -2488,7 +2424,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                 Container(
                   padding: EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.15),
+                    color: AppColors.primary.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
@@ -2636,7 +2572,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
             Container(
               padding: EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.1),
+                color: iconColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(

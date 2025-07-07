@@ -1,5 +1,6 @@
 import '../../domain/entities/plant_analysis_entity.dart';
 import 'disease_model.dart';
+import '../../../../core/utils/logger.dart';
 
 /// Plant Analysis Data Model (Data katmanı)
 ///
@@ -218,16 +219,16 @@ class PlantAnalysisModel {
   factory PlantAnalysisModel.fromJson(Map<String, dynamic> json) {
     try {
       // Debug: Test user's specific JSON
-      print('🔍 PlantAnalysisModel.fromJson START');
-      print('🔍 JSON keys: ${json.keys.toList()}');
-      print('🔍 plantName raw: ${json['plantName']}');
-      print('🔍 isHealthy raw: ${json['isHealthy']}');
-      print('🔍 probability raw: ${json['probability']}');
-      print(
+      AppLogger.d('🔍 PlantAnalysisModel.fromJson START');
+      AppLogger.d('🔍 JSON keys: ${json.keys.toList()}');
+      AppLogger.d('🔍 plantName raw: ${json['plantName']}');
+      AppLogger.d('🔍 isHealthy raw: ${json['isHealthy']}');
+      AppLogger.d('🔍 probability raw: ${json['probability']}');
+      AppLogger.d(
           '🔍 growthScore raw: ${json['growthScore']} (type: ${json['growthScore']?.runtimeType})');
-      print(
+      AppLogger.d(
           '🔍 growthStage raw: ${json['growthStage']} (type: ${json['growthStage']?.runtimeType})');
-      print(
+      AppLogger.d(
           '🔍 growthComment raw: ${json['growthComment']} (type: ${json['growthComment']?.runtimeType})');
 
       // Diseases parsing
@@ -324,18 +325,18 @@ class PlantAnalysisModel {
       );
 
       // Success debug'unu constructor'dan sonra yapamayız, çünkü direkt return ediliyor
-      print('🔍 PlantAnalysisModel.fromJson SUCCESS - will return model');
+      AppLogger.d('🔍 PlantAnalysisModel.fromJson SUCCESS - will return model');
     } catch (e, stackTrace) {
       // Debug için JSON içeriğini loglayalım
-      print('🚨 PlantAnalysisModel.fromJson parse error: $e');
-      print('🔍 JSON keys: ${json.keys.toList()}');
-      print(
+      AppLogger.d('🚨 PlantAnalysisModel.fromJson parse error: $e');
+      AppLogger.d('🔍 JSON keys: ${json.keys.toList()}');
+      AppLogger.d(
           '🔍 JSON plantName: ${json['plantName']} (type: ${json['plantName']?.runtimeType})');
-      print(
+      AppLogger.d(
           '🔍 JSON isHealthy: ${json['isHealthy']} (type: ${json['isHealthy']?.runtimeType})');
-      print(
+      AppLogger.d(
           '🔍 JSON probability: ${json['probability']} (type: ${json['probability']?.runtimeType})');
-      print(
+      AppLogger.d(
           '🔍 Stack trace first line: ${stackTrace.toString().split('\n').first}');
 
       throw FormatException(

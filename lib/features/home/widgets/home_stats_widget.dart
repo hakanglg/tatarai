@@ -101,14 +101,14 @@ class HomeStatsWidget extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: stat.color.withOpacity(0.08),
+            color: stat.color.withValues(alpha: 0.08),
             blurRadius: 20,
             offset: const Offset(0, 4),
             spreadRadius: 0,
           ),
         ],
         border: Border.all(
-          color: stat.color.withOpacity(0.1),
+          color: stat.color.withValues(alpha: 0.1),
           width: 1,
         ),
       ),
@@ -121,7 +121,7 @@ class HomeStatsWidget extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: stat.color.withOpacity(0.1),
+              color: stat.color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(
@@ -180,7 +180,7 @@ class HomeStatsWidget extends StatelessWidget {
         color: AppColors.surfaceVariant,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: stat.color.withOpacity(0.15),
+          color: stat.color.withValues(alpha: 0.15),
           width: 1,
         ),
       ),
@@ -191,7 +191,7 @@ class HomeStatsWidget extends StatelessWidget {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: stat.color.withOpacity(0.1),
+              color: stat.color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(

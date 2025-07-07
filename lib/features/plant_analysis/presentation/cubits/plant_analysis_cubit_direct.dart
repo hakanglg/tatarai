@@ -221,19 +221,8 @@ class PlantAnalysisCubitDirect extends Cubit<PlantAnalysisState> {
 
       // Güncel dil ayarını al ve Gemini servisine uygula
       final currentLocale = LocalizationManager.instance.currentLocale;
-      final geminiLanguage = currentLocale.languageCode == 'tr'
-          ? GeminiResponseLanguage.turkish
-          : GeminiResponseLanguage.english;
-
-      // GeminiServiceImpl cast ederek dil ayarını güncelle
-      if (_geminiService is GeminiServiceImpl) {
-        (_geminiService as GeminiServiceImpl).setLanguage(geminiLanguage);
-        AppLogger.logWithContext(
-          _serviceName,
-          '🌐 Gemini dil ayarı güncellendi',
-          'Dil: ${geminiLanguage.code}',
-        );
-      }
+      final languageCode = currentLocale.languageCode == 'tr' ? 'tr' : 'en';
+      _geminiService.setLanguage(languageCode); // String olarak gönder
 
       final analysisModel = await _geminiService.analyzeImage(
         imageBytes,
@@ -244,7 +233,7 @@ class PlantAnalysisCubitDirect extends Cubit<PlantAnalysisState> {
         fieldName: fieldName,
       );
 
-      print(
+      AppLogger.d(
           '  - Analysis model imageUrl from Gemini: ${analysisModel.imageUrl}');
 
       AppLogger.successWithContext(
@@ -333,10 +322,11 @@ class PlantAnalysisCubitDirect extends Cubit<PlantAnalysisState> {
       ));
 
       // Convert model to entity with proper ID and image URL
-      print('🔍 Image File Debug:');
-      print('  - Image file path: ${imageFile.path}');
-      print('  - Image file exists: ${await imageFile.exists()}');
-      print('  - Analysis model imageUrl before: ${analysisModel.imageUrl}');
+      AppLogger.d('🔍 Image File Debug:');
+      AppLogger.d('  - Image file path: ${imageFile.path}');
+      AppLogger.d('  - Image file exists: ${await imageFile.exists()}');
+      AppLogger.d(
+          '  - Analysis model imageUrl before: ${analysisModel.imageUrl}');
 
       final updatedModel = analysisModel.copyWith(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -345,12 +335,12 @@ class PlantAnalysisCubitDirect extends Cubit<PlantAnalysisState> {
             'file://${imageFile.path}', // Set the image file path with file:// prefix
       );
 
-      print(
+      AppLogger.d(
           '  - Updated model imageUrl after copyWith: ${updatedModel.imageUrl}');
 
       final analysisEntity = updatedModel.toEntity();
 
-      print(
+      AppLogger.d(
           '  - Analysis entity imageUrl after toEntity: ${analysisEntity.imageUrl}');
 
       // Emit success with direct result (bypass repository for now)

@@ -1,9 +1,20 @@
 import 'dart:async';
-
+import 'dart:io';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tatarai/core/constants/app_constants.dart';
+import 'package:tatarai/core/init/app_initializer.dart';
+import 'package:tatarai/core/routing/route_paths.dart';
+import 'package:tatarai/core/services/service_locator.dart';
+import 'package:tatarai/core/services/firestore/firestore_service.dart';
+import 'package:tatarai/core/services/permission_service.dart';
+import 'package:tatarai/core/utils/logger.dart';
+import 'package:tatarai/features/splash/constants/splash_constants.dart';
+import 'package:tatarai/features/update/views/force_update_screen.dart';
 
 import '../../../core/init/app_initializer.dart';
 import '../../../core/routing/route_names.dart';
@@ -232,6 +243,53 @@ class SplashService {
       }
     } catch (e) {
       AppLogger.e('❌ NavigationManager başlatma hatası', e);
+    }
+  }
+
+  /// iOS permissions'ları başlatır ki Settings'de görünebilsinler
+  ///
+  /// Bu metot iOS'ta kamera ve galeri izinlerinin Settings > TatarAI
+  /// bölümünde görünmesini sağlar. Kullanıcı henüz bu özellikleri
+  /// kullanmasa bile izinleri iOS ayarlarında yönetebilir.
+  ///
+  /// iOS 14+ için enhanced permission handling ile limited photo access desteği.
+  Future<void> initializePermissions() async {
+    try {
+      AppLogger.i('🔐 iOS permissions başlatılıyor...');
+      await PermissionService().initializeIOSPermissions();
+      AppLogger.i('✅ iOS permissions başarıyla başlatıldı');
+    } catch (e) {
+      AppLogger.e('❌ iOS permissions başlatma hatası', e);
+      // Permission hatası uygulamanın çalışmasını engellemez
+    }
+  }
+
+  /// Debug için force permission initialization
+  ///
+  /// Bu metot debug/test durumlarında permission sorunlarını
+  /// çözmek için kullanılabilir. Settings sayfasından çağrılabilir.
+  Future<void> debugInitializePermissions() async {
+    try {
+      AppLogger.i('🔧 DEBUG: iOS permissions force başlatılıyor...');
+      await PermissionService().debugForceInitializeIOSPermissions();
+      AppLogger.i('✅ DEBUG: iOS permissions force başarıyla tamamlandı');
+    } catch (e) {
+      AppLogger.e('❌ DEBUG: iOS permissions force başlatma hatası', e);
+      rethrow; // Debug'da hata fırlatmasına izin ver
+    }
+  }
+
+  /// Debug için permission durumlarını test eder
+  ///
+  /// Bu metot mevcut permission durumlarını kontrol eder ve
+  /// log'lar. Sorun tespiti için kullanılabilir.
+  Future<void> debugTestPermissions() async {
+    try {
+      AppLogger.i('🔬 DEBUG: Permission durumları test ediliyor...');
+      await PermissionService().debugTestPermissions();
+      AppLogger.i('✅ DEBUG: Permission test tamamlandı');
+    } catch (e) {
+      AppLogger.e('❌ DEBUG: Permission test hatası', e);
     }
   }
 

@@ -1,4 +1,4 @@
-import 'package:bloc/bloc.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -421,6 +421,26 @@ class PaymentCubit extends Cubit<PaymentState> {
         hasError: true,
         errorMessage: 'Kullanıcı bilgileri güncellenemedi',
       ));
+    }
+  }
+
+  /// External customer info güncellemelerini handle eder
+  /// RevenueCat listener'dan gelen güncellemeler için kullanılır
+  void updateCustomerInfoFromExternal(CustomerInfo customerInfo) {
+    try {
+      final isPremium = _checkIfUserIsPremium(customerInfo);
+
+      emit(state.copyWith(
+        customerInfo: customerInfo,
+        isPremium: isPremium,
+        hasError: false,
+        errorMessage: null,
+      ));
+
+      AppLogger.i(
+          'PaymentCubit: External customer info güncellendi. Premium: $isPremium');
+    } catch (e) {
+      AppLogger.e('PaymentCubit: External customer info güncelleme hatası: $e');
     }
   }
 }

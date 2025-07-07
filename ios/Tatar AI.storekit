@@ -90,7 +90,11 @@
           "familyShareable" : false,
           "groupNumber" : 1,
           "internalID" : "6745511009",
-          "introductoryOffer" : null,
+          "introductoryOffer" : {
+            "internalID" : "6745511010",
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P1W"
+          },
           "localizations" : [
             {
               "description" : "Sınırsız Bitki Analizi",

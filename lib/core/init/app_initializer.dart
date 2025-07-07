@@ -8,10 +8,12 @@ import 'package:purchases_flutter/purchases_flutter.dart';
 
 import 'package:tatarai/core/init/localization/localization_manager.dart';
 import 'package:tatarai/core/services/firebase_manager.dart';
+import 'package:tatarai/core/services/permission_service.dart';
 import 'package:tatarai/core/services/remote_config_service.dart';
 import 'package:tatarai/core/services/service_locator.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/core/utils/network_util.dart';
+import '../../features/payment/cubits/payment_cubit.dart';
 
 /// TatarAI uygulamasının başlatma sürecini yöneten Initializer class'ı
 ///
@@ -79,6 +81,9 @@ class AppInitializer {
       if (firebaseSuccess) {
         await _initializeServiceLocator();
       }
+
+      // 8. Permission Service (Service Locator'dan sonra, Firebase bağımsız)
+      await _initializePermissionService(useServiceLocator: firebaseSuccess);
 
       _isInitialized = true;
       AppLogger.i('🎉 AppInitializer başarıyla tamamlandı');
@@ -300,6 +305,9 @@ class AppInitializer {
       // Firebase user sync
       await _syncRevenueCatWithFirebase();
 
+      // RevenueCat listener kurulumu - Premium durum değişikliklerini dinle
+      await _setupRevenueCatListeners();
+
       AppLogger.i('✅ RevenueCat başarıyla başlatıldı');
     } catch (e, stackTrace) {
       AppLogger.e('❌ RevenueCat başlatma hatası', e, stackTrace);
@@ -338,6 +346,55 @@ class AppInitializer {
     }
   }
 
+  /// RevenueCat listener kurulumu - Premium durum değişikliklerini dinle
+  Future<void> _setupRevenueCatListeners() async {
+    try {
+      AppLogger.i('RevenueCat customer info listener kuruluyor...');
+
+      // Customer info değişikliklerini dinle
+      Purchases.addCustomerInfoUpdateListener((customerInfo) async {
+        AppLogger.i('🔄 RevenueCat customer info güncellendi');
+        AppLogger.i(
+            'Active entitlements: ${customerInfo.entitlements.active.keys.toList()}');
+
+        // Premium durumunu kontrol et
+        final isNowPremium =
+            customerInfo.entitlements.active.containsKey('premium');
+        AppLogger.i('Premium durumu: $isNowPremium');
+
+        // PaymentCubit'e bildirim gönder (eğer mevcutsa)
+        try {
+          // Service locator ile PaymentCubit'e erişim
+          if (ServiceLocator.isRegistered<PaymentCubit>()) {
+            final paymentCubit = ServiceLocator.get<PaymentCubit>();
+
+            // External customer info güncelleme metodunu kullan
+            paymentCubit.updateCustomerInfoFromExternal(customerInfo);
+
+            AppLogger.i(
+                'PaymentCubit external update tamamlandı - Premium: $isNowPremium');
+
+            // Ekstra güvenlik için 500ms sonra refresh de yap
+            Future.delayed(const Duration(milliseconds: 500), () {
+              try {
+                paymentCubit.refreshCustomerInfo();
+                AppLogger.i('PaymentCubit ekstra refresh tamamlandı');
+              } catch (e) {
+                AppLogger.w('PaymentCubit ekstra refresh hatası: $e');
+              }
+            });
+          }
+        } catch (e) {
+          AppLogger.w('PaymentCubit güncellenemedi: $e');
+        }
+      });
+
+      AppLogger.i('✅ RevenueCat listener kurulumu tamamlandı');
+    } catch (e) {
+      AppLogger.e('❌ RevenueCat listener kurulum hatası', e);
+    }
+  }
+
   // ============================================================================
   // WARNING METHODS - Development Uyarı Mesajları
   // ============================================================================
@@ -361,5 +418,32 @@ class AppInitializer {
     AppLogger.w('Ödeme özellikleri çalışmayacak.');
     AppLogger.w('Lütfen .env dosyasına uygun API key\'i ekleyin.');
     AppLogger.w('=' * 60);
+  }
+
+  /// Permission Service başlatma
+  Future<void> _initializePermissionService({bool useServiceLocator = true}) async {
+    try {
+      AppLogger.i('🔐 Permission Service başlatılıyor...');
+      
+      // Service Locator kullanılabilirse ondan al, yoksa direkt instance oluştur
+      final PermissionService permissionService;
+      if (useServiceLocator) {
+        permissionService = ServiceLocator.get<PermissionService>();
+        AppLogger.i('🔐 Permission Service Service Locator\'dan alındı');
+      } else {
+        permissionService = PermissionService();
+        AppLogger.i('🔐 Permission Service direkt instance oluşturuldu');
+      }
+      
+      await permissionService.initialize();
+      
+      // Note: iOS permissions will be requested on-demand when user tries to use camera/gallery
+      AppLogger.i('🔐 Permission Service initialized - permissions will be requested on-demand');
+      
+      AppLogger.i('✅ Permission Service başarıyla başlatıldı');
+    } catch (e, stackTrace) {
+      AppLogger.e('❌ Permission Service başlatma hatası', e, stackTrace);
+      // Permission hatası uygulamayı durdurmasın
+    }
   }
 }

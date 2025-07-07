@@ -73,7 +73,7 @@ class HomeTipsWidget extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: tip.color.withOpacity(0.12),
+            color: tip.color.withValues(alpha: 0.12),
             blurRadius: 12,
             offset: const Offset(0, 4),
             spreadRadius: 0,
@@ -100,8 +100,8 @@ class HomeTipsWidget extends StatelessWidget {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      tip.color.withOpacity(0.8),
-                      tip.color.withOpacity(0.6),
+                      tip.color.withValues(alpha: 0.8),
+                      tip.color.withValues(alpha: 0.6),
                     ],
                   ),
                 ),
@@ -121,7 +121,7 @@ class HomeTipsWidget extends StatelessWidget {
                       Container(
                         padding: EdgeInsets.all(context.dimensions.paddingS),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Icon(
@@ -138,7 +138,7 @@ class HomeTipsWidget extends StatelessWidget {
                         child: Text(
                           tip.category,
                           style: AppTextTheme.bodyText1.copyWith(
-                            color: Colors.white.withOpacity(0.9),
+                            color: Colors.white.withValues(alpha: 0.9),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -164,7 +164,7 @@ class HomeTipsWidget extends StatelessWidget {
                   Text(
                     tip.description,
                     style: AppTextTheme.bodyText1.copyWith(
-                      color: Colors.white.withOpacity(0.9),
+                      color: Colors.white.withValues(alpha: 0.9),
                       height: 1.5,
                       fontWeight: FontWeight.w500,
                     ),
@@ -182,10 +182,10 @@ class HomeTipsWidget extends StatelessWidget {
                         vertical: context.dimensions.paddingS,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: Colors.white.withOpacity(0.3),
+                          color: Colors.white.withValues(alpha: 0.3),
                           width: 1,
                         ),
                       ),

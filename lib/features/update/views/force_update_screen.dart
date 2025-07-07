@@ -106,10 +106,10 @@ class _ForceUpdateScreenState extends State<ForceUpdateScreen>
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  AppColors.primary.withOpacity(0.08),
+                  AppColors.primary.withValues(alpha: 0.08),
                   AppColors.white,
                   AppColors.white,
-                  AppColors.primary.withOpacity(0.05),
+                  AppColors.primary.withValues(alpha: 0.05),
                 ],
               ),
             ),
@@ -168,11 +168,11 @@ class _ForceUpdateScreenState extends State<ForceUpdateScreen>
                               width: 140,
                               height: 140,
                               decoration: BoxDecoration(
-                                color: AppColors.primary.withOpacity(0.1),
+                                color: AppColors.primary.withValues(alpha: 0.1),
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: AppColors.primary.withOpacity(0.2),
+                                    color: AppColors.primary.withValues(alpha: 0.2),
                                     blurRadius: 20,
                                     spreadRadius: 1,
                                   ),

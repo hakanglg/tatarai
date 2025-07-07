@@ -422,6 +422,35 @@ class AuthCubit extends BaseCubit<AuthState> {
     emit(currentState.copyWith(isFirstTime: false));
   }
 
+  /// Kullanıcı verilerini Firestore'dan yeniden yükler
+  Future<void> refresh() async {
+    try {
+      final currentState = state;
+      if (currentState is! AuthAuthenticated) {
+        logWarning('Refresh için authenticated state gerekli');
+        return;
+      }
+
+      logInfo('Kullanıcı verileri refresh ediliyor', currentState.user.id);
+
+      // Firestore'dan güncel kullanıcı verilerini al
+      final updatedUser = await _authRepository.getCurrentUserData();
+      
+      if (updatedUser != null) {
+        logSuccess('Kullanıcı verileri başarıyla refresh edildi', updatedUser.id);
+        logInfo('Güncel analiz kredileri: ${updatedUser.analysisCredits}');
+        
+        emit(currentState.copyWith(user: updatedUser));
+      } else {
+        logWarning('Refresh sırasında kullanıcı verisi bulunamadı');
+      }
+    } catch (error, stackTrace) {
+      handleError('Kullanıcı verileri refresh hatası', error, stackTrace);
+      // Hata durumunda mevcut state'i korumaya devam et, critical error verme
+      logWarning('Refresh hatası, mevcut state korunuyor');
+    }
+  }
+
   /// Hesabı tamamen siler
   Future<void> deleteAccount() async {
     try {

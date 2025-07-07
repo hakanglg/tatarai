@@ -18,6 +18,7 @@ import '../../features/payment/cubits/payment_cubit.dart';
 import '../../features/home/cubits/home_cubit.dart';
 import '../utils/logger.dart';
 import '../../features/plant_analysis/services/plant_analysis_service.dart';
+import 'permission_service.dart';
 
 /// Dependency injection için service locator
 ///
@@ -162,6 +163,11 @@ class ServiceLocator {
       () => GeminiServiceImpl(),
     );
 
+    // Permission Service (Singleton)
+    _getIt.registerLazySingleton<PermissionService>(
+      () => PermissionService(),
+    );
+
     AppLogger.logWithContext('ServiceLocator', 'Core servisler kayıt edildi');
   }
 
@@ -196,7 +202,7 @@ class ServiceLocator {
         try {
           final storage = _getIt<FirebaseStorage>();
           return PlantAnalysisService(
-            geminiService: _getIt<GeminiService>(),
+            geminiService: _getIt<GeminiServiceInterface>(),
             firestore: _getIt<FirebaseFirestore>(),
             storage: storage,
           );

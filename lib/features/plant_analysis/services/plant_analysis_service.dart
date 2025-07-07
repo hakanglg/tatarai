@@ -1,18 +1,19 @@
 import 'dart:async';
+import 'dart:convert'; // utf8 için
 import 'dart:io';
-import 'dart:convert';
 import 'dart:typed_data';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:tatarai/core/constants/app_constants.dart';
-import 'package:tatarai/core/utils/validation_util.dart';
+import 'package:tatarai/core/services/ai/gemini_service_interface.dart';
+import 'package:tatarai/core/services/service_locator.dart';
 import 'package:tatarai/core/utils/logger.dart';
+import 'package:tatarai/features/plant_analysis/data/models/plant_analysis_model.dart';
+import 'package:tatarai/features/plant_analysis/data/models/location_models.dart';
+import 'package:tatarai/features/plant_analysis/services/gemini_response_parser.dart';
 import 'package:tatarai/core/models/user_model.dart';
 import 'package:tatarai/core/init/localization/localization_manager.dart';
-import 'package:tatarai/features/plant_analysis/services/gemini_service.dart';
-import 'package:tatarai/features/plant_analysis/data/models/plant_analysis_model.dart';
+import 'package:tatarai/core/constants/app_constants.dart';
+import 'package:tatarai/core/utils/validation_util.dart';
 
 /// Plant Analysis Service Result Types
 ///
@@ -59,7 +60,7 @@ class PlantAnalysisService {
   // ============================================================================
 
   /// Gemini AI service for plant analysis
-  final GeminiService _geminiService;
+  final GeminiServiceInterface _geminiService;
 
   /// Firestore instance for user data management
   final FirebaseFirestore _firestore;
@@ -80,7 +81,7 @@ class PlantAnalysisService {
   /// @param firestore - Firestore database instance
   /// @param storage - Firebase storage instance
   PlantAnalysisService({
-    required GeminiService geminiService,
+    required GeminiServiceInterface geminiService,
     required FirebaseFirestore firestore,
     required FirebaseStorage storage,
   })  : _geminiService = geminiService,
@@ -197,7 +198,7 @@ class PlantAnalysisService {
         AppLogger.successWithContext(
           _serviceName,
           'AI analysis completed',
-          'Response length: ${analysisResult.length} characters',
+          'Plant: ${analysisResult.plantName}',
         );
 
         // 6. Update user credits
@@ -213,7 +214,7 @@ class PlantAnalysisService {
         return AnalysisResponse(
           success: true,
           message: 'Analysis completed successfully',
-          result: analysisResult,
+          result: jsonEncode(analysisResult.toJson()),
           location: locationInfo,
           fieldName: fieldName,
           resultType: AnalysisServiceResultType.success,
@@ -273,7 +274,7 @@ class PlantAnalysisService {
       return AnalysisResponse(
         success: true,
         message: 'Disease recommendations retrieved successfully',
-        result: recommendations,
+        result: jsonEncode(recommendations.toJson()),
         resultType: AnalysisServiceResultType.success,
       );
     } catch (e, stackTrace) {
@@ -321,7 +322,7 @@ class PlantAnalysisService {
       return AnalysisResponse(
         success: true,
         message: 'Plant care recommendations retrieved successfully',
-        result: careAdvice,
+        result: jsonEncode(careAdvice.toJson()),
         resultType: AnalysisServiceResultType.success,
       );
     } catch (e, stackTrace) {

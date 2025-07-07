@@ -1,10 +1,15 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
-import 'package:tatarai/core/constants/locale_constants.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:tatarai/core/extensions/string_extension.dart';
-import 'package:tatarai/core/init/localization/localization_manager.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
+import 'package:tatarai/core/theme/dimensions.dart';
 import 'package:tatarai/core/theme/text_theme.dart';
+import 'package:tatarai/features/settings/cubits/language_cubit.dart';
+import 'package:tatarai/features/settings/cubits/language_state.dart';
+import 'package:tatarai/core/constants/locale_constants.dart';
+import 'package:tatarai/core/init/localization/localization_manager.dart';
 import 'package:tatarai/core/utils/logger.dart';
 
 import 'package:flutter/material.dart';

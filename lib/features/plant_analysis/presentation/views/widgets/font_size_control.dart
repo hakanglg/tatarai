@@ -121,7 +121,7 @@ class FontSizeControl extends StatelessWidget {
           padding: EdgeInsets.all(context.dimensions.spaceXS),
           decoration: BoxDecoration(
             color: isEnabled
-                ? AppColors.primary.withOpacity(0.1)
+                ? AppColors.primary.withValues(alpha: 0.1)
                 : AppColors.divider,
             borderRadius: BorderRadius.circular(context.dimensions.radiusXS),
           ),
