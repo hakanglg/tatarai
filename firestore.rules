@@ -1,72 +1,102 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Kimlik doğrulama kontrolü
-    function isAuth() {
+    // =============================================================================
+    // HELPER FUNCTIONS
+    // =============================================================================
+    
+    /// Check if user is authenticated
+    function isAuthenticated() {
       return request.auth != null;
     }
     
-    // Kullanıcının kendi verisine erişim kontrolü
+    /// Check if user owns the resource
     function isOwner(userId) {
       return request.auth != null && request.auth.uid == userId;
     }
     
-    // Admin kontrolü (Başka bir koleksiyonda admin listesi tutularak yapılabilir)
+    /// Check if user is admin
     function isAdmin() {
-      return isAuth() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      return isAuthenticated() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
-
-    // Kullanıcı profilleri - Giriş/kayıt için izin eklendi
+    
+    /// Validate user profile data
+    function isValidUserData() {
+      return request.resource.data.keys().hasAll(['email', 'createdAt']) &&
+             request.resource.data.email is string &&
+             request.resource.data.createdAt is timestamp;
+    }
+    
+    /// Validate plant analysis data
+    function isValidAnalysisData() {
+      return request.resource.data.keys().hasAll(['userId', 'timestamp', 'status']) &&
+             request.resource.data.userId is string &&
+             request.resource.data.timestamp is timestamp &&
+             request.resource.data.status is string &&
+             request.resource.data.status in ['pending', 'completed', 'failed'];
+    }
+    
+    /// Check if resource size is reasonable (prevent large data uploads)
+    function isValidSize() {
+      return request.resource.size < 1024 * 1024; // 1MB limit
+    }
+    
+    // =============================================================================
+    // USER PROFILES - Production Security Rules
+    // =============================================================================
+    
     match /users/{userId} {
-      // Kullanıcı, kendi verilerini okuyabilir ve yazabilir
-      allow get, list: if isAuth();
-      allow create: if isAuth() && request.auth.uid == userId;
-      allow update, delete: if isOwner(userId);
+      // Users can only read their own profile
+      allow read: if isOwner(userId);
+      
+      // Users can create their own profile with valid data
+      allow create: if isOwner(userId) && isValidUserData() && isValidSize();
+      
+      // Users can update their own profile with valid data
+      allow update: if isOwner(userId) && isValidUserData() && isValidSize();
+      
+      // Users can delete their own profile
+      allow delete: if isOwner(userId);
     }
     
-    // Analizler - Sadece kendi analizlerine erişim
-    match /users/{userId}/analyses/{analysisId} {
-      // Kullanıcı, kendi analizlerini okuyabilir ve yazabilir
-      allow read, write: if isOwner(userId);
-    }
+    // =============================================================================
+    // PLANT ANALYSES - Production Security Rules
+    // =============================================================================
     
-    // Yeni plant_analyses yapısı - Her kullanıcının kendi analyses koleksiyonu
     match /plant_analyses/{userId}/analyses/{analysisId} {
-      // Sadece kendi analizlerine erişim
-      allow read, write: if isAuth() && request.auth.uid == userId;
+      // Users can only access their own analyses
+      allow read: if isOwner(userId);
+      
+      // Users can create analyses with valid data
+      allow create: if isOwner(userId) && isValidAnalysisData() && isValidSize();
+      
+      // Users can update their own analyses
+      allow update: if isOwner(userId) && isValidAnalysisData() && isValidSize();
+      
+      // Users can delete their own analyses
+      allow delete: if isOwner(userId);
     }
     
-    // Admin kullanıcılarının listesi 
+    // =============================================================================
+    // ADMIN MANAGEMENT - Production Security Rules
+    // =============================================================================
+    
     match /admins/{adminId} {
-      allow read: if isAuth();
+      // Only authenticated users can read admin list (for admin checks)
+      allow read: if isAuthenticated();
+      
+      // Only existing admins can manage admin list
       allow write: if isAdmin();
     }
     
-    // Cihaz token'ları - Notification için
+    // =============================================================================
+    // DEVICE TOKENS - Production Security Rules
+    // =============================================================================
+    
     match /deviceTokens/{tokenId} {
-      allow read, write: if isAuth() && request.auth.uid == resource.data.userId;
-    }
-    
-    // Genel okuma izni: Kimlik doğrulaması yapılmış her kullanıcı herhangi bir koleksiyonu okuyabilir
-    // Bu geçici bir kural ve güvenli olmadığından sadece DEVELOPMENT ortamında kullanılmalıdır
-    match /{document=**} {
-      allow read: if isAuth();
-    }
-
-    // ============================================================================
-    // GEÇİCİ DEVELOPMENT RULES - PRODUCTION'DA KALDIRILMALI!
-    // ============================================================================
-    
-    // Geçici çözüm: Tüm kullanıcı belgelerine yazma erişimi
-    // ÖNEMLİ: Bu kural sadece development için geçici!
-    match /users/{userId} {
-      allow read, write: if isAuth();
-    }
-    
-    // Plant analyses koleksiyonu için yeni yapı - DEVELOPMENT kuralları
-    match /plant_analyses/{userId}/analyses/{analysisId} {
-      // Development için geçici - authenticated kullanıcılar kendi verilerine erişebilir
-      allow read, write: if isAuth() && request.auth.uid == userId;
+      // Users can manage their own device tokens
+      allow read, write: if isAuthenticated() && 
+                          request.auth.uid == resource.data.userId;
     }
   }
 } 
