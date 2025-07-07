@@ -10,7 +10,6 @@ import '../../../core/theme/dimensions.dart';
 import '../../../core/theme/text_theme.dart';
 import '../../../core/utils/logger.dart';
 import '../widgets/home_premium_card.dart';
-import '../../plant_analysis/data/models/plant_analysis_model.dart';
 import '../../plant_analysis/presentation/views/all_analysis/all_analyses_screen.dart';
 import '../../plant_analysis/presentation/views/widgets/analysis_card.dart';
 import '../../plant_analysis/presentation/views/analyses_result/analysis_result_screen.dart';
@@ -165,95 +164,157 @@ class _HomeTabContentState extends State<HomeTabContent> {
           backgroundColor:
               CupertinoColors.systemGroupedBackground.resolveFrom(context),
           child: SafeArea(
-            child: Column(
-              children: [
-                _buildNavigationBar(context),
-                Expanded(
-                  child: _buildMainContent(),
-                ),
-              ],
-            ),
+            child: _buildMainContent(),
           ),
         ),
       ),
     );
   }
 
-  /// Basit navigation bar
-  Widget _buildNavigationBar(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.all(context.dimensions.paddingM),
-      decoration: BoxDecoration(
-        color: CupertinoColors.systemBackground.resolveFrom(context),
-        border: Border(
-          bottom: BorderSide(
-            color: AppColors.divider.withValues(alpha: 0.3),
-            width: 0.33,
-          ),
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Logo ve başlık
-          Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    width: 0.5,
+  /// SliverAppBar ile kaybolur navigation bar
+  Widget _buildSliverAppBar() {
+    return SliverAppBar(
+      expandedHeight: 110.0,
+      collapsedHeight: 70.0,
+      floating: true,
+      pinned: false,
+      snap: true,
+      stretch: true,
+      backgroundColor: CupertinoColors.systemBackground.resolveFrom(context),
+      surfaceTintColor: Colors.transparent,
+      automaticallyImplyLeading: false,
+      elevation: 0,
+      shadowColor: Colors.transparent,
+      flexibleSpace: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          // AppBar'ın expand oranını hesapla (0.0-1.0)
+          final expandRatio = ((constraints.maxHeight - 70.0) / (110.0 - 70.0)).clamp(0.0, 1.0);
+          final isExpanded = expandRatio > 0.5;
+          
+          return FlexibleSpaceBar(
+            titlePadding: EdgeInsets.zero,
+            centerTitle: false,
+            background: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              decoration: BoxDecoration(
+                color: CupertinoColors.systemBackground.resolveFrom(context),
+                border: Border(
+                  bottom: BorderSide(
+                    color: AppColors.divider.withValues(alpha: 0.3),
+                    width: 0.33,
                   ),
                 ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: Image.asset(
-                    'assets/images/applogo.png',
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-              SizedBox(width: context.dimensions.spaceL),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'app_title'.locale(context),
-                    style: AppTextTheme.headline4.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                      fontSize: 24,
-                    ),
-                  ),
-                  Text(
-                    'app_subtitle'.locale(context),
-                    style: AppTextTheme.caption.copyWith(
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
-                    ),
+                boxShadow: isExpanded ? [] : [
+                  BoxShadow(
+                    color: AppColors.black.withValues(alpha: 0.05),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),
-            ],
-          ),
-          // Bildirim butonu
-          CupertinoButton(
-            padding: EdgeInsets.all(context.dimensions.paddingM),
-            onPressed: () => _showNotifications(context),
-            child: Icon(
-              CupertinoIcons.bell_fill,
-              color: AppColors.textSecondary,
-              size: 20,
+              child: SafeArea(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: context.dimensions.paddingM,
+                    vertical: context.dimensions.paddingS,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Logo ve başlık
+                      Expanded(
+                        child: Row(
+                          children: [
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              width: isExpanded ? 48 : 40,
+                              height: isExpanded ? 48 : 40,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(isExpanded ? 20 : 16),
+                                border: Border.all(
+                                  color: AppColors.primary.withValues(alpha: 0.1),
+                                  width: 0.5,
+                                ),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(isExpanded ? 20 : 16),
+                                child: Image.asset(
+                                  'assets/images/applogo.png',
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: context.dimensions.spaceM),
+                            Expanded(
+                              child: AnimatedOpacity(
+                                duration: const Duration(milliseconds: 200),
+                                opacity: expandRatio,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      'app_title'.locale(context),
+                                      style: AppTextTheme.headline4.copyWith(
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.textPrimary,
+                                        fontSize: 22 + (2 * expandRatio),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    if (isExpanded) ...[
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'app_subtitle'.locale(context),
+                                        style: AppTextTheme.caption.copyWith(
+                                          color: AppColors.textSecondary,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 12,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Bildirim butonu
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        child: CupertinoButton(
+                          padding: EdgeInsets.all(context.dimensions.paddingXS),
+                          onPressed: () => _showNotifications(context),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: EdgeInsets.all(isExpanded ? 8 : 6),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: isExpanded ? 0.1 : 0.05),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              CupertinoIcons.bell_fill,
+                              color: AppColors.textSecondary,
+                              size: isExpanded ? 20 : 18,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
+
 
   /// Ana içerik
   Widget _buildMainContent() {
@@ -267,6 +328,7 @@ class _HomeTabContentState extends State<HomeTabContent> {
           parent: AlwaysScrollableScrollPhysics(),
         ),
         slivers: [
+          _buildSliverAppBar(),
           _buildHeaderSection(),
           _buildPremiumSection(),
           _buildStatsSection(),
@@ -742,7 +804,78 @@ class _HomeTabContentState extends State<HomeTabContent> {
       child: SafeArea(
         child: Column(
           children: [
-            _buildNavigationBar(context),
+            Container(
+              padding: EdgeInsets.all(context.dimensions.paddingM),
+              decoration: BoxDecoration(
+                color: CupertinoColors.systemBackground.resolveFrom(context),
+                border: Border(
+                  bottom: BorderSide(
+                    color: AppColors.divider.withValues(alpha: 0.3),
+                    width: 0.33,
+                  ),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Logo ve başlık
+                  Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            width: 0.5,
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: Image.asset(
+                            'assets/images/applogo.png',
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: context.dimensions.spaceL),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'app_title'.locale(context),
+                            style: AppTextTheme.headline4.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                              fontSize: 24,
+                            ),
+                          ),
+                          Text(
+                            'app_subtitle'.locale(context),
+                            style: AppTextTheme.caption.copyWith(
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  // Bildirim butonu
+                  CupertinoButton(
+                    padding: EdgeInsets.all(context.dimensions.paddingM),
+                    onPressed: () => _showNotifications(context),
+                    child: Icon(
+                      CupertinoIcons.bell_fill,
+                      color: AppColors.textSecondary,
+                      size: 20,
+                    ),
+                  ),
+                ],
+              ),
+            ),
             Expanded(
               child: Center(
                 child: Container(

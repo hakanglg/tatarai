@@ -60,6 +60,11 @@ class _AnalysisScreenState extends State<AnalysisScreen>
     WidgetsBinding.instance.addObserver(this);
 
     try {
+      // Widget'tan gelen image file'ı al
+      if (widget.imageFile != null) {
+        _selectedImage = widget.imageFile;
+      }
+      
       _initializeAnimations();
       _checkEmulator();
       _loadProvinces();
@@ -73,6 +78,11 @@ class _AnalysisScreenState extends State<AnalysisScreen>
   void dispose() {
     // App lifecycle observer'ı kaldır
     WidgetsBinding.instance.removeObserver(this);
+    // Animation controller'ı dispose et
+    _animationController.dispose();
+    // Text controller'ları dispose et
+    _locationController.dispose();
+    _fieldNameController.dispose();
     super.dispose();
   }
 

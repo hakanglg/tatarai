@@ -44,13 +44,6 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
   /// Fade animation for the content.
   late Animation<double> _fadeAnimation;
 
-  @override
-  void dispose() {
-    _locationController.dispose();
-    _fieldNameController.dispose();
-    _animationController.dispose();
-    super.dispose();
-  }
 
   /// Initializes the animations for the screen.
   /// Sets up the fade and scale transitions.

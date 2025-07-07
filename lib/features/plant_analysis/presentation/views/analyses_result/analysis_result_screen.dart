@@ -51,9 +51,27 @@ extension PlantAnalysisModelUIExtension on PlantAnalysisModel {
   Color getGrowthScoreColor(int score) {
     if (score >= 80) return CupertinoColors.systemGreen;
     if (score >= 60) return AppColors.info;
-    if (score >= 40) return CupertinoColors.systemYellow;
+    if (score >= 40) return const Color(0xFFFF9500); // Daha koyu sarı renk
     if (score >= 20) return CupertinoColors.systemOrange;
     return CupertinoColors.systemRed;
+  }
+
+  /// Gelişim skoruna göre text rengi döndürür (kontrast için)
+  Color getGrowthScoreTextColor(int score) {
+    if (score >= 80) return CupertinoColors.white; // Yeşil üzerinde beyaz
+    if (score >= 60) return CupertinoColors.white; // Mavi üzerinde beyaz
+    if (score >= 40) return CupertinoColors.black; // Sarı üzerinde siyah
+    if (score >= 20) return CupertinoColors.white; // Turuncu üzerinde beyaz
+    return CupertinoColors.white; // Kırmızı üzerinde beyaz
+  }
+
+  /// Gelişim skoruna göre secondary text rengi döndürür
+  Color getGrowthScoreSecondaryTextColor(int score) {
+    if (score >= 80) return CupertinoColors.white.withValues(alpha: 0.9);
+    if (score >= 60) return CupertinoColors.white.withValues(alpha: 0.9);
+    if (score >= 40) return CupertinoColors.black.withValues(alpha: 0.7); // Sarı için koyu renk
+    if (score >= 20) return CupertinoColors.white.withValues(alpha: 0.9);
+    return CupertinoColors.white.withValues(alpha: 0.9);
   }
 
   /// Hastalık şiddet seviyesini döndürür (Yüksek, Orta, Düşük)
@@ -301,7 +319,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                         '$score',
                         style: AppTextTheme.headline6.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: color,
+                          color: result.getGrowthScoreTextColor(score),
                         ),
                         toolbarOptions: const ToolbarOptions(
                           copy: true,
@@ -353,7 +371,9 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                         '${score}/100 Puan',
                         style: AppTextTheme.captionL.copyWith(
                           fontWeight: FontWeight.w600,
-                          color: color,
+                          color: score >= 40 && score < 60 
+                              ? CupertinoColors.black.withValues(alpha: 0.8)
+                              : color,
                         ),
                         toolbarOptions: const ToolbarOptions(
                           copy: true,
@@ -406,7 +426,9 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                     ),
                     child: Icon(
                       CupertinoIcons.clock_fill,
-                      color: color,
+                      color: score >= 40 && score < 60 
+                          ? CupertinoColors.black.withValues(alpha: 0.7)
+                          : color,
                       size: 20,
                     ),
                   ),
@@ -418,7 +440,9 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                         SelectableText(
                           'growth_stage'.locale(context),
                           style: AppTextTheme.captionL.copyWith(
-                            color: color.withValues(alpha: 0.8),
+                            color: score >= 40 && score < 60 
+                                ? CupertinoColors.black.withValues(alpha: 0.6)
+                                : color.withValues(alpha: 0.8),
                             fontWeight: FontWeight.w600,
                             fontSize: _currentFontSize * 0.85,
                           ),
@@ -433,7 +457,9 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen>
                         SelectableText(
                           result.growthStage!,
                           style: AppTextTheme.bodyText1.copyWith(
-                            color: color,
+                            color: score >= 40 && score < 60 
+                                ? CupertinoColors.black.withValues(alpha: 0.8)
+                                : color,
                             fontSize: _currentFontSize * 1.05,
                             fontWeight: FontWeight.bold,
                           ),
