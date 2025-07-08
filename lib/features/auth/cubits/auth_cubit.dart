@@ -6,10 +6,8 @@ import '../../../core/services/service_locator.dart';
 import '../../../core/repositories/auth_repository.dart';
 import '../../../core/models/user_model.dart';
 import 'auth_state.dart';
-import 'package:bloc/bloc.dart';
 import 'package:flutter/material.dart';
 import 'package:tatarai/core/extensions/string_extension.dart';
-import 'package:tatarai/core/utils/cache_manager.dart';
 
 /// Authentication işlemlerini yöneten Cubit
 ///

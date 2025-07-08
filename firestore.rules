@@ -78,5 +78,15 @@ service cloud.firestore {
       allow read, write: if isAuthenticated() && 
                           request.auth.uid == resource.data.userId;
     }
+    
+    // =============================================================================
+    // DEVICE CREDITS - Production Security Rules
+    // =============================================================================
+    
+    match /device_credits/{deviceId} {
+      // Authenticated users can read and write device credit records
+      // This is needed for device-based credit tracking system
+      allow read, write: if isAuthenticated();
+    }
   }
 } 

@@ -98,6 +98,7 @@ dependencies:
   device_info_plus: ^11.4.0
   app_settings: ^6.1.1
   package_info_plus: ^8.3.0
+  crypto: ^3.0.5
 
   # Platform support
   flutter_web_plugins:
