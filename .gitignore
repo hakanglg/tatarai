@@ -44,6 +44,14 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Android build files
+android/app/.cxx/
+android/app/build/
+android/.gradle/
+
+# Android local configuration
+android/local.properties
+
 # Environment files
 .env
 .env.*
