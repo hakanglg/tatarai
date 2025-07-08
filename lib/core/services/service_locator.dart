@@ -19,6 +19,8 @@ import '../../features/home/cubits/home_cubit.dart';
 import '../utils/logger.dart';
 import '../../features/plant_analysis/services/plant_analysis_service.dart';
 import 'permission_service.dart';
+import 'device_identification_service.dart';
+import 'device_credit_service.dart';
 
 /// Dependency injection için service locator
 ///
@@ -168,6 +170,19 @@ class ServiceLocator {
       () => PermissionService(),
     );
 
+    // Device Identification Service (Singleton)
+    _getIt.registerLazySingleton<DeviceIdentificationService>(
+      () => DeviceIdentificationService.instance,
+    );
+
+    // Device Credit Service (Singleton)
+    _getIt.registerLazySingleton<DeviceCreditService>(
+      () => DeviceCreditService(
+        firestoreService: _getIt<FirestoreServiceInterface>(),
+        deviceService: _getIt<DeviceIdentificationService>(),
+      ),
+    );
+
     AppLogger.logWithContext('ServiceLocator', 'Core servisler kayıt edildi');
   }
 
@@ -178,6 +193,8 @@ class ServiceLocator {
       () => AuthRepository(
         firebaseAuth: _getIt<FirebaseAuth>(),
         firestoreService: _getIt<FirestoreServiceInterface>(),
+        deviceService: _getIt<DeviceIdentificationService>(),
+        deviceCreditService: _getIt<DeviceCreditService>(),
       ),
     );
 

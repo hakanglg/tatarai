@@ -5,6 +5,8 @@ import '../utils/logger.dart';
 import '../services/firestore/firestore_service_interface.dart';
 import '../services/firestore/firestore_service.dart';
 import '../services/service_locator.dart';
+import '../services/device_identification_service.dart';
+import '../services/device_credit_service.dart';
 
 /// Firebase Authentication ve Firestore entegrasyonu için repository
 ///
@@ -25,6 +27,9 @@ class AuthRepository {
   /// Firestore service instance
   final FirestoreServiceInterface _firestoreService;
 
+  /// Device credit service instance
+  final DeviceCreditService _deviceCreditService;
+
   /// Kullanıcı koleksiyon adı
   static const String _usersCollection = 'users';
 
@@ -32,8 +37,15 @@ class AuthRepository {
   AuthRepository({
     FirebaseAuth? firebaseAuth,
     FirestoreServiceInterface? firestoreService,
+    DeviceIdentificationService? deviceService,
+    DeviceCreditService? deviceCreditService,
   })  : _firebaseAuth = firebaseAuth ?? FirebaseAuth.instance,
-        _firestoreService = firestoreService ?? _getFirestoreService();
+        _firestoreService = firestoreService ?? _getFirestoreService(),
+        _deviceCreditService = deviceCreditService ?? 
+            DeviceCreditService(
+              firestoreService: firestoreService ?? _getFirestoreService(),
+              deviceService: deviceService ?? DeviceIdentificationService.instance,
+            );
 
   /// ServiceLocator'dan FirestoreService'i al (lazy loading)
   static FirestoreServiceInterface _getFirestoreService() {
@@ -60,12 +72,20 @@ class AuthRepository {
   /// Anonim giriş yapar
   ///
   /// Kullanıcıyı anonim olarak giriş yapar ve Firestore'da kaydeder.
-  /// İlk kez giriş yapan kullanıcılar için onboarding'e yönlendirilecek.
+  /// Cihaz bazlı kredi kontrolü yaparak ilk kez kullanılan cihazlara 5 kredi verir.
+  /// Daha önce kullanılmış cihazlarda 0 kredi ile hesap açılır.
   Future<UserModel> signInAnonymously() async {
     try {
       AppLogger.logWithContext('AuthRepository', 'Anonim giriş başlatılıyor');
 
+      // Firebase Auth durumunu kontrol et
+      AppLogger.logWithContext('AuthRepository', 
+          'Firebase Auth instance: ${_firebaseAuth.app.name}');
+      AppLogger.logWithContext('AuthRepository', 
+          'Current user before sign in: ${_firebaseAuth.currentUser?.uid ?? "null"}');
+
       // Firebase'de anonim giriş yap
+      AppLogger.logWithContext('AuthRepository', 'signInAnonymously() çağrısı yapılıyor...');
       final UserCredential userCredential =
           await _firebaseAuth.signInAnonymously();
       final User? firebaseUser = userCredential.user;
@@ -77,11 +97,18 @@ class AuthRepository {
       AppLogger.logWithContext(
           'AuthRepository', 'Firebase anonim giriş başarılı', firebaseUser.uid);
 
-      // UserModel oluştur (önce memory'de)
+      // Cihaz bazlı kredi kontrolü yap ve uygun kredi sayısını al
+      final int initialCredits = await _deviceCreditService
+          .getCreditsForNewUser(firebaseUser.uid);
+      
       UserModel newUser = UserModel.anonymous(
         id: firebaseUser.uid,
         name: 'Misafir Kullanıcı ${firebaseUser.uid.substring(0, 8)}',
-      );
+      ).copyWith(analysisCredits: initialCredits);
+
+      AppLogger.logWithContext('AuthRepository', 
+          'Yeni kullanıcı oluşturuluyor', 
+          '${firebaseUser.uid} - Kredi: $initialCredits');
 
       try {
         // Kullanıcının daha önce kaydedilip kaydedilmediğini kontrol et
@@ -118,6 +145,12 @@ class AuthRepository {
       }
 
       return newUser;
+    } on FirebaseAuthException catch (e, stackTrace) {
+      AppLogger.errorWithContext(
+          'AuthRepository', 
+          'Firebase Auth hatası: ${e.code} - ${e.message}', 
+          e, stackTrace);
+      rethrow;
     } catch (e, stackTrace) {
       AppLogger.errorWithContext(
           'AuthRepository', 'Anonim giriş genel hatası', e, stackTrace);
@@ -191,12 +224,8 @@ class AuthRepository {
   /// Kullanıcıyı Firestore'dan alır
   Future<UserModel?> _getUserFromFirestore(String userId) async {
     try {
-      // Firestore service'in hazır olup olmadığını kontrol et
-      if (_firestoreService == null) {
-        AppLogger.warnWithContext('AuthRepository',
-            'Firestore service henüz hazır değil, null döndürülüyor');
-        return null;
-      }
+      // Firestore service her zaman non-null olacak (constructor guarantee)
+      // Bu kontrol artık gereksiz ama backward compatibility için bırakıyoruz
 
       AppLogger.logWithContext(
           'AuthRepository', '🔍 Firestore\'dan kullanıcı alınıyor', userId);
@@ -257,10 +286,7 @@ class AuthRepository {
       AppLogger.logWithContext('AuthRepository',
           '📝 Kullanıcı Firestore\'a kaydediliyor başlatıldı', user.id);
 
-      // Firestore service'in mevcut olup olmadığını kontrol et
-      if (_firestoreService == null) {
-        throw Exception('Firestore service mevcut değil');
-      }
+      // Firestore service her zaman non-null olacak (constructor guarantee)
 
       // Firebase Auth durumunu kontrol et
       final currentUser = _firebaseAuth.currentUser;
@@ -373,16 +399,39 @@ class AuthRepository {
   }
 
   /// Hesabı tamamen siler
+  /// 
+  /// NOT: Cihaz kredi kaydı silinmez - bu sayede aynı cihazdan
+  /// yeni hesap açıldığında önceki kredi miktarı restore edilir
   Future<void> deleteAccount() async {
     try {
       final user = currentUser;
       if (user == null) {
-        throw Exception('Kullanıcı bulunamadı');
+        AppLogger.warnWithContext('AuthRepository', 
+            'Silinecek kullanıcı bulunamadı - zaten çıkış yapılmış olabilir');
+        return; // Kullanıcı zaten yoksa işlem tamamlanmış sayılır
       }
 
       AppLogger.logWithContext(
           'AuthRepository', 'Hesap silme işlemi başlatılıyor', user.uid);
 
+      // Önce kullanıcının mevcut kredi sayısını al ve cihaz kaydında sakla
+      try {
+        final UserModel? currentUserData = await _getUserFromFirestore(user.uid);
+        if (currentUserData != null) {
+          await _deviceCreditService.updateUserCredits(
+            user.uid, 
+            currentUserData.analysisCredits,
+          );
+          AppLogger.logWithContext('AuthRepository', 
+              'Kullanıcı kredisi cihaz kaydında saklandı', 
+              '${user.uid} - ${currentUserData.analysisCredits} kredi');
+        }
+      } catch (creditUpdateError) {
+        AppLogger.warnWithContext('AuthRepository', 
+            'Kredi güncelleme hatası (devam ediliyor)', creditUpdateError);
+        // Kredi güncelleme hatası olsa da hesap silme işlemine devam et
+      }
+      
       // Firestore'dan kullanıcı verisini sil
       await _firestoreService.deleteDocument(
         collection: _usersCollection,
@@ -390,14 +439,31 @@ class AuthRepository {
       );
 
       // Firebase Auth'dan kullanıcıyı sil
-      await user.delete();
+      try {
+        await user.delete();
+        AppLogger.logWithContext('AuthRepository', 
+            'Firebase Auth kullanıcısı silindi', user.uid);
+      } on FirebaseAuthException catch (authError) {
+        if (authError.code == 'user-not-found') {
+          AppLogger.warnWithContext('AuthRepository', 
+              'Firebase Auth kullanıcısı zaten mevcut değil', user.uid);
+          // Kullanıcı zaten yoksa devam et, hata verme
+        } else {
+          AppLogger.errorWithContext('AuthRepository', 
+              'Firebase Auth kullanıcı silme hatası', authError);
+          rethrow;
+        }
+      }
 
       AppLogger.successWithContext(
-          'AuthRepository', 'Hesap başarıyla silindi', user.uid);
+          'AuthRepository', 'Hesap başarıyla silindi (cihaz kaydı ve kredi korundu)', user.uid);
     } catch (e, stackTrace) {
       AppLogger.errorWithContext(
           'AuthRepository', 'Hesap silme hatası', e, stackTrace);
       rethrow;
     }
   }
+
+  /// Device credit service'ine erişim sağlar (debug/admin için)
+  DeviceCreditService get deviceCreditService => _deviceCreditService;
 }
