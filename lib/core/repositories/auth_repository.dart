@@ -78,7 +78,14 @@ class AuthRepository {
     try {
       AppLogger.logWithContext('AuthRepository', 'Anonim giriş başlatılıyor');
 
+      // Firebase Auth durumunu kontrol et
+      AppLogger.logWithContext('AuthRepository', 
+          'Firebase Auth instance: ${_firebaseAuth.app.name}');
+      AppLogger.logWithContext('AuthRepository', 
+          'Current user before sign in: ${_firebaseAuth.currentUser?.uid ?? "null"}');
+
       // Firebase'de anonim giriş yap
+      AppLogger.logWithContext('AuthRepository', 'signInAnonymously() çağrısı yapılıyor...');
       final UserCredential userCredential =
           await _firebaseAuth.signInAnonymously();
       final User? firebaseUser = userCredential.user;
@@ -138,6 +145,12 @@ class AuthRepository {
       }
 
       return newUser;
+    } on FirebaseAuthException catch (e, stackTrace) {
+      AppLogger.errorWithContext(
+          'AuthRepository', 
+          'Firebase Auth hatası: ${e.code} - ${e.message}', 
+          e, stackTrace);
+      rethrow;
     } catch (e, stackTrace) {
       AppLogger.errorWithContext(
           'AuthRepository', 'Anonim giriş genel hatası', e, stackTrace);
@@ -393,7 +406,9 @@ class AuthRepository {
     try {
       final user = currentUser;
       if (user == null) {
-        throw Exception('Kullanıcı bulunamadı');
+        AppLogger.warnWithContext('AuthRepository', 
+            'Silinecek kullanıcı bulunamadı - zaten çıkış yapılmış olabilir');
+        return; // Kullanıcı zaten yoksa işlem tamamlanmış sayılır
       }
 
       AppLogger.logWithContext(
@@ -424,7 +439,21 @@ class AuthRepository {
       );
 
       // Firebase Auth'dan kullanıcıyı sil
-      await user.delete();
+      try {
+        await user.delete();
+        AppLogger.logWithContext('AuthRepository', 
+            'Firebase Auth kullanıcısı silindi', user.uid);
+      } on FirebaseAuthException catch (authError) {
+        if (authError.code == 'user-not-found') {
+          AppLogger.warnWithContext('AuthRepository', 
+              'Firebase Auth kullanıcısı zaten mevcut değil', user.uid);
+          // Kullanıcı zaten yoksa devam et, hata verme
+        } else {
+          AppLogger.errorWithContext('AuthRepository', 
+              'Firebase Auth kullanıcı silme hatası', authError);
+          rethrow;
+        }
+      }
 
       AppLogger.successWithContext(
           'AuthRepository', 'Hesap başarıyla silindi (cihaz kaydı ve kredi korundu)', user.uid);
