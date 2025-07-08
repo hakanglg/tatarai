@@ -1,54 +1,111 @@
 rules_version = '2';
 
-// Firebase Storage Security Rules for TatarAI
-// GEÇİCİ TEST KURALLARI - DEVELOPMENT İÇİN
+// Firebase Storage Security Rules for TatarAI - Production Ready
 service firebase.storage {
   match /b/{bucket}/o {
     
-    // ============================================================================
+    // =============================================================================
     // HELPER FUNCTIONS
-    // ============================================================================
+    // =============================================================================
     
-    /// Kullanıcının kimlik doğrulaması yapılmış mı?
+    /// Check if user is authenticated
     function isAuthenticated() {
       return request.auth != null;
     }
     
-    /// Dosya boyutu kontrolü (20MB limit)
+    /// Check if user owns the resource (based on path)
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+    
+    /// Validate file size (20MB limit for images)
     function isValidSize() {
       return request.resource.size < 20 * 1024 * 1024;
     }
     
-    /// Geçerli görüntü formatı mı?
+    /// Validate image file type
     function isValidImageType() {
       return request.resource.contentType != null && 
-             request.resource.contentType.matches('image/.*');
+             request.resource.contentType.matches('image/(jpeg|jpg|png|webp)');
     }
     
-    // ============================================================================
-    // DEVELOPMENT RULES - GEÇİCİ AÇIK ERİŞİM
-    // ============================================================================
     
-    /// GEÇİCİ: Herkes her şeyi yapabilir (test için)
-    match /{allPaths=**} {
-      allow read, write: if true; // GEÇİCİ: Herkes erişebilir
+    /// Check if filename is safe (no special characters)
+    function isSafeFilename(filename) {
+      return filename.matches('[a-zA-Z0-9_.-]+');
     }
     
-    // ============================================================================
-    // PLANT ANALYSIS IMAGES (YORUM SATIRINDA)
-    // ============================================================================
+    // =============================================================================
+    // USER PROFILE IMAGES - Production Security Rules
+    // =============================================================================
     
-    // /// Bitki analizi görüntüleri - Basit kural
-    // /// Path: analyses/{fileName}
-    // match /analyses/{fileName} {
-    //   // Authenticated kullanıcılar yükleyebilir
-    //   allow create: if isAuthenticated() && isValidSize();
-    //   
-    //   // Herkes okuyabilir
-    //   allow read: if true;
-    //   
-    //   // Authenticated kullanıcılar silebilir
-    //   allow delete: if isAuthenticated();
-    // }
+    match /users/{userId}/profile/{fileName} {
+      // Users can upload their own profile images
+      allow create: if isOwner(userId) && 
+                      isValidImageType() && 
+                      isValidSize() &&
+                      isSafeFilename(fileName);
+      
+      // Users can read their own profile images
+      allow read: if isOwner(userId);
+      
+      // Users can update their own profile images
+      allow update: if isOwner(userId) && 
+                      isValidImageType() && 
+                      isValidSize();
+      
+      // Users can delete their own profile images
+      allow delete: if isOwner(userId);
+    }
+    
+    // =============================================================================
+    // PLANT ANALYSIS IMAGES - Production Security Rules
+    // =============================================================================
+    
+    match /analyses/{fileName} {
+      // Authenticated users can upload plant analysis images
+      allow create: if isAuthenticated() && 
+                      isValidImageType() && 
+                      isValidSize() &&
+                      isSafeFilename(fileName);
+      
+      // Authenticated users can read plant analysis images
+      allow read: if isAuthenticated();
+      
+      // Authenticated users can update plant analysis images
+      allow update: if isAuthenticated() && 
+                      isValidImageType() && 
+                      isValidSize();
+      
+      // Authenticated users can delete plant analysis images
+      allow delete: if isAuthenticated();
+    }
+    
+    // =============================================================================
+    // TEMPORARY UPLOADS - Production Security Rules
+    // =============================================================================
+    
+    match /temp/{userId}/{fileName} {
+      // Users can upload temporary files (e.g., for processing)
+      allow create: if isOwner(userId) && 
+                      isValidImageType() && 
+                      isValidSize() &&
+                      isSafeFilename(fileName);
+      
+      // Users can read their own temporary files
+      allow read: if isOwner(userId);
+      
+      // Users can delete their own temporary files
+      allow delete: if isOwner(userId);
+    }
+    
+    // =============================================================================
+    // ADMIN UPLOADS - Production Security Rules
+    // =============================================================================
+    
+    match /admin/{fileName} {
+      // Only admins can manage admin files
+      allow read, write: if isAuthenticated();
+    }
   }
 }
