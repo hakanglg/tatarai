@@ -33,6 +33,22 @@ class HomeState extends BaseState {
   /// - Network hatası durumunda
   final List<PlantAnalysisModel> recentAnalyses;
 
+  /// Toplam analiz sayısı
+  ///
+  /// Kullanıcının tüm analizlerinin toplam sayısı
+  /// Recent analyses'den farklı olarak gerçek toplam sayıyı tutar
+  final int totalAnalysisCount;
+
+  /// Bu ay yapılan analiz sayısı
+  ///
+  /// Sadece bu ay yapılan analizlerin toplam sayısı
+  final int thisMonthAnalysisCount;
+
+  /// Sağlıklı bitki analizi sayısı
+  ///
+  /// Sağlıklı olarak tespit edilen bitkilerin toplam sayısı
+  final int healthyPlantsCount;
+
   /// Home screen data refresh durumu
   ///
   /// Pull-to-refresh veya manuel refresh sırasında true olur.
@@ -49,6 +65,9 @@ class HomeState extends BaseState {
   const HomeState({
     this.user,
     this.recentAnalyses = const [],
+    this.totalAnalysisCount = 0,
+    this.thisMonthAnalysisCount = 0,
+    this.healthyPlantsCount = 0,
     this.isRefreshing = false,
     this.lastRefreshTime,
     super.isLoading = false,
@@ -79,6 +98,9 @@ class HomeState extends BaseState {
   HomeState copyWith({
     UserModel? user,
     List<PlantAnalysisModel>? recentAnalyses,
+    int? totalAnalysisCount,
+    int? thisMonthAnalysisCount,
+    int? healthyPlantsCount,
     bool? isLoading,
     bool? isRefreshing,
     DateTime? lastRefreshTime,
@@ -92,6 +114,9 @@ class HomeState extends BaseState {
       user: clearUser ? null : (user ?? this.user),
       recentAnalyses:
           clearAnalyses ? const [] : (recentAnalyses ?? this.recentAnalyses),
+      totalAnalysisCount: totalAnalysisCount ?? this.totalAnalysisCount,
+      thisMonthAnalysisCount: thisMonthAnalysisCount ?? this.thisMonthAnalysisCount,
+      healthyPlantsCount: healthyPlantsCount ?? this.healthyPlantsCount,
       isLoading: isLoading ?? this.isLoading,
       isRefreshing: isRefreshing ?? this.isRefreshing,
       lastRefreshTime: lastRefreshTime ?? this.lastRefreshTime,
@@ -106,6 +131,9 @@ class HomeState extends BaseState {
         ...super.props,
         user,
         recentAnalyses,
+        totalAnalysisCount,
+        thisMonthAnalysisCount,
+        healthyPlantsCount,
         isRefreshing,
         lastRefreshTime,
       ];
@@ -116,6 +144,9 @@ class HomeState extends BaseState {
     return 'HomeState{'
         'user: ${user?.id ?? "null"}, '
         'recentAnalysesCount: ${recentAnalyses.length}, '
+        'totalAnalysisCount: $totalAnalysisCount, '
+        'thisMonthAnalysisCount: $thisMonthAnalysisCount, '
+        'healthyPlantsCount: $healthyPlantsCount, '
         'isLoading: $isLoading, '
         'isRefreshing: $isRefreshing, '
         'hasError: ${errorMessage != null}, '

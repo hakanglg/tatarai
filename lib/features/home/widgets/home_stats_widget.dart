@@ -249,20 +249,10 @@ class HomeStatsWidget extends StatelessWidget {
     int healthyPlants = 0;
     int thisMonthAnalyses = 0;
 
-    if (!state.isLoading && state.recentAnalyses.isNotEmpty) {
-      totalAnalyses = state.recentAnalyses.length;
-      healthyPlants =
-          state.recentAnalyses.where((analysis) => analysis.isHealthy).length;
-
-      // Bu ay yapılan analizler
-      final now = DateTime.now();
-      final thisMonth = DateTime(now.year, now.month);
-      thisMonthAnalyses = state.recentAnalyses.where((analysis) {
-        if (analysis.timestamp == null) return false;
-        final analysisDate =
-            DateTime.fromMillisecondsSinceEpoch(analysis.timestamp!);
-        return analysisDate.isAfter(thisMonth);
-      }).length;
+    if (!state.isLoading) {
+      totalAnalyses = state.totalAnalysisCount;
+      healthyPlants = state.healthyPlantsCount;
+      thisMonthAnalyses = state.thisMonthAnalysisCount;
     }
 
     return [

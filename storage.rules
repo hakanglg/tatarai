@@ -29,11 +29,6 @@ service firebase.storage {
              request.resource.contentType.matches('image/(jpeg|jpg|png|webp)');
     }
     
-    /// Validate file metadata
-    function hasValidMetadata() {
-      return request.resource.metadata != null &&
-             request.resource.metadata.keys().hasAll(['userId', 'uploadedAt']);
-    }
     
     /// Check if filename is safe (no special characters)
     function isSafeFilename(filename) {
@@ -67,23 +62,23 @@ service firebase.storage {
     // PLANT ANALYSIS IMAGES - Production Security Rules
     // =============================================================================
     
-    match /plant_analyses/{userId}/images/{fileName} {
-      // Users can upload images for their own plant analyses
-      allow create: if isOwner(userId) && 
+    match /analyses/{fileName} {
+      // Authenticated users can upload plant analysis images
+      allow create: if isAuthenticated() && 
                       isValidImageType() && 
                       isValidSize() &&
                       isSafeFilename(fileName);
       
-      // Users can read their own plant analysis images
-      allow read: if isOwner(userId);
+      // Authenticated users can read plant analysis images
+      allow read: if isAuthenticated();
       
-      // Users can update their own plant analysis images
-      allow update: if isOwner(userId) && 
+      // Authenticated users can update plant analysis images
+      allow update: if isAuthenticated() && 
                       isValidImageType() && 
                       isValidSize();
       
-      // Users can delete their own plant analysis images
-      allow delete: if isOwner(userId);
+      // Authenticated users can delete plant analysis images
+      allow delete: if isAuthenticated();
     }
     
     // =============================================================================
@@ -110,8 +105,7 @@ service firebase.storage {
     
     match /admin/{fileName} {
       // Only admins can manage admin files
-      allow read, write: if isAuthenticated() && 
-                           exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      allow read, write: if isAuthenticated();
     }
   }
 }

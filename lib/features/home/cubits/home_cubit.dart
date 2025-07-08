@@ -174,6 +174,7 @@ class HomeCubit extends BaseCubit<HomeState> {
       await Future.wait([
         _loadUserData(),
         _loadRecentAnalyses(),
+        _loadAnalysisStatistics(),
       ]);
 
       emit(state.copyWith(
@@ -201,6 +202,7 @@ class HomeCubit extends BaseCubit<HomeState> {
       await Future.wait([
         _loadUserData(),
         _loadRecentAnalyses(),
+        _loadAnalysisStatistics(),
       ]);
 
       emit(state.copyWith(
@@ -279,6 +281,61 @@ class HomeCubit extends BaseCubit<HomeState> {
     } catch (e, stackTrace) {
       AppLogger.e('User data loading failed', e, stackTrace);
       rethrow;
+    }
+  }
+
+  /// Tüm analiz istatistiklerini yükler
+  Future<void> _loadAnalysisStatistics() async {
+    try {
+      logInfo('Loading analysis statistics');
+
+      if (ServiceLocator.isRegistered<PlantAnalysisRepository>()) {
+        final repository = ServiceLocator.get<PlantAnalysisRepository>();
+        
+        // Paralel olarak tüm istatistikleri al
+        final results = await Future.wait([
+          repository.getTotalAnalysesCount(),
+          repository.getHealthStatistics(),
+          _getThisMonthAnalysesCount(repository),
+        ]);
+        
+        final totalCount = results[0] as int;
+        final healthStats = results[1] as Map<String, dynamic>;
+        final thisMonthCount = results[2] as int;
+        
+        final healthyCount = healthStats['healthy'] as int? ?? 0;
+        
+        logInfo('Statistics loaded - Total: $totalCount, Healthy: $healthyCount, This month: $thisMonthCount');
+        
+        // State'i güncelle
+        emit(state.copyWith(
+          totalAnalysisCount: totalCount,
+          healthyPlantsCount: healthyCount,
+          thisMonthAnalysisCount: thisMonthCount,
+        ));
+      }
+    } catch (e, stackTrace) {
+      AppLogger.e('Analysis statistics loading failed', e, stackTrace);
+      // Don't throw error, just keep previous values
+    }
+  }
+
+  /// Bu ayki analiz sayısını hesaplar
+  Future<int> _getThisMonthAnalysesCount(PlantAnalysisRepository repository) async {
+    try {
+      final now = DateTime.now();
+      final startOfMonth = DateTime(now.year, now.month, 1);
+      final endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+      
+      final analyses = await repository.getAnalysesByDateRange(
+        startDate: startOfMonth,
+        endDate: endOfMonth,
+      );
+      
+      return analyses.length;
+    } catch (e) {
+      AppLogger.e('This month analyses count calculation failed', e);
+      return 0;
     }
   }
 
