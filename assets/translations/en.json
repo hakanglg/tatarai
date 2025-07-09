@@ -160,10 +160,9 @@
   "data_not_found_title": "Data Not Found",
   "database_error_title": "Database Error",
 
-  "onboarding_title_1": "Plant Health Analysis",
-  "onboarding_title_2": "Agricultural Recommendations",
-  "onboarding_title_3": "Disease Diagnosis",
-  "onboarding_title_4": "TatarAI Premium",
+  "onboarding_title_1": "Welcome to TatarAI",
+  "onboarding_title_2": "Analyze Your Crops in Seconds",
+  "onboarding_title_3": "Start with 5 Free Analyses",
 
   "nav_home": "Home",
   "nav_analysis": "Analysis",
@@ -356,11 +355,11 @@
   "healthy": "Healthy",
   "health_issue": "Health Issue",
   
-  "onboarding_desc_1": "Analyze your plants' health with AI and detect problems in early stages.",
-  "onboarding_desc_2": "Get personalized agricultural recommendations based on plant type and growing conditions.",
-  "onboarding_desc_3": "Diagnose diseases in your plants with AI and get solution recommendations.",
-  "onboarding_desc_4": "Your AI-powered app for plant health analysis is ready. Start now and analyze your plants' health at a professional level.",
-  "onboarding_special_offer": "Start with 5 free analysis credits",
+  "onboarding_desc_1": "Your AI-powered assistant for healthy crops. Get instant analysis, disease detection, and expert recommendations.",
+  "onboarding_desc_2": "• Upload a plant photo\n• Get instant AI diagnosis\n• Learn disease, treatment & care tips",
+  "onboarding_desc_3": "Free users receive 5 credits to try the app. Upgrade to Premium for unlimited access and advanced features.",
+  "onboarding_desc_4": "Join Premium for unlimited analysis, detailed reports, expert recommendations and more.",
+  "onboarding_special_offer": "Get unlimited analysis with Premium",
   "welcome_gift": "Welcome Gift",
   "app_features": "Secure • Fast • Easy to Use",
   
@@ -369,6 +368,19 @@
   "refresh": "Refresh",
   "app_initialization_error": "An Error Occurred While Starting the Application",
   "start_analysis": "Start Analysis",
+  "free_vs_premium": "Free vs Premium",
+  "limited_analysis": "5 Analysis Credits",
+  "unlimited_analysis": "Unlimited Analysis",
+  "basic_features": "Basic Features",
+  "advanced_features": "Advanced Features",
+  "upgrade_to_premium": "Upgrade to Premium",
+  "start_free": "Start Free",
+  "free_plan": "Free Plan",
+  "premium_plan": "Premium Plan",
+  "basic_analysis": "Basic Analysis",
+  "detailed_reports": "Detailed Reports",
+  "expert_recommendations": "Expert Recommendations",
+  "priority_support": "Priority Support",
   "loading_latest_analyses": "Loading your latest analyses",
   "latest_analyses": "Your Recent Analyses",
   "latest_analyses_desc": "Your most recent plant analyses",
@@ -566,5 +578,11 @@
   "gallery_permission_settings_message": "To access the gallery, you need to enable photo library permission in settings.",
   "camera_permission_error": "Camera permission error occurred. Please try again.",
   "gallery_permission_error": "Gallery permission error occurred. Please try again.",
-  "permission_restricted_error": "This feature is restricted. Please check your device settings."
+  "permission_restricted_error": "This feature is restricted. Please check your device settings.",
+  
+  "choose_plan": "Choose Your Plan",
+  "choose_plan_desc": "Select the plan that best fits your needs",
+  "get_started": "Get Started",
+  "try_premium_free": "Try Premium for Free",
+  "start_with_free": "Start with Free Plan"
 } 
