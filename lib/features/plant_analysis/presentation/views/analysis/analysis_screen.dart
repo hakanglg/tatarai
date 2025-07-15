@@ -1,11 +1,11 @@
 import 'dart:io';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sprung/sprung.dart';
 import 'package:tatarai/core/services/permission_service.dart';
 import 'package:tatarai/core/services/media_permission_handler.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:tatarai/core/extensions/string_extension.dart';
 import 'package:tatarai/core/widgets/app_dialog_manager.dart';
 import 'package:tatarai/core/theme/color_scheme.dart';
@@ -98,45 +98,6 @@ class _AnalysisScreenState extends State<AnalysisScreen>
     }
   }
 
-  /// App resume olduğunda çalışacak handler
-  void _handleAppResume() {
-    if (!mounted) return;
-
-    try {
-      // State'i refresh et
-      setState(() {
-        // UI'ı force update et
-      });
-
-      // Permission status'unu tekrar kontrol et
-      _checkPermissionsAfterResume();
-
-      AppLogger.i('✅ App resume handling tamamlandı');
-    } catch (e) {
-      AppLogger.e('❌ App resume handling hatası: $e');
-    }
-  }
-
-  /// Resume sonrası permission kontrolü
-  Future<void> _checkPermissionsAfterResume() async {
-    if (!mounted) return;
-
-    try {
-      // Permission Service ile cache refresh
-      await PermissionService().onAppResume();
-
-      // İzin durumlarını log'la
-      final cameraStatus =
-          PermissionService().getCachedPermissionStatus(Permission.camera);
-      final photosStatus =
-          PermissionService().getCachedPermissionStatus(Permission.photos);
-
-      AppLogger.i('📷 Resume sonrası kamera izni: $cameraStatus');
-      AppLogger.i('📸 Resume sonrası galeri izni: $photosStatus');
-    } catch (e) {
-      AppLogger.e('Permission kontrolü hatası: $e');
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -921,6 +882,46 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                           ),
                         ),
                       ),
+
+                    // Debug permission test button (only in debug mode)
+                    if (kDebugMode) ...[
+                      const SizedBox(height: 16),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: CupertinoButton(
+                          onPressed: () async {
+                            AppLogger.i('🔬 Debug permission test başlatılıyor...');
+                            await PermissionService().debugLogPermissions();
+                          },
+                          color: CupertinoColors.systemGrey,
+                          child: const Text('Debug: Test Permissions'),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: CupertinoButton(
+                          onPressed: () async {
+                            AppLogger.i('🚨 FORCE permission registration başlatılıyor...');
+                            await PermissionService().forceRegisterIOSPermissions();
+                          },
+                          color: CupertinoColors.systemRed,
+                          child: const Text('FORCE Register iOS Permissions'),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: CupertinoButton(
+                          onPressed: () async {
+                            AppLogger.i('💪 AGGRESSIVE permission registration başlatılıyor...');
+                            await PermissionService().aggressiveIOSPermissionRegistration();
+                          },
+                          color: CupertinoColors.systemOrange,
+                          child: const Text('AGGRESSIVE Register (Production)'),
+                        ),
+                      ),
+                    ],
 
                     const SizedBox(height: 40),
                   ],

@@ -41,13 +41,19 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>TatarAI, profil fotoğrafı çekmek ve bitki analizi yapmak için kamera erişimi gerektirir. Bu izin yalnızca açıkça fotoğraf çekmeyi seçtiğinizde kullanılır ve başka hiçbir amaçla kullanılmaz. Kamera erişimine izin vermezseniz, fotoğraf çekemezsiniz ancak galeriden seçme seçeneğini hala kullanabilirsiniz.</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>TatarAI, analiz sonuçlarını ve diğer fotoğrafları galerinize kaydetmek için izin istiyor. Bu özellik yalnızca fotoğraf kaydetmeyi açıkça seçtiğinizde kullanılır ve izniniz olmadan hiçbir veri saklanmaz.</string>
+	<string>TatarAI uses your camera to take photos of plants for AI-powered analysis and identification. Photos are processed locally and only used for plant analysis.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>TatarAI, profil fotoğrafınızı güncellemek ve bitki analizi yapmak için fotoğraf galerisi erişimi gerektirir. Bu izin yalnızca açıkça bir fotoğraf seçtiğinizde kullanılır ve fotoğraflarınız izniniz olmadan paylaşılmaz veya depolanmaz. Galeri erişimine izin vermezseniz, fotoğraf seçemezsiniz ancak kamera seçeneğini hala kullanabilirsiniz.</string>
+	<string>TatarAI needs access to your photo library to select plant photos for AI analysis and identification. Selected photos are processed locally for plant analysis only.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>TatarAI can save plant analysis results to your photo library when you choose to save them. This feature is optional and only used when you explicitly save results.</string>
 	<key>PHPhotoLibraryPreventAutomaticLimitedAccessAlert</key>
 	<false/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app does not use the microphone.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app does not use location services.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>This app does not use location services.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

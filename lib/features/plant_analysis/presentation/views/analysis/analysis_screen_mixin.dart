@@ -94,9 +94,14 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
       
       if (selectedImage != null && mounted) {
         final file = File(selectedImage.path);
+        AppLogger.i('📷 Analysis screen: Creating File from path: ${selectedImage.path}');
+        AppLogger.i('📷 Analysis screen: File exists: ${file.existsSync()}');
+        
         setState(() {
           _selectedImage = file;
         });
+        
+        AppLogger.i('📷 Analysis screen: State updated, _selectedImage set to: ${_selectedImage?.path}');
         
         HapticFeedback.lightImpact();
         _animationController.forward(from: 0.0);
@@ -648,6 +653,23 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
     ];
     _locationController.text = parts.where((p) => p != null).join('/');
   }
+
+  /// App resume olduğunda çalışacak handler
+  void _handleAppResume() {
+    if (!mounted) return;
+
+    try {
+      // State'i refresh et
+      setState(() {
+        // UI'ı force update et
+      });
+
+      AppLogger.i('✅ App resume handling tamamlandı');
+    } catch (e) {
+      AppLogger.e('❌ App resume handling hatası: $e');
+    }
+  }
+
 
   // Premium navigation artık HomePremiumCard widget'ı içinde handle ediliyor
 }
