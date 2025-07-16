@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:tatarai/core/services/permission_service.dart';
@@ -70,6 +71,8 @@ class MediaPermissionHandler {
     AppLogger.i('📷 Handling camera selection');
 
     try {
+      AppLogger.i('📷 Camera: Starting ImagePicker.pickImage with camera source');
+      
       // Directly try to capture - ImagePicker will trigger native permission
       final image = await _imagePicker.pickImage(
         source: ImageSource.camera,
@@ -79,12 +82,16 @@ class MediaPermissionHandler {
         preferredCameraDevice: CameraDevice.rear,
       );
 
+      AppLogger.i('📷 Camera: ImagePicker returned: ${image?.path ?? 'null'}');
+
       if (image != null) {
         AppLogger.i('✅ Camera capture successful: ${image.path}');
         AppLogger.i('📷 Camera: Image size: ${await image.length()} bytes');
+        AppLogger.i('📷 Camera: File exists: ${File(image.path).existsSync()}');
+        AppLogger.i('📷 Camera: Returning XFile to caller');
         return image;
       } else {
-        AppLogger.i('User cancelled camera capture or permission denied');
+        AppLogger.i('❌ Camera: ImagePicker returned null - user cancelled or permission denied');
         // Check if it was permission denial and redirect to settings
         if (context.mounted) {
           await _handlePermissionDenied(context, 'camera');
@@ -92,7 +99,7 @@ class MediaPermissionHandler {
         return null;
       }
     } catch (e) {
-      AppLogger.e('❌ Camera capture failed', e);
+      AppLogger.e('❌ Camera capture failed with exception', e);
       // Handle permission error - redirect to settings
       if (context.mounted) {
         await _handlePermissionDenied(context, 'camera');

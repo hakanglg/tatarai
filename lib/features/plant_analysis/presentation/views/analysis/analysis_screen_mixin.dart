@@ -6,6 +6,28 @@ part of 'analysis_screen.dart';
 mixin _AnalysisScreenMixin on State<AnalysisScreen> {
   /// The file path of the selected image for analysis.
   File? _selectedImage;
+  
+  /// Temporary path to persist image across app lifecycle
+  String? _tempImagePath;
+  
+  @override
+  void initState() {
+    super.initState();
+    AppLogger.i('🔥 Analysis screen: initState called - _selectedImage: ${_selectedImage?.path}, _tempImagePath: $_tempImagePath');
+    _restoreImageFromPrefs();
+  }
+  
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    AppLogger.i('🔥 Analysis screen: didChangeDependencies called - _selectedImage: ${_selectedImage?.path}, _tempImagePath: $_tempImagePath');
+  }
+  
+  @override
+  void dispose() {
+    AppLogger.i('🔥 Analysis screen: dispose called - _selectedImage: ${_selectedImage?.path}, _tempImagePath: $_tempImagePath');
+    super.dispose();
+  }
 
   /// Controllers for the location and field name text fields.
   final TextEditingController _locationController = TextEditingController();
@@ -90,24 +112,36 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
     AppLogger.i('📸 Analysis screen: Starting photo source selection');
 
     try {
+      AppLogger.i('📷 Analysis screen: Calling MediaPermissionHandler.selectMedia');
       final selectedImage = await MediaPermissionHandler.instance.selectMedia(context);
+      
+      AppLogger.i('📷 Analysis screen: MediaPermissionHandler returned: ${selectedImage?.path ?? 'null'}');
       
       if (selectedImage != null && mounted) {
         final file = File(selectedImage.path);
         AppLogger.i('📷 Analysis screen: Creating File from path: ${selectedImage.path}');
         AppLogger.i('📷 Analysis screen: File exists: ${file.existsSync()}');
+        AppLogger.i('📷 Analysis screen: File size: ${file.existsSync() ? file.lengthSync() : 0} bytes');
+        
+        // Save temp path to restore after app resume
+        _tempImagePath = selectedImage.path;
+        AppLogger.i('📷 Analysis screen: Saved temp path: $_tempImagePath');
+        
+        // Also save to SharedPreferences for more persistent storage
+        await _saveImageToPrefs(selectedImage.path);
         
         setState(() {
           _selectedImage = file;
         });
         
         AppLogger.i('📷 Analysis screen: State updated, _selectedImage set to: ${_selectedImage?.path}');
+        AppLogger.i('📷 Analysis screen: _selectedImage exists: ${_selectedImage?.existsSync()}');
         
         HapticFeedback.lightImpact();
         _animationController.forward(from: 0.0);
         AppLogger.i('✅ Analysis screen: Image selected successfully: ${selectedImage.path}');
       } else {
-        AppLogger.i('ℹ️ Analysis screen: User cancelled image selection or permission denied');
+        AppLogger.i('ℹ️ Analysis screen: selectedImage is null or not mounted - selectedImage: ${selectedImage?.path}, mounted: $mounted');
       }
     } catch (e) {
       AppLogger.e('❌ Analysis screen: Error in photo selection', e);
@@ -659,6 +693,21 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
     if (!mounted) return;
 
     try {
+      // Temporary image path varsa restore et
+      if (_tempImagePath != null) {
+        final tempFile = File(_tempImagePath!);
+        if (tempFile.existsSync()) {
+          AppLogger.i('📷 App resume: Restoring image from temp path: $_tempImagePath');
+          setState(() {
+            _selectedImage = tempFile;
+          });
+          _tempImagePath = null; // Clear temp path after restore
+        } else {
+          AppLogger.w('⚠️ App resume: Temp image file not found: $_tempImagePath');
+          _tempImagePath = null;
+        }
+      }
+
       // State'i refresh et
       setState(() {
         // UI'ı force update et
@@ -670,6 +719,42 @@ mixin _AnalysisScreenMixin on State<AnalysisScreen> {
     }
   }
 
+
+  /// SharedPreferences'tan image path'i restore et
+  Future<void> _restoreImageFromPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedImagePath = prefs.getString('temp_selected_image_path');
+      
+      if (savedImagePath != null) {
+        final file = File(savedImagePath);
+        if (file.existsSync()) {
+          AppLogger.i('📱 Restoring image from SharedPreferences: $savedImagePath');
+          setState(() {
+            _selectedImage = file;
+          });
+          // Clear saved path after restore
+          await prefs.remove('temp_selected_image_path');
+        } else {
+          AppLogger.w('⚠️ Saved image file not found: $savedImagePath');
+          await prefs.remove('temp_selected_image_path');
+        }
+      }
+    } catch (e) {
+      AppLogger.e('❌ Error restoring image from SharedPreferences', e);
+    }
+  }
+  
+  /// SharedPreferences'a image path'i kaydet
+  Future<void> _saveImageToPrefs(String imagePath) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('temp_selected_image_path', imagePath);
+      AppLogger.i('📱 Saved image path to SharedPreferences: $imagePath');
+    } catch (e) {
+      AppLogger.e('❌ Error saving image to SharedPreferences', e);
+    }
+  }
 
   // Premium navigation artık HomePremiumCard widget'ı içinde handle ediliyor
 }

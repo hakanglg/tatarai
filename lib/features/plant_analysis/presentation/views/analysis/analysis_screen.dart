@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sprung/sprung.dart';
 import 'package:tatarai/core/services/permission_service.dart';
 import 'package:tatarai/core/services/media_permission_handler.dart';
@@ -90,11 +91,16 @@ class _AnalysisScreenState extends State<AnalysisScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     AppLogger.i('📱 App lifecycle değişti: $state');
+    AppLogger.i('📱 Current state - _selectedImage: ${_selectedImage?.path}, _tempImagePath: $_tempImagePath');
 
     if (state == AppLifecycleState.resumed) {
       // Kullanıcı settings'den geri döndü, state'i refresh et
       AppLogger.i('🔄 App resumed - state refresh ediliyor');
       _handleAppResume();
+    } else if (state == AppLifecycleState.paused) {
+      AppLogger.i('⏸️ App paused - state: _selectedImage: ${_selectedImage?.path}, _tempImagePath: $_tempImagePath');
+    } else if (state == AppLifecycleState.inactive) {
+      AppLogger.i('😴 App inactive - state: _selectedImage: ${_selectedImage?.path}, _tempImagePath: $_tempImagePath');
     }
   }
 
@@ -102,6 +108,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
   @override
   Widget build(BuildContext context) {
     AppLogger.i('AnalysisScreen - build başladı');
+    AppLogger.i('🔥 Build method - _selectedImage: ${_selectedImage?.path}, _tempImagePath: $_tempImagePath');
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       child: SafeArea(
