@@ -1,125 +1,80 @@
+import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:tatarai/core/services/permission_service.dart';
-import 'package:tatarai/core/widgets/permission_dialog_manager.dart';
+import 'package:tatarai/core/extensions/string_extension.dart';
 import 'package:tatarai/core/utils/logger.dart';
 
-/// 📸 Medya izin ve seçim işlemlerini merkezi yöneten servis
-///
-/// Kamera ve galeri işlemlerini tek yerden yönetir.
-/// Permission handling, dialog gösterme ve image picking işlemlerini
-/// koordine eder.
+/// Simple media selection handler with native permission flow
 class MediaPermissionHandler {
   MediaPermissionHandler._();
-
   static final MediaPermissionHandler _instance = MediaPermissionHandler._();
   static MediaPermissionHandler get instance => _instance;
 
   final ImagePicker _imagePicker = ImagePicker();
+  final PermissionService _permissionService = PermissionService();
 
-  /// Ana medya seçim metodu
-  ///
-  /// Kullanıcıya kaynak seçim dialog'u gösterir ve seçilen kaynağa göre
-  /// izin kontrolü yaparak resim seçer. İzinler on-demand olarak istenir.
+  /// Show photo source selection and handle the entire flow
   Future<XFile?> selectMedia(BuildContext context) async {
     if (!context.mounted) return null;
 
-    AppLogger.i('📸 Medya seçim işlemi başlatılıyor');
+    AppLogger.i('📸 Starting media selection');
 
     try {
-      // Direkt kaynak seçim dialog'unu göster
-      final choice =
-          await PermissionDialogManager.showPhotoSourceDialog(context);
-
-      if (choice == null || !context.mounted) {
-        AppLogger.i('Kullanıcı fotoğraf kaynağı seçimini iptal etti');
+      // Show source selection dialog
+      final source = await _showSourceDialog(context);
+      if (source == null || !context.mounted) {
+        AppLogger.i('User cancelled source selection');
         return null;
       }
 
-      // Seçilen kaynağa göre izin kontrol et ve işlem yap
-      switch (choice) {
-        case PhotoSourceChoice.camera:
-          return await _handleCameraSelection(context);
-        case PhotoSourceChoice.gallery:
-          return await _handleGallerySelection(context);
+      // Handle the selected source
+      switch (source) {
+        case ImageSource.camera:
+          return await _handleCamera(context);
+        case ImageSource.gallery:
+          return await _handleGallery(context);
       }
     } catch (e) {
-      AppLogger.e('Medya seçim hatası', e);
-      if (context.mounted) {
-        await PermissionDialogManager.showPermissionErrorDialog(
-          context,
-          'Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.',
-        );
-      }
+      AppLogger.e('❌ Media selection error', e);
       return null;
     }
   }
 
-  /// Kamera seçimi handling
-  Future<XFile?> _handleCameraSelection(BuildContext context) async {
-    if (!context.mounted) return null;
-
-    AppLogger.i('📷 Kamera izni kontrol ediliyor ve gerekirse isteniyor');
-
-    // Kamera iznini kontrol et ve gerekirse iste
-    final cameraResult =
-        await PermissionService().requestCameraPermission(context: context);
-
-    if (!context.mounted) return null;
-
-    // İzin sonucunu handle et
-    if (cameraResult != PermissionRequestResult.granted) {
-      AppLogger.w('📷 Kamera izni alınamadı: $cameraResult');
-      await PermissionDialogManager.handlePermissionResult(
-        context: context,
-        result: cameraResult,
-        permission: Permission.camera,
-        onRetry: () => _handleCameraSelection(context),
-      );
-      return null;
-    }
-
-    // İzin alındı, kamera ile fotoğraf çek
-    AppLogger.i('📷 Kamera izni verildi, fotoğraf çekiliyor');
-    return await _pickImageFromCamera();
+  /// Show source selection dialog
+  Future<ImageSource?> _showSourceDialog(BuildContext context) async {
+    return await showCupertinoModalPopup<ImageSource>(
+      context: context,
+      builder: (BuildContext context) => CupertinoActionSheet(
+        title: Text('photo_source_description'.locale(context)),
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(context, ImageSource.camera),
+            child: Text('camera'.locale(context)),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(context, ImageSource.gallery),
+            child: Text('gallery'.locale(context)),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          isDestructiveAction: true,
+          onPressed: () => Navigator.pop(context),
+          child: Text('cancel'.locale(context)),
+        ),
+      ),
+    );
   }
 
-  /// Galeri seçimi handling
-  Future<XFile?> _handleGallerySelection(BuildContext context) async {
-    if (!context.mounted) return null;
+  /// Handle camera selection with native permission flow
+  Future<XFile?> _handleCamera(BuildContext context) async {
+    AppLogger.i('📷 Handling camera selection');
 
-    AppLogger.i('📸 Galeri izni kontrol ediliyor ve gerekirse isteniyor');
-
-    // Galeri iznini kontrol et ve gerekirse iste
-    final photosResult =
-        await PermissionService().requestPhotosPermission(context: context);
-
-    if (!context.mounted) return null;
-
-    // İzin sonucunu handle et
-    if (photosResult != PermissionRequestResult.granted) {
-      AppLogger.w('📸 Galeri izni alınamadı: $photosResult');
-      await PermissionDialogManager.handlePermissionResult(
-        context: context,
-        result: photosResult,
-        permission: Permission.photos,
-        onRetry: () => _handleGallerySelection(context),
-      );
-      return null;
-    }
-
-    // İzin alındı, galeriden fotoğraf seç
-    AppLogger.i('📸 Galeri izni verildi, fotoğraf seçiliyor');
-    return await _pickImageFromGallery();
-  }
-
-  /// Kameradan fotoğraf çekme
-  Future<XFile?> _pickImageFromCamera() async {
     try {
-      AppLogger.i('📷 Kameradan fotoğraf çekiliyor');
-
-      final XFile? image = await _imagePicker.pickImage(
+      AppLogger.i('📷 Camera: Starting ImagePicker.pickImage with camera source');
+      
+      // Directly try to capture - ImagePicker will trigger native permission
+      final image = await _imagePicker.pickImage(
         source: ImageSource.camera,
         maxWidth: 1920,
         maxHeight: 1920,
@@ -127,33 +82,39 @@ class MediaPermissionHandler {
         preferredCameraDevice: CameraDevice.rear,
       );
 
+      AppLogger.i('📷 Camera: ImagePicker returned: ${image?.path ?? 'null'}');
+
       if (image != null) {
-        AppLogger.i('✅ Kameradan fotoğraf başarıyla alındı: ${image.path}');
-
-        // Dosya boyutunu kontrol et
-        final fileSize = await _getFileSize(image.path);
-        if (fileSize > 10 * 1024 * 1024) {
-          // 10MB
-          AppLogger.w('⚠️ Dosya boyutu çok büyük: ${fileSize}B');
-          return null;
-        }
+        AppLogger.i('✅ Camera capture successful: ${image.path}');
+        AppLogger.i('📷 Camera: Image size: ${await image.length()} bytes');
+        AppLogger.i('📷 Camera: File exists: ${File(image.path).existsSync()}');
+        AppLogger.i('📷 Camera: Returning XFile to caller');
+        return image;
       } else {
-        AppLogger.i('ℹ️ Kullanıcı kamera işlemini iptal etti');
+        AppLogger.i('❌ Camera: ImagePicker returned null - user cancelled or permission denied');
+        // Check if it was permission denial and redirect to settings
+        if (context.mounted) {
+          await _handlePermissionDenied(context, 'camera');
+        }
+        return null;
       }
-
-      return image;
     } catch (e) {
-      AppLogger.e('❌ Kameradan fotoğraf çekme hatası', e);
+      AppLogger.e('❌ Camera capture failed with exception', e);
+      // Handle permission error - redirect to settings
+      if (context.mounted) {
+        await _handlePermissionDenied(context, 'camera');
+      }
       return null;
     }
   }
 
-  /// Galeriden fotoğraf seçme
-  Future<XFile?> _pickImageFromGallery() async {
-    try {
-      AppLogger.i('🖼️ Galeriden fotoğraf seçiliyor');
+  /// Handle gallery selection with native permission flow
+  Future<XFile?> _handleGallery(BuildContext context) async {
+    AppLogger.i('📸 Handling gallery selection');
 
-      final XFile? image = await _imagePicker.pickImage(
+    try {
+      // Directly try to select - ImagePicker will trigger native permission
+      final image = await _imagePicker.pickImage(
         source: ImageSource.gallery,
         maxWidth: 1920,
         maxHeight: 1920,
@@ -161,86 +122,47 @@ class MediaPermissionHandler {
       );
 
       if (image != null) {
-        AppLogger.i('✅ Galeriden fotoğraf başarıyla alındı: ${image.path}');
-
-        // Dosya boyutunu kontrol et
-        final fileSize = await _getFileSize(image.path);
-        if (fileSize > 10 * 1024 * 1024) {
-          // 10MB
-          AppLogger.w('⚠️ Dosya boyutu çok büyük: ${fileSize}B');
-          return null;
-        }
+        AppLogger.i('✅ Gallery selection successful: ${image.path}');
+        AppLogger.i('📸 Gallery: Image size: ${await image.length()} bytes');
+        return image;
       } else {
-        AppLogger.i('ℹ️ Kullanıcı galeri seçimini iptal etti');
+        AppLogger.i('User cancelled gallery selection or permission denied');
+        // Check if it was permission denial and redirect to settings
+        if (context.mounted) {
+          await _handlePermissionDenied(context, 'gallery');
+        }
+        return null;
       }
-
-      return image;
     } catch (e) {
-      AppLogger.e('❌ Galeriden fotoğraf seçme hatası', e);
+      AppLogger.e('❌ Gallery selection failed', e);
+      // Handle permission error - redirect to settings
+      if (context.mounted) {
+        await _handlePermissionDenied(context, 'gallery');
+      }
       return null;
     }
   }
 
-  /// Hızlı kamera erişimi (permission check olmadan)
-  ///
-  /// Bu metot sadece izin zaten verilmişse kullanılmalı.
-  /// Izin kontrolü yapmaz, sadece kamerayı açar.
-  Future<XFile?> quickCameraCapture() async {
-    AppLogger.i('⚡ Hızlı kamera çekimi');
-    return await _pickImageFromCamera();
-  }
+  /// Handle permission denied case - only open settings if actually denied
+  Future<void> _handlePermissionDenied(BuildContext context, String type) async {
+    if (!context.mounted) return;
 
-  /// Hızlı galeri erişimi (permission check olmadan)
-  ///
-  /// Bu metot sadece izin zaten verilmişse kullanılmalı.
-  /// Izin kontrolü yapmaz, sadece galeriyi açar.
-  Future<XFile?> quickGalleryPick() async {
-    AppLogger.i('⚡ Hızlı galeri seçimi');
-    return await _pickImageFromGallery();
-  }
-
-  /// Sadece kamera ile fotoğraf çek (dialog olmadan)
-  ///
-  /// İzin kontrolü yapar, gerekirse dialog gösterir.
-  /// Galeri seçeneği sunmaz.
-  Future<XFile?> captureFromCameraOnly(BuildContext context) async {
-    if (!context.mounted) return null;
-
-    AppLogger.i('📷 Sadece kamera ile çekim');
-    return await _handleCameraSelection(context);
-  }
-
-  /// Sadece galeriden seç (dialog olmadan)
-  ///
-  /// İzin kontrolü yapar, gerekirse dialog gösterir.
-  /// Kamera seçeneği sunmaz.
-  Future<XFile?> pickFromGalleryOnly(BuildContext context) async {
-    if (!context.mounted) return null;
-
-    AppLogger.i('🖼️ Sadece galeriden seçim');
-    return await _handleGallerySelection(context);
-  }
-
-  /// Dosya boyutunu byte cinsinden döndürür
-  Future<int> _getFileSize(String filePath) async {
     try {
-      final file = XFile(filePath);
-      final length = await file.length();
-      return length;
+      bool isPermanentlyDenied = false;
+      
+      if (type == 'camera') {
+        isPermanentlyDenied = await _permissionService.isCameraPermissionPermanentlyDenied();
+      } else {
+        isPermanentlyDenied = await _permissionService.isPhotosPermissionPermanentlyDenied();
+      }
+
+      // Only open settings if permission is permanently denied
+      if (isPermanentlyDenied) {
+        AppLogger.i('🔧 Permission permanently denied, opening settings');
+        await _permissionService.openSettings();
+      }
     } catch (e) {
-      AppLogger.e('Dosya boyutu alınamadı', e);
-      return 0;
+      AppLogger.e('❌ Permission check failed', e);
     }
-  }
-
-  /// Permission durumlarını kontrol et ve debug için log'la
-  Future<void> debugPermissionStatus() async {
-    final cameraStatus =
-        PermissionService().getCachedPermissionStatus(Permission.camera);
-    final photosStatus =
-        PermissionService().getCachedPermissionStatus(Permission.photos);
-
-    AppLogger.i('🔍 Debug - Kamera izni: $cameraStatus');
-    AppLogger.i('🔍 Debug - Galeri izni: $photosStatus');
   }
 }

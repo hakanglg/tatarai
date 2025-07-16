@@ -1229,8 +1229,8 @@ class _SettingsScreenState extends State<SettingsScreen>
     try {
       AppLogger.i('🔧 iOS Permissions test başlıyor...');
 
-      // Force initialize iOS permissions
-      await PermissionService().debugForceInitializeIOSPermissions();
+      // Debug log iOS permissions
+      await PermissionService().debugLogPermissions();
 
       AppLogger.i('✅ iOS Permissions test tamamlandı');
 
@@ -1274,7 +1274,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             onPressed: () async {
               Navigator.pop(ctx);
               final result = await PermissionService()
-                  .requestCameraPermission(context: context);
+                  .requestCameraPermission();
               AppLogger.i('Test Camera Permission Result: $result');
             },
             child: const Text('Kamera'),
@@ -1283,7 +1283,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             onPressed: () async {
               Navigator.pop(ctx);
               final result = await PermissionService()
-                  .requestPhotosPermission(context: context);
+                  .requestPhotosPermission();
               AppLogger.i('Test Gallery Permission Result: $result');
             },
             child: const Text('Galeri'),

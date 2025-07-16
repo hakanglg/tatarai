@@ -256,7 +256,7 @@ class SplashService {
   Future<void> initializePermissions() async {
     try {
       AppLogger.i('🔐 iOS permissions başlatılıyor...');
-      await PermissionService().initializeIOSPermissions();
+      await PermissionService().registerIOSPermissions();
       AppLogger.i('✅ iOS permissions başarıyla başlatıldı');
     } catch (e) {
       AppLogger.e('❌ iOS permissions başlatma hatası', e);
@@ -271,7 +271,7 @@ class SplashService {
   Future<void> debugInitializePermissions() async {
     try {
       AppLogger.i('🔧 DEBUG: iOS permissions force başlatılıyor...');
-      await PermissionService().debugForceInitializeIOSPermissions();
+      await PermissionService().debugLogPermissions();
       AppLogger.i('✅ DEBUG: iOS permissions force başarıyla tamamlandı');
     } catch (e) {
       AppLogger.e('❌ DEBUG: iOS permissions force başlatma hatası', e);
@@ -286,7 +286,7 @@ class SplashService {
   Future<void> debugTestPermissions() async {
     try {
       AppLogger.i('🔬 DEBUG: Permission durumları test ediliyor...');
-      await PermissionService().debugTestPermissions();
+      await PermissionService().debugLogPermissions();
       AppLogger.i('✅ DEBUG: Permission test tamamlandı');
     } catch (e) {
       AppLogger.e('❌ DEBUG: Permission test hatası', e);

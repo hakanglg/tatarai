@@ -44,6 +44,26 @@ class NavigationItems {
 class NavigationManager with ChangeNotifier {
   // Singleton instance
   static NavigationManager? _instance;
+  
+  // Singleton screen instances to preserve state
+  static AnalysisScreen? _analysisScreenInstance;
+  
+  /// Get singleton AnalysisScreen instance to preserve state across rebuilds
+  static AnalysisScreen get analysisScreen {
+    if (_analysisScreenInstance == null) {
+      _analysisScreenInstance = const AnalysisScreen();
+      AppLogger.i('📱 NavigationManager: Created new singleton AnalysisScreen instance');
+    } else {
+      AppLogger.i('📱 NavigationManager: Reusing existing AnalysisScreen instance');
+    }
+    return _analysisScreenInstance!;
+  }
+  
+  /// Reset singleton instances (for debugging purposes)
+  static void resetSingletons() {
+    AppLogger.i('📱 NavigationManager: Resetting singleton instances');
+    _analysisScreenInstance = null;
+  }
 
   /// Singleton instance getter
   static NavigationManager? get instance => _instance;
@@ -93,11 +113,13 @@ class NavigationManager with ChangeNotifier {
   /// Ekranları başlat
   void _initScreens() {
     try {
+      AppLogger.i('📱 NavigationManager: Initializing screens with singleton pattern');
       _screens = [
         const HomeTabContent(),
-        const AnalysisScreen(),
+        analysisScreen, // Use singleton instance to preserve state
         const SettingsScreen(),
       ];
+      AppLogger.i('📱 NavigationManager: Screens initialized successfully');
     } catch (e, stack) {
       AppLogger.e('Ekranları yüklerken hata', e, stack);
       _screens = [

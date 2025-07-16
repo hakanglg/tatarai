@@ -6,7 +6,7 @@ class AppConstants {
 
   // Uygulama bilgileri
   static const String appName = 'TatarAI';
-  static const String appVersion = '1.0.2';
+  static const String appVersion = '1.0.3';
 
   // API Endpoint'leri
 
@@ -16,7 +16,8 @@ class AppConstants {
   // RevenueCat API anahtarları ve sabitleri
   static String get revenueiOSApiKey =>
       dotenv.env['REVENUECAT_IOS_API_KEY'] ?? '';
-  // static String get revenueAndroidApiKey => dotenv.env['REVENUECAT_API_KEY'] ?? '';
+  static String get revenueAndroidApiKey =>
+      dotenv.env['REVENUECAT_ANDROID_API_KEY'] ?? '';
   static const String entitlementId = 'premium';
 
   // Ücretsiz kullanıcı için analiz kredisi

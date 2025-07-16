@@ -5,7 +5,6 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
-
 import 'package:tatarai/core/init/localization/localization_manager.dart';
 import 'package:tatarai/core/services/firebase_manager.dart';
 import 'package:tatarai/core/services/permission_service.dart';
@@ -13,6 +12,7 @@ import 'package:tatarai/core/services/remote_config_service.dart';
 import 'package:tatarai/core/services/service_locator.dart';
 import 'package:tatarai/core/utils/logger.dart';
 import 'package:tatarai/core/utils/network_util.dart';
+
 import '../../features/payment/cubits/payment_cubit.dart';
 
 /// TatarAI uygulamasının başlatma sürecini yöneten Initializer class'ı
@@ -421,10 +421,11 @@ class AppInitializer {
   }
 
   /// Permission Service başlatma
-  Future<void> _initializePermissionService({bool useServiceLocator = true}) async {
+  Future<void> _initializePermissionService(
+      {bool useServiceLocator = true}) async {
     try {
       AppLogger.i('🔐 Permission Service başlatılıyor...');
-      
+
       // Service Locator kullanılabilirse ondan al, yoksa direkt instance oluştur
       final PermissionService permissionService;
       if (useServiceLocator) {
@@ -434,12 +435,27 @@ class AppInitializer {
         permissionService = PermissionService();
         AppLogger.i('🔐 Permission Service direkt instance oluşturuldu');
       }
-      
+
       await permissionService.initialize();
-      
+
+      // iOS için permission registration yapması gerekiyor ki Settings'te görünsün
+      if (Platform.isIOS) {
+        AppLogger.i('🍎 iOS permissions registration başlatılıyor...');
+        
+        // Production builds için aggressive registration kullan
+        if (!kDebugMode) {
+          AppLogger.i('🏭 Production build - aggressive permission registration');
+          await permissionService.aggressiveIOSPermissionRegistration();
+        } else {
+          AppLogger.i('🛠️ Debug build - standard permission registration');
+          await permissionService.registerIOSPermissions();
+        }
+      }
+
       // Note: iOS permissions will be requested on-demand when user tries to use camera/gallery
-      AppLogger.i('🔐 Permission Service initialized - permissions will be requested on-demand');
-      
+      AppLogger.i(
+          '🔐 Permission Service initialized - permissions will be requested on-demand');
+
       AppLogger.i('✅ Permission Service başarıyla başlatıldı');
     } catch (e, stackTrace) {
       AppLogger.e('❌ Permission Service başlatma hatası', e, stackTrace);
